@@ -883,5 +883,6 @@ def sort(args):
 # EXECUTE
 # =======
 
-args = parse()
-args.func(args)
+if __name__ == '__main__':
+    args = parse()
+    args.func(args)

@@ -1,3 +1,10 @@
 #!/usr/bin/env python3
 
-print('hi')
+import smof
+import unittest
+
+class TestSmof(unittest.TestCase):
+    pass
+
+if __name__ == '__main__':
+    unittest.main()
