@@ -19,44 +19,6 @@ def parse():
 
     subparsers = parser.add_subparsers()
 
-    # COMPLEXITY
-    complexity_parser = subparsers.add_parser(
-        'complexity',
-        help='Calculates the complexity of the given sequences'
-    )
-    complexity_parser.add_argument(
-        '-k', '--alphabet-size',
-        help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
-        default=4
-    )
-    complexity_parser.add_argument(
-        '-w', '--window-length',
-        help='Window length (if provided, output will average of window complexities)',
-        default=100
-    )
-    complexity_parser.add_argument(
-        '-m', '--word-length',
-        help='Length of each word',
-        default=1
-    )
-    complexity_parser.add_argument(
-        '-j', '--jump',
-        help='Distance between adjacent windows',
-        default=1
-    )
-    complexity_parser.add_argument(
-        '-o', '--offset',
-        help='Index of start point',
-        default=0
-    )
-    complexity_parser.add_argument(
-        '-d', '--drop',
-        help="Drop sequence if contains this character (e.g. 'X' or 'N')",
-        default=None
-    )
-    complexity_parser.set_defaults(func=complexity)
-
-
     # FSTAT
     fstat_parser = subparsers.add_parser(
         'fstat',
@@ -74,7 +36,6 @@ def parse():
         default=False)
     unmask_parser.set_defaults(func=unmask)
 
-
     # HSTAT
     hstat_parser = subparsers.add_parser(
         'hstat',
@@ -90,7 +51,6 @@ def parse():
         default=False)
     hstat_parser.set_defaults(func=hstat)
 
-
     # IDSEARCH
     idsearch_parser = subparsers.add_parser(
         'idsearch',
@@ -103,7 +63,6 @@ def parse():
         help="Header field value (e.g. '15237703' or 'AT5G64430')")
     idsearch_parser.set_defaults(func=idsearch)
 
-
     # PRETTYPRINT
     prettyprint_parser = subparsers.add_parser(
         'prettyprint',
@@ -114,7 +73,6 @@ def parse():
         type=int,
         default=60)
     prettyprint_parser.set_defaults(func=prettyprint)
-
 
     # QSTAT
     qstat_parser = subparsers.add_parser(
@@ -149,7 +107,6 @@ def parse():
     )
     qstat_parser.set_defaults(func=qstat)
 
-
     # RSEARCH
     rsearch_parser = subparsers.add_parser(
         'rsearch',
@@ -166,7 +123,6 @@ def parse():
         help="Read values from file")
     rsearch_parser.set_defaults(func=rsearch)
 
-
     # SAMPLE
     sample_parser = subparsers.add_parser(
         'sample',
@@ -178,7 +134,6 @@ def parse():
         default=1)
     sample_parser.set_defaults(func=sample)
 
-
     # SORT
     sort_parser = subparsers.add_parser(
         'sort',
@@ -188,7 +143,6 @@ def parse():
         help="Header fields by which to sort sequences",
         nargs='+')
     sort_parser.set_defaults(func=sort)
-
 
     # SEARCH
     search_parser = subparsers.add_parser(
@@ -211,7 +165,6 @@ def parse():
     )
     search_parser.set_defaults(func=search)
 
-
     # SPLIT
     split_parser = subparsers.add_parser(
         'split',
@@ -228,7 +181,6 @@ def parse():
     )
     split_parser.set_defaults(func=split)
 
-
     # SUBSEQ
     subseq_parser = subparsers.add_parser(
         'subseq',
@@ -244,8 +196,6 @@ def parse():
         action='store_true',
         default=False)
     subseq_parser.set_defaults(func=subseq)
-
-
 
     # FSUBSEQ
     fsubseq_parser = subparsers.add_parser(
@@ -266,8 +216,6 @@ def parse():
         default=-1)
     fsubseq_parser.set_defaults(func=fsubseq)
 
-
-
     # FASTA2CSV
     fasta2csv_parser = subparsers.add_parser(
         'fasta2csv',
@@ -286,8 +234,6 @@ def parse():
         help='Extract given fields from the header',
         nargs='+')
     fasta2csv_parser.set_defaults(func=fasta2csv)
-
-
 
     # PERM
     perm_parser = subparsers.add_parser(
@@ -318,7 +264,6 @@ def parse():
     )
     perm_parser.set_defaults(func=perm)
 
-
     # Simplifyheader
     simplifyheader_parser = subparsers.add_parser(
         'simplifyheader',
@@ -336,8 +281,6 @@ def parse():
         'reverse',
         help="Reverse each sequence")
     reverse_parser.set_defaults(func=reverse)
-
-
 
     # TRANSLATE
     translate_parser = subparsers.add_parser(
@@ -371,6 +314,9 @@ def parse():
         default=False
     )
 
+    if(len(sys.argv) == 1):
+        parser.print_help()
+        raise SystemExit
 
     args = parser.parse_args()
 
@@ -547,52 +493,6 @@ def csvrowGenerator(filename):
 # ====================
 # ONE-BY-ONE FUNCTIONS
 # ====================
-
-def complexity(args):
-    try:
-        w = int(args.window_length)
-        m = int(args.word_length)
-        k = pow(int(args.alphabet_size), m)
-        p = int(args.jump)
-        offset = int(args.offset)
-    except ValueError:
-        print('All values must be integers')
-        raise SystemExit
-
-    # Calculates the variable component of a single window's score
-    def varscore_generator(seq, words):
-        for i in range(offset, len(seq) - w + 1, p):
-            counts = defaultdict(int)
-            for j in range(i, i+w):
-                try:
-                    counts[words[j]] += 1
-                except IndexError:
-                    break
-            yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-    w_fact = math.log(math.factorial(w), k)
-
-    seq_id = 0
-    for seq in FSeqGenerator().next():
-        seq_id += 1
-        mean = 'NA'
-        var = 'NA'
-        if(len(seq.seq) < w + offset): pass
-        elif(args.drop and args.drop in seq.seq): pass
-        else:
-            words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-            varscores = tuple(score for score in varscore_generator(seq.seq, words))
-            winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-            mean = sum(winscores) / len(winscores)
-            try:
-                var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-            except ZeroDivisionError:
-                var = 'NA'
-            try:
-                col1 = seq.getvalue('gb', quiet=True)
-            except:
-                col1 = seq_id
-            print("{},{},{}".format(col1, mean, var))
 
 def fasta2csv(args):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
