@@ -348,6 +348,7 @@ class FSeqGenerator:
 class FSeq:
     # The translator for taking reverse complements
     revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
+
     def __init__(self, header, seq):
         self.seq = seq
         self.header = header
@@ -372,6 +373,8 @@ class FSeq:
                 self.headerfields[fields[i].strip()] = fields[i+1].strip()
 
     def has_field(self, field):
+        if(not self.headerfields):
+            self.parse_header()
         if field in self.headerfields:
             return True
         else:
@@ -407,11 +410,12 @@ class FSeq:
         simply counts the number of lowercase characters.
         '''
         # ASCII values: (97-122 for a-z), (65-90 for A-Z)
-        nmasked = sum([c > 90 for c in self.seq.encode('ascii')])
+        nmasked = sum(c > 90 for c in self.seq.encode('ascii'))
         return(nmasked)
+
     def subseq(self, a, b):
         try:
-            return(self.seq[a,b])
+            return(self.seq[a:b])
         except IndexError as e:
             print("Cannot extract subsequence ({}, {}) from".format(a,b))
             print('>' + self.header)
@@ -429,7 +433,6 @@ class FSeq:
             out.append(self.seq[i:i + column_width])
         outstr = '\n'.join(out)
         return(outstr)
-
 
     @classmethod
     def getrevcomp(cls, seq):
