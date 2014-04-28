@@ -1,11 +1,9 @@
 #! /usr/bin/python3
 
-import argparse
 import csv
 import random
 import re
 import sys
-import math
 import string
 from collections import defaultdict
 
@@ -14,6 +12,7 @@ from collections import defaultdict
 # ================
 
 def parse(argv=None):
+    import argparse
     parser = argparse.ArgumentParser(prog='smof')
 
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
@@ -30,6 +29,37 @@ def parse(argv=None):
     # )
 
     subparsers = parser.add_subparsers()
+
+    chsum_parser = subparsers.add_parser(
+        'chksum',
+        help="Calculate an md5 checksum for the input sequences"
+    )
+    method = chsum_parser.add_mutually_exclusive_group(required=False)
+    method.add_argument(
+        '-w', '--whole-file',
+        help='Calculate single md5sum for all headers and sequences (default action)',
+        action='store_true',
+        default=False
+    )
+    method.add_argument(
+        '-q', '--each-sequence',
+        help='Calculate md5sum for each sequence, write as TAB delimited list',
+        action='store_true',
+        default=False
+    )
+    method.add_argument(
+        '-s', '--all-sequences',
+        help='Calculate single md5sum for all sequences',
+        action='store_true',
+        default=False
+    )
+    method.add_argument(
+        '-d', '--all-headers',
+        help='Calculate single md5sum for all headers',
+        action='store_true',
+        default=False
+    )
+    chsum_parser.set_defaults(func=chsum)
 
     # FSTAT
     fstat_parser = subparsers.add_parser(
@@ -545,7 +575,34 @@ def csvrowGenerator(filename):
 # ONE-BY-ONE FUNCTIONS
 # ====================
 
-def fasta2csv(args, gen=FSeqGenerator()):
+def chsum(args, gen):
+    '''
+    Prints various hashes of the input fasta file
+    '''
+    import hashlib
+    h = hashlib.md5()
+    # Hash the sequences only (in input order)
+    if(args.all_sequences):
+        fun = lambda s: h.update(s.seq.encode('ascii'))
+    # Hash the headers only (in input order)
+    elif(args.all_headers):
+        fun = lambda s: h.update(s.header.encode('ascii'))
+    # Write <header>\t<sequence hash> for each sequence
+    elif(args.each_sequence):
+        fun = lambda s: print('\t'.join((s.header, hashlib.md5(s.seq.encode('ascii')).hexdigest())))
+    # DEFAULT: Hash each header-sequence pair
+    else:
+        fun = lambda s: h.update('\n'.join((s.header, s.seq)).encode('ascii'))
+
+    for seq in gen.next():
+        fun(seq)
+
+    # Print output hash for cumulative options
+    if not args.each_sequence:
+        print(h.hexdigest())
+
+
+def fasta2csv(args, gen):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
     out = []
     if(args.header):
@@ -560,7 +617,7 @@ def fasta2csv(args, gen=FSeqGenerator()):
             elements = [seq.header]
         w.writerow(tuple(elements + [seq.seq]))
 
-def fstat(args, gen=FSeqGenerator()):
+def fstat(args, gen):
     stats = Stat()
     nseqs = 0
     nchars = 0
@@ -574,7 +631,7 @@ def fstat(args, gen=FSeqGenerator()):
     print("nchars: {}".format(nchars))
     print("mean length: {}".format(round(nchars/nseqs, 4)))
 
-def hstat(args, gen=FSeqGenerator()):
+def hstat(args, gen):
     ''' Writes chosen header and seq length data to csv '''
     fieldnames = list(args.fields)
     if(args.length):
@@ -589,14 +646,14 @@ def hstat(args, gen=FSeqGenerator()):
             row['length'] = len(seq.seq)
         w.writerow(row)
 
-def idsearch(args, gen=FSeqGenerator()):
+def idsearch(args, gen):
     ''' Print entries whose headers contain a field with a given value '''
     # TODO make mass search
     for seq in gen.next():
         if(seq.field_is(args.field, args.value)):
             seq.print()
 
-def perm(args, gen=FSeqGenerator()):
+def perm(args, gen):
     w = args.word_size
     start = args.start_offset
     end = args.end_offset
@@ -617,12 +674,12 @@ def perm(args, gen=FSeqGenerator()):
             header=seq.header
         FSeq(header, out).print()
 
-def prettyprint(args, gen=FSeqGenerator()):
+def prettyprint(args, gen):
     ''' Print each sequence with even columns of length cwidth '''
     for seq in gen.next():
         seq.print(args.cwidth)
 
-def qstat(args, gen=FSeqGenerator()):
+def qstat(args, gen):
     class Result:
         def __init__(self, seq, args):
             self.stats = self._getstats(seq, args)
@@ -673,13 +730,13 @@ def qstat(args, gen=FSeqGenerator()):
     w.writeheader()
     [ w.writerow(r.getdict(charset)) for r in results ]
 
-def reverse(args, gen=FSeqGenerator()):
+def reverse(args, gen):
     ''' Reverse each sequence '''
     for seq in gen.next():
         rseq = FSeq(seq.header, seq.seq[::-1])
         rseq.print()
 
-def rsearch(args, gen=FSeqGenerator()):
+def rsearch(args, gen):
     '''
     Extracts sequences matching a certain pattern
     '''
@@ -705,7 +762,7 @@ def rsearch(args, gen=FSeqGenerator()):
         if(match in values):
             seq.print()
 
-def search(args, gen=FSeqGenerator()):
+def search(args, gen):
     ''' Print entries whose headers contain a given pattern '''
     # TODO add highlighting
     prog = re.compile(args.pattern)
@@ -720,7 +777,7 @@ def search(args, gen=FSeqGenerator()):
         elif(not hasmatch and args.invert):
             seq.print()
 
-def simplifyheader(args, gen=FSeqGenerator()):
+def simplifyheader(args, gen):
     if(hasattr(args.fields, '__upper__')):
         args.fields = (args.fields, )
     for seq in gen.next():
@@ -729,7 +786,7 @@ def simplifyheader(args, gen=FSeqGenerator()):
         header = '|'.join(pairs)
         FSeq(header, seq.seq).print()
 
-def split(args, gen=FSeqGenerator()):
+def split(args, gen):
     k = int(args.nfiles)
     p = args.prefix
     seqs = []
@@ -743,7 +800,7 @@ def split(args, gen=FSeqGenerator()):
             for seq in (seqs[x] for x in range(begin, end)):
                 fo.write(seq.get_pretty_string() + '\n')
 
-def subseq(args, gen=FSeqGenerator()):
+def subseq(args, gen):
     ''' Index starting from 1 (not 0) '''
     for seq in gen.next():
         a = args.bounds[0]
@@ -762,7 +819,7 @@ def subseq(args, gen=FSeqGenerator()):
             newseq = seq.seq[a-1:b]
         FSeq(seq.header, newseq).print()
 
-def tounk(args, gen=FSeqGenerator()):
+def tounk(args, gen):
     if(args.type.lower()[0] in ['a', 'p']):
         irr = args.pir
         unk = args.punk
@@ -776,7 +833,7 @@ def tounk(args, gen=FSeqGenerator()):
         seq.seq = seq.seq.translate(trans)
         seq.print()
 
-def fsubseq(args, gen=FSeqGenerator()):
+def fsubseq(args, gen):
     '''
     Extracts many subsequences. Positional argument 'file'
     '''
@@ -819,7 +876,7 @@ def fsubseq(args, gen=FSeqGenerator()):
                     newseq = seq.seq[(a-1):b]
                 FSeq(seq.header, newseq).print()
 
-def unmask(args, gen=FSeqGenerator()):
+def unmask(args, gen):
     ''' Converts to upcase '''
     for seq in gen.next():
         if(args.to_x):
@@ -833,13 +890,13 @@ def unmask(args, gen=FSeqGenerator()):
 # FULL FUNCTIONS
 # ==============
 
-def sample(args, gen=FSeqGenerator()):
+def sample(args, gen):
     ''' Randomly sample n entries from input file '''
     seqs = [s for s in gen.next()]
     sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
     [seqs[i].print() for i in sample_indices]
 
-def sort(args, gen=FSeqGenerator()):
+def sort(args, gen):
     seqs = [s for s in gen.next()]
     seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
     [s.print() for s in seqs]
@@ -850,5 +907,6 @@ def sort(args, gen=FSeqGenerator()):
 # =======
 
 if __name__ == '__main__':
+    gen = FSeqGenerator()
     args = parse()
-    args.func(args)
+    args.func(args, gen)
