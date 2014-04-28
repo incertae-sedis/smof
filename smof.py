@@ -13,10 +13,21 @@ from collections import defaultdict
 # Argument Parsing
 # ================
 
-def parse():
+def parse(argv=None):
     parser = argparse.ArgumentParser(prog='smof')
 
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
+
+    # parser.add_argument(
+    #     'input',
+    #     nargs='?',
+    #     default=sys.stdin
+    # )
+    # parser.add_argument(
+    #     'output',
+    #     nargs='?',
+    #     default=sys.stdout
+    # )
 
     subparsers = parser.add_subparsers()
 
@@ -356,7 +367,7 @@ def parse():
         parser.print_help()
         raise SystemExit
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     return(args)
 
@@ -534,7 +545,7 @@ def csvrowGenerator(filename):
 # ONE-BY-ONE FUNCTIONS
 # ====================
 
-def fasta2csv(args):
+def fasta2csv(args, gen=FSeqGenerator()):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
     out = []
     if(args.header):
@@ -542,18 +553,18 @@ def fasta2csv(args):
             w.writerow(args.fields + ['seq'])
         else:
             w.writerow(['header', 'seq'])
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         if(args.fields):
             elements = [seq.getvalue(field) for field in args.fields]
         else:
             elements = [seq.header]
         w.writerow(tuple(elements + [seq.seq]))
 
-def fstat(args):
+def fstat(args, gen=FSeqGenerator()):
     stats = Stat()
     nseqs = 0
     nchars = 0
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         nseqs += 1
         nchars += len(seq.seq)
         stats.update_counts(seq)
@@ -563,14 +574,14 @@ def fstat(args):
     print("nchars: {}".format(nchars))
     print("mean length: {}".format(round(nchars/nseqs, 4)))
 
-def hstat(args):
+def hstat(args, gen=FSeqGenerator()):
     ''' Writes chosen header and seq length data to csv '''
     fieldnames = list(args.fields)
     if(args.length):
         fieldnames.append('length')
     w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
     w.writeheader()
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         row = {}
         for field in args.fields:
             row[field] = seq.getvalue(field)
@@ -578,18 +589,18 @@ def hstat(args):
             row['length'] = len(seq.seq)
         w.writerow(row)
 
-def idsearch(args):
+def idsearch(args, gen=FSeqGenerator()):
     ''' Print entries whose headers contain a field with a given value '''
     # TODO make mass search
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         if(seq.field_is(args.field, args.value)):
             seq.print()
 
-def perm(args):
+def perm(args, gen=FSeqGenerator()):
     w = args.word_size
     start = args.start_offset
     end = args.end_offset
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         s = seq.seq
         L = len(s)
         prefix = s[0:start]
@@ -606,12 +617,12 @@ def perm(args):
             header=seq.header
         FSeq(header, out).print()
 
-def prettyprint(args):
+def prettyprint(args, gen=FSeqGenerator()):
     ''' Print each sequence with even columns of length cwidth '''
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         seq.print(args.cwidth)
 
-def qstat(args):
+def qstat(args, gen=FSeqGenerator()):
     class Result:
         def __init__(self, seq, args):
             self.stats = self._getstats(seq, args)
@@ -649,7 +660,7 @@ def qstat(args):
 
     results = []
     # Fill a list with Stat objects
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         # Trim the beginning and end of the sequence, as specified
         trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
         seq = FSeq(seq.header, trunc_seq)
@@ -662,13 +673,13 @@ def qstat(args):
     w.writeheader()
     [ w.writerow(r.getdict(charset)) for r in results ]
 
-def reverse(args):
+def reverse(args, gen=FSeqGenerator()):
     ''' Reverse each sequence '''
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         rseq = FSeq(seq.header, seq.seq[::-1])
         rseq.print()
 
-def rsearch(args):
+def rsearch(args, gen=FSeqGenerator()):
     '''
     Extracts sequences matching a certain pattern
     '''
@@ -680,7 +691,7 @@ def rsearch(args):
     if(args.values):
         values.update(args.values)
     pat = re.compile(args.pattern)
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         m = re.search(pat, seq.header)
         # If no match
         if(not m):
@@ -694,11 +705,11 @@ def rsearch(args):
         if(match in values):
             seq.print()
 
-def search(args):
+def search(args, gen=FSeqGenerator()):
     ''' Print entries whose headers contain a given pattern '''
     # TODO add highlighting
     prog = re.compile(args.pattern)
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         if(args.seq):
             searchseq = seq.seq
         else:
@@ -709,20 +720,20 @@ def search(args):
         elif(not hasmatch and args.invert):
             seq.print()
 
-def simplifyheader(args):
+def simplifyheader(args, gen=FSeqGenerator()):
     if(hasattr(args.fields, '__upper__')):
         args.fields = (args.fields, )
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         values = [seq.getvalue(field) for field in args.fields]
         pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
         header = '|'.join(pairs)
         FSeq(header, seq.seq).print()
 
-def split(args):
+def split(args, gen=FSeqGenerator()):
     k = int(args.nfiles)
     p = args.prefix
     seqs = []
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         seqs.append(seq)
     for i in range(0, k):
         begin = i * (len(seqs) // k + 1)
@@ -732,9 +743,9 @@ def split(args):
             for seq in (seqs[x] for x in range(begin, end)):
                 fo.write(seq.get_pretty_string() + '\n')
 
-def subseq(args):
+def subseq(args, gen=FSeqGenerator()):
     ''' Index starting from 1 (not 0) '''
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         a = args.bounds[0]
         b = args.bounds[1]
         # If a > b, take reverse complement if that option is enabled,
@@ -751,7 +762,7 @@ def subseq(args):
             newseq = seq.seq[a-1:b]
         FSeq(seq.header, newseq).print()
 
-def tounk(args):
+def tounk(args, gen=FSeqGenerator()):
     if(args.type.lower()[0] in ['a', 'p']):
         irr = args.pir
         unk = args.punk
@@ -761,11 +772,11 @@ def tounk(args):
     if(args.lc):
         irr = ''.join(set(irr) | set(string.ascii_lowercase))
     trans = str.maketrans(irr, unk * len(irr))
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         seq.seq = seq.seq.translate(trans)
         seq.print()
 
-def fsubseq(args):
+def fsubseq(args, gen=FSeqGenerator()):
     '''
     Extracts many subsequences. Positional argument 'file'
     '''
@@ -789,7 +800,7 @@ def fsubseq(args):
             sys.exit()
         bounds[pat].append((a,b))
 
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         for pat in bounds.keys():
             if(not re.search(pat, seq.header)):
                 continue
@@ -808,9 +819,9 @@ def fsubseq(args):
                     newseq = seq.seq[(a-1):b]
                 FSeq(seq.header, newseq).print()
 
-def unmask(args):
+def unmask(args, gen=FSeqGenerator()):
     ''' Converts to upcase '''
-    for seq in FSeqGenerator().next():
+    for seq in gen.next():
         if(args.to_x):
             unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
         else:
@@ -822,13 +833,14 @@ def unmask(args):
 # FULL FUNCTIONS
 # ==============
 
-def sample(args):
+def sample(args, gen=FSeqGenerator()):
     ''' Randomly sample n entries from input file '''
-    seqs = [s for s in FSeqGenerator().next()]
+    seqs = [s for s in gen.next()]
     sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
     [seqs[i].print() for i in sample_indices]
-def sort(args):
-    seqs = [s for s in FSeqGenerator().next()]
+
+def sort(args, gen=FSeqGenerator()):
+    seqs = [s for s in gen.next()]
     seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
     [s.print() for s in seqs]
 
