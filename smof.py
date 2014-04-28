@@ -6,6 +6,7 @@ import random
 import re
 import sys
 import math
+import string
 from collections import defaultdict
 
 # ================
@@ -62,6 +63,43 @@ def parse():
         'value',
         help="Header field value (e.g. '15237703' or 'AT5G64430')")
     idsearch_parser.set_defaults(func=idsearch)
+
+    # tounk
+    tounk_parser = subparsers.add_parser(
+        'tounk',
+        help='Convert irregular characters to unknown character'
+    )
+    tounk_parser.add_argument(
+        '-t', '--type',
+        help='Sequence type [n, p]'
+    )
+    tounk_parser.add_argument(
+        '-l', '--lc',
+        help='Convert lower-case to unknown',
+        action='store_true',
+        default=False
+    )
+    tounk_parser.add_argument(
+        '--nir',
+        help='Nucleotide irregulars [default=(not ACGT)]',
+        default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
+    )
+    tounk_parser.add_argument(
+        '--pir',
+        help='Protein irregulars [default=BJOUZbjouz]',
+        default='BJOUXZbjouxz'
+    )
+    tounk_parser.add_argument(
+        '--nunk',
+        help='Nucleotide unknown character (default=N)',
+        default='N'
+    )
+    tounk_parser.add_argument(
+        '--punk',
+        help='Protein unknown character (default=X)',
+        default='X'
+    )
+    tounk_parser.set_defaults(func=tounk)
 
     # PRETTYPRINT
     prettyprint_parser = subparsers.add_parser(
@@ -348,7 +386,6 @@ class FSeqGenerator:
 class FSeq:
     # The translator for taking reverse complements
     revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
-
     def __init__(self, header, seq):
         self.seq = seq
         self.header = header
@@ -713,6 +750,20 @@ def subseq(args):
         else:
             newseq = seq.seq[a-1:b]
         FSeq(seq.header, newseq).print()
+
+def tounk(args):
+    if(args.type.lower()[0] in ['a', 'p']):
+        irr = args.pir
+        unk = args.punk
+    elif(args.type.lower()[0] in ['n', 'd']):
+        irr = args.nir
+        unk = args.nunk
+    if(args.lc):
+        irr = ''.join(set(irr) | set(string.ascii_lowercase))
+    trans = str.maketrans(irr, unk * len(irr))
+    for seq in FSeqGenerator().next():
+        seq.seq = seq.seq.translate(trans)
+        seq.print()
 
 def fsubseq(args):
     '''
