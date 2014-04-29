@@ -37,6 +37,12 @@ def parse(argv=None):
         usage=genusage.format('chksum'),
         help="Calculate an md5 checksum for the input sequences"
     )
+    chsum_parser.add_argument(
+        '-i', '--ignore-case',
+        help='Convert all to uppercase, before hashing',
+        action='store_true',
+        default=False
+    )
     method = chsum_parser.add_mutually_exclusive_group(required=False)
     method.add_argument(
         '-w', '--whole-file',
@@ -575,6 +581,12 @@ class FSeq:
         outstr = '\n'.join(out)
         return(outstr)
 
+    def seq_upper(self):
+        self.seq = self.seq.upper()
+
+    def header_upper(self):
+        self.header = self.header.upper()
+
     @classmethod
     def getrevcomp(cls, seq):
         return(seq[::-1].translate(FSeq.revcomp_translator))
@@ -700,6 +712,11 @@ def chsum(args, gen):
         fun = lambda s: h.update('\n'.join((s.header, s.seq)).encode('ascii'))
 
     for seq in gen.next():
+        if args.ignore_case:
+            if args.all_headers or args.whole_file :
+                seq.header_upper()
+            if not args.all_headers:
+                seq.seq_upper()
         fun(seq)
 
     # Print output hash for cumulative options
