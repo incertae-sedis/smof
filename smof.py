@@ -248,12 +248,18 @@ def parse(argv=None):
     search_parser.add_argument(
         '-i', '--invert',
         help="Drop all not matching the pattern",
-        action='store_false',
-        default=True
+        action='store_true',
+        default=False
     )
     search_parser.add_argument(
-        '-s', '--seq',
+        '-q', '--seq',
         help='Search for pattern in the sequence',
+        action='store_true',
+        default=False
+    )
+    search_parser.add_argument(
+        '-c', '--color',
+        help='Highlight the matched sequence',
         action='store_true',
         default=False
     )
@@ -600,6 +606,12 @@ class ColorString:
             self.seq[i][0] = col
 
     def print(self, colwidth=None):
+        lastcol = self.seq[0][0]
+        for i in range(1, len(self.seq)):
+            if(self.seq[i][0] == lastcol):
+                self.seq[i][0] = ''
+            else:
+                lastcol = self.seq[i][0]
         for i in range(len(self.seq)):
             print(''.join(self.seq[i]), end='')
             if(colwidth and i % colwidth == 0 and i != 0):
@@ -852,19 +864,23 @@ def retrieve(args, gen):
             seq.print()
 
 def search(args, gen):
-    ''' Print entries whose headers contain a given pattern '''
-    # TODO add highlighting
+    '''
+    Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
+    '''
     prog = re.compile(args.pattern)
     for seq in gen.next():
-        if(args.seq):
-            searchseq = seq.seq
-        else:
-            searchseq = seq.header
-        hasmatch = prog.search(searchseq) is None
-        if(hasmatch and not args.invert):
-            seq.print()
-        elif(not hasmatch and args.invert):
-            seq.print()
+        text = seq.seq if args.seq else seq.header
+        m = prog.search(text)
+        if (not m and not args.invert) or (m and args.invert):
+            continue
+        if(args.color and not args.invert):
+            if(args.seq):
+                seq.colseq.setseq(text)
+                seq.colseq.colormatch(prog)
+            else:
+                seq.colheader.setseq(text)
+                seq.colheader.colormatch(prog)
+        seq.print()
 
 def simplifyheader(args, gen):
     if(hasattr(args.fields, '__upper__')):
