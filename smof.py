@@ -7,7 +7,7 @@ import sys
 import string
 from collections import defaultdict
 
-__version__ = "1.0.1"
+__version__ = "1.0"
 
 # ================
 # Argument Parsing
