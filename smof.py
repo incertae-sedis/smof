@@ -17,19 +17,9 @@ def parse(argv=None):
 
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
 
-    # parser.add_argument(
-    #     'input',
-    #     nargs='?',
-    #     default=sys.stdin
-    # )
-    # parser.add_argument(
-    #     'output',
-    #     nargs='?',
-    #     default=sys.stdout
-    # )
-
     subparsers = parser.add_subparsers()
 
+    # CHSUM
     chsum_parser = subparsers.add_parser(
         'chksum',
         help="Calculate an md5 checksum for the input sequences"
@@ -186,21 +176,46 @@ def parse(argv=None):
     )
     qstat_parser.set_defaults(func=qstat)
 
-    # RSEARCH
-    rsearch_parser = subparsers.add_parser(
-        'rsearch',
-        help="Mass extract of sequences from regex header search")
-    rsearch_parser.add_argument(
+    # RETRIEVE
+    retrieve_parser = subparsers.add_parser(
+        'retrieve',
+        help="Retrieve sequences with matches pattern"
+    )
+    retrieve_parser.add_argument(
         '-p', '--pattern',
-        help="Perl regex pattern containing one set of parentheses")
-    rsearch_parser.add_argument(
-        '-v', '--values',
-        help="The acceptable values for the parenthesized group",
-        nargs='+')
-    rsearch_parser.add_argument(
-        '-f', '--valuefile',
-        help="Read values from file")
-    rsearch_parser.set_defaults(func=rsearch)
+        help="Perl regular expressions",
+        nargs='+'
+    )
+    retrieve_parser.add_argument(
+        '-P', '--patternfile',
+        help="Perl regular expressions"
+    )
+    retrieve_parser.add_argument(
+        '-g', '--groups',
+        help="The acceptable values for parenthesized groups",
+        nargs='*'
+    )
+    retrieve_parser.add_argument(
+        '-G', '--groupfile',
+        help="Read values from file"
+    )
+    retrieve_parser.add_argument(
+        '-v', '--invert',
+        help="Write sequences that don't match"
+    )
+    retrieve_parser.add_argument(
+        '-q', '--match-sequence',
+        help='Match sequence rather than header',
+        action='store_true',
+        default=False
+    )
+    retrieve_parser.add_argument(
+        '-c', '--color',
+        help='Color match',
+        action='store_true',
+        default=False
+    )
+    retrieve_parser.set_defaults(func=retrieve)
 
     # SAMPLE
     sample_parser = subparsers.add_parser(
@@ -431,6 +446,8 @@ class FSeq:
         self.seq = seq
         self.header = header
         self.headerfields = {}
+        self.colseq = ColorString()
+        self.colheader = ColorString()
 
     def parse_header(self):
         '''
@@ -502,9 +519,17 @@ class FSeq:
             print('>' + self.header)
 
     def print(self, column_width=80):
-        print('>' + self.header)
+        if self.colheader.seq:
+            self.colheader.print(column_width)
+        else:
+            print('>' + self.header)
         for i in range(0, len(self.seq), column_width):
-            print(self.seq[i:i + column_width])
+            if self.colseq.seq:
+                self.colseq.print(column_width)
+                break
+            else:
+                print(self.seq[i:i + column_width])
+
     def get_pretty_string(self, column_width=80):
         out = ['>' + self.header]
         for i in range(0, len(self.seq), column_width):
@@ -553,6 +578,42 @@ class Stat:
             charset.update(s.counts.keys())
         return(charset)
 
+class Colors:
+    HIGHLIGHT = chr(27) + '[32m'
+    BACKGROUND = chr(27) + '[0m'
+
+class ColorString:
+    def __init__(self,
+                 bgcolor=Colors.BACKGROUND,
+                 default=Colors.HIGHLIGHT):
+        self.bgcolor = bgcolor
+        self.default = default
+        self.seq = []
+
+    def setseq(self, seq):
+        if not self.seq:
+            self.seq = [[self.bgcolor, s] for s in seq]
+
+    def colorpos(self, pos, col=None):
+        col = self.default if not col else col
+        for i in pos:
+            self.seq[i][0] = col
+
+    def print(self, colwidth=None):
+        for i in range(len(self.seq)):
+            print(''.join(self.seq[i]), end='')
+            if(colwidth and i % colwidth == 0 and i != 0):
+                print()
+        print()
+
+    def colormatch(self, pattern, col=None):
+        col = self.default if not col else col
+        s = ''.join([x[1] for x in self.seq])
+        for m in re.compile(pattern).finditer(s):
+            a = m.start()
+            b = m.start() + len(m.group())
+            self.colorpos(list(range(a,b)), col)
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -600,7 +661,6 @@ def chsum(args, gen):
     # Print output hash for cumulative options
     if not args.each_sequence:
         print(h.hexdigest())
-
 
 def fasta2csv(args, gen):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
@@ -736,30 +796,59 @@ def reverse(args, gen):
         rseq = FSeq(seq.header, seq.seq[::-1])
         rseq.print()
 
-def rsearch(args, gen):
+def retrieve(args, gen):
     '''
     Extracts sequences matching a certain pattern
     '''
-    values = set()
-    if(args.valuefile):
-        with open(args.valuefile) as f:
-            filevalues = [line.rstrip('\n') for line in f.readlines()]
-            values.update(filevalues)
-    if(args.values):
-        values.update(args.values)
-    pat = re.compile(args.pattern)
+    def getset(values, filename):
+        s = set()
+        if filename:
+            with open(filename, 'r') as f:
+                s.update([line.rstrip('\n') for line in f.readlines()])
+        if values:
+            s.update(values)
+        return(s)
+
+    groups = getset(args.groups, args.groupfile)
+    pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
+
+    if(len(pat) > 1 and groups):
+        print('Cannot process multiple patterns with groups', file=sys.stderr)
+        raise SystemExit
+    if not pat:
+        print('Please provide a pattern (-p <regex>)', file=sys.stderr)
+
     for seq in gen.next():
-        m = re.search(pat, seq.header)
-        # If no match
-        if(not m):
-            continue
-        try:
-            # If at least one group defined
-            match = m.group(1)
-        except:
-            # If no groups defined
-            match = m.group(0)
-        if(match in values):
+        if(args.match_sequence):
+            text = seq.seq
+        else:
+            text = seq.header
+        for p in pat:
+            m = re.search(p, text)
+            if not m and not args.invert:
+                continue
+            elif groups:
+                try:
+                    # If at least one group defined
+                    match = m.group(1)
+                except:
+                    # If no groups defined
+                    match = m.group(0)
+                if (match in groups and args.invert) or \
+                   (match not in groups and not args.invert):
+                    continue
+            if not args.color or args.invert:
+                seq.print()
+                break
+            # KLUDGE, TODO: Make seq and header classes
+            else:
+                if(args.match_sequence):
+                    seq.colseq.setseq(text)
+                    seq.colseq.colormatch(p)
+                else:
+                    seq.colheader.setseq(text)
+                    seq.colheader.colormatch(p)
+        if(seq.colseq.seq or seq.colheader.seq):
             seq.print()
 
 def search(args, gen):
@@ -835,7 +924,7 @@ def tounk(args, gen):
 
 def fsubseq(args, gen):
     '''
-    Extracts many subsequences. Positional argument 'file'
+    Extracts many subsequences. Positional argument file
     '''
     bounds = defaultdict(list)
     for row in csvrowGenerator(args.file):
