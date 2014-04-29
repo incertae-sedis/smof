@@ -7,21 +7,34 @@ import sys
 import string
 from collections import defaultdict
 
+__version__ = "1.0.1"
+
 # ================
 # Argument Parsing
 # ================
 
 def parse(argv=None):
     import argparse
-    parser = argparse.ArgumentParser(prog='smof')
+    parser = argparse.ArgumentParser(
+        prog='smof',
+        usage='<fastafile> | smof <subcommand> <options>',
+        description='Tools for studying and manipulating fasta files')
 
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0')
+    parser.add_argument(
+        '-v', '--version',
+        action='version',
+        version='%(prog)s {}'.format(__version__))
 
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(
+        metavar='[ for help on each: smof <subcommand> -h ]',
+        title='subcommands')
+
+    genusage = '<fastafile> | smof {} <options>'
 
     # CHSUM
     chsum_parser = subparsers.add_parser(
         'chksum',
+        usage=genusage.format('chksum'),
         help="Calculate an md5 checksum for the input sequences"
     )
     method = chsum_parser.add_mutually_exclusive_group(required=False)
@@ -54,12 +67,14 @@ def parse(argv=None):
     # FSTAT
     fstat_parser = subparsers.add_parser(
         'fstat',
+        usage=genusage.format('fstat'),
         help="Provides total counts for file sequence characters")
     fstat_parser.set_defaults(func=fstat)
 
     # UNMASK
     unmask_parser = subparsers.add_parser(
         'unmask',
+        usage=genusage.format('unmask'),
         help="Converts all letters to uppercase")
     unmask_parser.add_argument(
         '-x', '--to-x',
@@ -71,6 +86,7 @@ def parse(argv=None):
     # HSTAT
     hstat_parser = subparsers.add_parser(
         'hstat',
+        usage=genusage.format('hstat'),
         help="Extract info from headers (also seq length)")
     hstat_parser.add_argument(
         'fields',
@@ -86,6 +102,7 @@ def parse(argv=None):
     # IDSEARCH
     idsearch_parser = subparsers.add_parser(
         'idsearch',
+        usage=genusage.format('idsearch'),
         help='Find sequences by field/value pair')
     idsearch_parser.add_argument(
         'field',
@@ -98,6 +115,7 @@ def parse(argv=None):
     # tounk
     tounk_parser = subparsers.add_parser(
         'tounk',
+        usage=genusage.format('tounk'),
         help='Convert irregular characters to unknown character'
     )
     tounk_parser.add_argument(
@@ -135,6 +153,7 @@ def parse(argv=None):
     # PRETTYPRINT
     prettyprint_parser = subparsers.add_parser(
         'prettyprint',
+        usage=genusage.format('prettyprint'),
         help='Prints fasta file in neat columns')
     prettyprint_parser.add_argument(
         'cwidth',
@@ -146,6 +165,7 @@ def parse(argv=None):
     # QSTAT
     qstat_parser = subparsers.add_parser(
         'qstat',
+        usage=genusage.format('qstat'),
         help="Gathers statistics on each sequence")
     qstat_parser.add_argument(
         '-f', '--fields',
@@ -179,6 +199,7 @@ def parse(argv=None):
     # RETRIEVE
     retrieve_parser = subparsers.add_parser(
         'retrieve',
+        usage=genusage.format('retrieve'),
         help="Retrieve sequences with matches pattern"
     )
     retrieve_parser.add_argument(
@@ -220,6 +241,7 @@ def parse(argv=None):
     # SAMPLE
     sample_parser = subparsers.add_parser(
         'sample',
+        usage=genusage.format('sample'),
         help="Randomly select entries from fasta file")
     sample_parser.add_argument(
         'n',
@@ -231,6 +253,7 @@ def parse(argv=None):
     # SORT
     sort_parser = subparsers.add_parser(
         'sort',
+        usage=genusage.format('sort'),
         help="Sort sequences by given fields")
     sort_parser.add_argument(
         'fields',
@@ -241,6 +264,7 @@ def parse(argv=None):
     # SEARCH
     search_parser = subparsers.add_parser(
         'search',
+        usage=genusage.format('search'),
         help='Search for pattern')
     search_parser.add_argument(
         'pattern',
@@ -268,6 +292,7 @@ def parse(argv=None):
     # SPLIT
     split_parser = subparsers.add_parser(
         'split',
+        usage=genusage.format('split'),
         help='Split a multifasta file into k smaller filers'
     )
     split_parser.add_argument(
@@ -284,6 +309,7 @@ def parse(argv=None):
     # SUBSEQ
     subseq_parser = subparsers.add_parser(
         'subseq',
+        usage=genusage.format('subseq'),
         help="Extract subsequence from each entry")
     subseq_parser.add_argument(
         'bounds',
@@ -300,6 +326,7 @@ def parse(argv=None):
     # FSUBSEQ
     fsubseq_parser = subparsers.add_parser(
         'fsubseq',
+        usage=genusage.format('fsubseq'),
         help="Mass extraction of subsequences from first fasta entry")
     fsubseq_parser.add_argument(
         'file',
@@ -319,7 +346,8 @@ def parse(argv=None):
     # FASTA2CSV
     fasta2csv_parser = subparsers.add_parser(
         'fasta2csv',
-        help="Converts a fasta file to a csv, two columns (header|sequence)")
+        usage=genusage.format('fasta2csv'),
+        help="Converts a fasta file to 2-column csv")
     fasta2csv_parser.add_argument(
         '-d', '--delimiter',
         help="Set delimiter (',' by default)",
@@ -338,6 +366,7 @@ def parse(argv=None):
     # PERM
     perm_parser = subparsers.add_parser(
         'perm',
+        usage=genusage.format('perm'),
         help="Randomly order sequence by words of length w"
     )
     perm_parser.add_argument(
@@ -366,7 +395,8 @@ def parse(argv=None):
 
     # Simplifyheader
     simplifyheader_parser = subparsers.add_parser(
-        'simplifyheader',
+        'rmfields',
+        usage=genusage.format('rmfields'),
         help="Reduce header to given fields"
     )
     simplifyheader_parser.add_argument(
@@ -379,12 +409,14 @@ def parse(argv=None):
     # REVERSE
     reverse_parser = subparsers.add_parser(
         'reverse',
+        usage=genusage.format('reverse'),
         help="Reverse each sequence")
     reverse_parser.set_defaults(func=reverse)
 
     # TRANSLATE
     translate_parser = subparsers.add_parser(
         'translate',
+        usage=genusage.format('translate'),
         help="Translates DNA (wrapper for EMBOSS transeq)"
     )
     translate_parser.add_argument(
