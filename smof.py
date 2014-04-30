@@ -2,6 +2,7 @@
 
 import csv
 import random
+import math
 import re
 import sys
 import string
@@ -69,6 +70,44 @@ def parse(argv=None):
         default=False
     )
     chsum_parser.set_defaults(func=chsum)
+
+    # COMPLEXITY
+    complexity_parser = subparsers.add_parser(
+        'complexity',
+        usage=genusage.format('complexity'),
+        help='Calculates the complexity of the given sequences'
+    )
+    complexity_parser.add_argument(
+        '-k', '--alphabet-size',
+        help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
+        default=4
+    )
+    complexity_parser.add_argument(
+        '-w', '--window-length',
+        help='Window length (if provided, output will average of window complexities)',
+        default=100
+    )
+    complexity_parser.add_argument(
+        '-m', '--word-length',
+        help='Length of each word',
+        default=1
+    )
+    complexity_parser.add_argument(
+        '-j', '--jump',
+        help='Distance between adjacent windows',
+        default=1
+    )
+    complexity_parser.add_argument(
+        '-o', '--offset',
+        help='Index of start point',
+        default=0
+    )
+    complexity_parser.add_argument(
+        '-d', '--drop',
+        help="Drop sequence if contains this character (e.g. 'X' or 'N')",
+        default=None
+    )
+    complexity_parser.set_defaults(func=complexity)
 
     # FSTAT
     fstat_parser = subparsers.add_parser(
@@ -722,6 +761,52 @@ def chsum(args, gen):
     # Print output hash for cumulative options
     if not args.each_sequence:
         print(h.hexdigest())
+
+def complexity(args, gen):
+    try:
+        w = int(args.window_length)
+        m = int(args.word_length)
+        k = pow(int(args.alphabet_size), m)
+        p = int(args.jump)
+        offset = int(args.offset)
+    except ValueError:
+        print('All values must be integers')
+        raise SystemExit
+
+    # Calculates the variable component of a single window's score
+    def varscore_generator(seq, words):
+        for i in range(offset, len(seq) - w + 1, p):
+            counts = defaultdict(int)
+            for j in range(i, i+w):
+                try:
+                    counts[words[j]] += 1
+                except IndexError:
+                    break
+            yield sum([math.log(math.factorial(x), k) for x in counts.values()])
+
+    w_fact = math.log(math.factorial(w), k)
+
+    seq_id = 0
+    for seq in gen.next():
+        seq_id += 1
+        mean = 'NA'
+        var = 'NA'
+        if(len(seq.seq) < w + offset): pass
+        elif(args.drop and args.drop in seq.seq): pass
+        else:
+            words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
+            varscores = tuple(score for score in varscore_generator(seq.seq, words))
+            winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
+            mean = sum(winscores) / len(winscores)
+            try:
+                var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
+            except ZeroDivisionError:
+                var = 'NA'
+            try:
+                col1 = seq.getvalue('gb', quiet=True)
+            except:
+                col1 = seq_id
+            print("{},{},{}".format(col1, mean, var))
 
 def fasta2csv(args, gen):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
