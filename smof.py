@@ -32,6 +32,38 @@ def parse(argv=None):
 
     genusage = '<fastafile> | smof {} <options>'
 
+    chsum_parser(subparsers, genusage)
+    complexity_parser(subparsers, genusage)
+    fstat_parser(subparsers, genusage)
+    unmask_parser(subparsers, genusage)
+    hstat_parser(subparsers, genusage)
+    idsearch_parser(subparsers, genusage)
+    tounk_parser(subparsers, genusage)
+    prettyprint_parser(subparsers, genusage)
+    qstat_parser(subparsers, genusage)
+    retrieve_parser(subparsers, genusage)
+    sample_parser(subparsers, genusage)
+    sort_parser(subparsers, genusage)
+    search_parser(subparsers, genusage)
+    split_parser(subparsers, genusage)
+    subseq_parser(subparsers, genusage)
+    fsubseq_parser(subparsers, genusage)
+    fasta2csv_parser(subparsers, genusage)
+    perm_parser(subparsers, genusage)
+    simplifyheader_parser(subparsers, genusage)
+    reverse_parser(subparsers, genusage)
+    translate_parser(subparsers, genusage)
+
+    if(len(sys.argv) == 1):
+        parser.print_help()
+        raise SystemExit
+
+    args = parser.parse_args(argv)
+
+    return(args)
+
+
+def chsum_parser(subparsers, genusage):
     # CHSUM
     chsum_parser = subparsers.add_parser(
         'chksum',
@@ -71,7 +103,7 @@ def parse(argv=None):
     )
     chsum_parser.set_defaults(func=chsum)
 
-    # COMPLEXITY
+def complexity_parser(subparsers, genusage):
     complexity_parser = subparsers.add_parser(
         'complexity',
         usage=genusage.format('complexity'),
@@ -109,14 +141,14 @@ def parse(argv=None):
     )
     complexity_parser.set_defaults(func=complexity)
 
-    # FSTAT
+def fstat_parser(subparsers, genusage):
     fstat_parser = subparsers.add_parser(
         'fstat',
         usage=genusage.format('fstat'),
         help="Provides total counts for file sequence characters")
     fstat_parser.set_defaults(func=fstat)
 
-    # UNMASK
+def unmask_parser(subparsers, genusage):
     unmask_parser = subparsers.add_parser(
         'unmask',
         usage=genusage.format('unmask'),
@@ -128,7 +160,7 @@ def parse(argv=None):
         default=False)
     unmask_parser.set_defaults(func=unmask)
 
-    # HSTAT
+def hstat_parser(subparsers, genusage):
     hstat_parser = subparsers.add_parser(
         'hstat',
         usage=genusage.format('hstat'),
@@ -144,7 +176,7 @@ def parse(argv=None):
         default=False)
     hstat_parser.set_defaults(func=hstat)
 
-    # IDSEARCH
+def idsearch_parser(subparsers, genusage):
     idsearch_parser = subparsers.add_parser(
         'idsearch',
         usage=genusage.format('idsearch'),
@@ -157,7 +189,7 @@ def parse(argv=None):
         help="Header field value (e.g. '15237703' or 'AT5G64430')")
     idsearch_parser.set_defaults(func=idsearch)
 
-    # tounk
+def tounk_parser(subparsers, genusage):
     tounk_parser = subparsers.add_parser(
         'tounk',
         usage=genusage.format('tounk'),
@@ -195,7 +227,7 @@ def parse(argv=None):
     )
     tounk_parser.set_defaults(func=tounk)
 
-    # PRETTYPRINT
+def prettyprint_parser(subparsers, genusage):
     prettyprint_parser = subparsers.add_parser(
         'prettyprint',
         usage=genusage.format('prettyprint'),
@@ -207,7 +239,7 @@ def parse(argv=None):
         default=60)
     prettyprint_parser.set_defaults(func=prettyprint)
 
-    # QSTAT
+def qstat_parser(subparsers, genusage):
     qstat_parser = subparsers.add_parser(
         'qstat',
         usage=genusage.format('qstat'),
@@ -241,7 +273,7 @@ def parse(argv=None):
     )
     qstat_parser.set_defaults(func=qstat)
 
-    # RETRIEVE
+def retrieve_parser(subparsers, genusage):
     retrieve_parser = subparsers.add_parser(
         'retrieve',
         usage=genusage.format('retrieve'),
@@ -283,7 +315,7 @@ def parse(argv=None):
     )
     retrieve_parser.set_defaults(func=retrieve)
 
-    # SAMPLE
+def sample_parser(subparsers, genusage):
     sample_parser = subparsers.add_parser(
         'sample',
         usage=genusage.format('sample'),
@@ -295,7 +327,7 @@ def parse(argv=None):
         default=1)
     sample_parser.set_defaults(func=sample)
 
-    # SORT
+def sort_parser(subparsers, genusage):
     sort_parser = subparsers.add_parser(
         'sort',
         usage=genusage.format('sort'),
@@ -306,7 +338,7 @@ def parse(argv=None):
         nargs='+')
     sort_parser.set_defaults(func=sort)
 
-    # SEARCH
+def search_parser(subparsers, genusage):
     search_parser = subparsers.add_parser(
         'search',
         usage=genusage.format('search'),
@@ -334,7 +366,7 @@ def parse(argv=None):
     )
     search_parser.set_defaults(func=search)
 
-    # SPLIT
+def split_parser(subparsers, genusage):
     split_parser = subparsers.add_parser(
         'split',
         usage=genusage.format('split'),
@@ -351,7 +383,7 @@ def parse(argv=None):
     )
     split_parser.set_defaults(func=split)
 
-    # SUBSEQ
+def subseq_parser(subparsers, genusage):
     subseq_parser = subparsers.add_parser(
         'subseq',
         usage=genusage.format('subseq'),
@@ -368,7 +400,7 @@ def parse(argv=None):
         default=False)
     subseq_parser.set_defaults(func=subseq)
 
-    # FSUBSEQ
+def fsubseq_parser(subparsers, genusage):
     fsubseq_parser = subparsers.add_parser(
         'fsubseq',
         usage=genusage.format('fsubseq'),
@@ -388,7 +420,7 @@ def parse(argv=None):
         default=-1)
     fsubseq_parser.set_defaults(func=fsubseq)
 
-    # FASTA2CSV
+def fasta2csv_parser(subparsers, genusage):
     fasta2csv_parser = subparsers.add_parser(
         'fasta2csv',
         usage=genusage.format('fasta2csv'),
@@ -408,7 +440,7 @@ def parse(argv=None):
         nargs='+')
     fasta2csv_parser.set_defaults(func=fasta2csv)
 
-    # PERM
+def perm_parser(subparsers, genusage):
     perm_parser = subparsers.add_parser(
         'perm',
         usage=genusage.format('perm'),
@@ -438,7 +470,7 @@ def parse(argv=None):
     )
     perm_parser.set_defaults(func=perm)
 
-    # Simplifyheader
+def simplifyheader_parser(subparsers, genusage):
     simplifyheader_parser = subparsers.add_parser(
         'rmfields',
         usage=genusage.format('rmfields'),
@@ -451,14 +483,14 @@ def parse(argv=None):
     )
     simplifyheader_parser.set_defaults(func=simplifyheader)
 
-    # REVERSE
+def reverse_parser(subparsers, genusage):
     reverse_parser = subparsers.add_parser(
         'reverse',
         usage=genusage.format('reverse'),
         help="Reverse each sequence")
     reverse_parser.set_defaults(func=reverse)
 
-    # TRANSLATE
+def translate_parser(subparsers, genusage):
     translate_parser = subparsers.add_parser(
         'translate',
         usage=genusage.format('translate'),
@@ -490,14 +522,6 @@ def parse(argv=None):
         action='store_true',
         default=False
     )
-
-    if(len(sys.argv) == 1):
-        parser.print_help()
-        raise SystemExit
-
-    args = parser.parse_args(argv)
-
-    return(args)
 
 
 # =================
