@@ -39,7 +39,6 @@ class Parser:
             title='subcommands')
         return(subparsers)
 
-
 def parse(argv=None):
 
     parser = Parser()
@@ -50,455 +49,31 @@ def parse(argv=None):
 
     Chksum(parser)
 
-    genusage = parser.usage
-    subparsers = parser.subparsers
-
-    complexity_parser(subparsers, genusage)
-    fstat_parser(subparsers, genusage)
-    unmask_parser(subparsers, genusage)
-    hstat_parser(subparsers, genusage)
-    idsearch_parser(subparsers, genusage)
-    tounk_parser(subparsers, genusage)
-    prettyprint_parser(subparsers, genusage)
-    qstat_parser(subparsers, genusage)
-    retrieve_parser(subparsers, genusage)
-    sample_parser(subparsers, genusage)
-    sort_parser(subparsers, genusage)
-    search_parser(subparsers, genusage)
-    split_parser(subparsers, genusage)
-    subseq_parser(subparsers, genusage)
-    fsubseq_parser(subparsers, genusage)
-    fasta2csv_parser(subparsers, genusage)
-    perm_parser(subparsers, genusage)
-    simplifyheader_parser(subparsers, genusage)
-    reverse_parser(subparsers, genusage)
-    translate_parser(subparsers, genusage)
+    Complexity(parser)
+    Fstat(parser)
+    Unmask(parser)
+    Hstat(parser)
+    Idsearch(parser)
+    Tounk(parser)
+    Prettyprint(parser)
+    Qstat(parser)
+    Retrieve(parser)
+    Sample(parser)
+    Sort(parser)
+    Search(parser)
+    Split(parser)
+    Subseq(parser)
+    Fsubseq(parser)
+    Fasta2csv(parser)
+    Perm(parser)
+    Simplifyheader(parser)
+    Reverse(parser)
+    Translate(parser)
 
 
     args = parser.parser.parse_args(argv)
 
     return(args)
-
-
-def complexity_parser(subparsers, genusage):
-    complexity_parser = subparsers.add_parser(
-        'complexity',
-        usage=genusage.format('complexity'),
-        help='Calculates the complexity of the given sequences'
-    )
-    complexity_parser.add_argument(
-        '-k', '--alphabet-size',
-        help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
-        default=4
-    )
-    complexity_parser.add_argument(
-        '-w', '--window-length',
-        help='Window length (if provided, output will average of window complexities)',
-        default=100
-    )
-    complexity_parser.add_argument(
-        '-m', '--word-length',
-        help='Length of each word',
-        default=1
-    )
-    complexity_parser.add_argument(
-        '-j', '--jump',
-        help='Distance between adjacent windows',
-        default=1
-    )
-    complexity_parser.add_argument(
-        '-o', '--offset',
-        help='Index of start point',
-        default=0
-    )
-    complexity_parser.add_argument(
-        '-d', '--drop',
-        help="Drop sequence if contains this character (e.g. 'X' or 'N')",
-        default=None
-    )
-    complexity_parser.set_defaults(func=complexity)
-
-def fstat_parser(subparsers, genusage):
-    fstat_parser = subparsers.add_parser(
-        'fstat',
-        usage=genusage.format('fstat'),
-        help="Provides total counts for file sequence characters")
-    fstat_parser.set_defaults(func=fstat)
-
-def unmask_parser(subparsers, genusage):
-    unmask_parser = subparsers.add_parser(
-        'unmask',
-        usage=genusage.format('unmask'),
-        help="Converts all letters to uppercase")
-    unmask_parser.add_argument(
-        '-x', '--to-x',
-        help="Convert lower case letters to X",
-        action='store_true',
-        default=False)
-    unmask_parser.set_defaults(func=unmask)
-
-def hstat_parser(subparsers, genusage):
-    hstat_parser = subparsers.add_parser(
-        'hstat',
-        usage=genusage.format('hstat'),
-        help="Extract info from headers (also seq length)")
-    hstat_parser.add_argument(
-        'fields',
-        help="Header fields to write to csv",
-        nargs='+')
-    hstat_parser.add_argument(
-        '--length',
-        help="Report length of each sequence",
-        action='store_true',
-        default=False)
-    hstat_parser.set_defaults(func=hstat)
-
-def idsearch_parser(subparsers, genusage):
-    idsearch_parser = subparsers.add_parser(
-        'idsearch',
-        usage=genusage.format('idsearch'),
-        help='Find sequences by field/value pair')
-    idsearch_parser.add_argument(
-        'field',
-        help="Header field (e.g. 'gi' or 'locus')")
-    idsearch_parser.add_argument(
-        'value',
-        help="Header field value (e.g. '15237703' or 'AT5G64430')")
-    idsearch_parser.set_defaults(func=idsearch)
-
-def tounk_parser(subparsers, genusage):
-    tounk_parser = subparsers.add_parser(
-        'tounk',
-        usage=genusage.format('tounk'),
-        help='Convert irregular characters to unknown character'
-    )
-    tounk_parser.add_argument(
-        '-t', '--type',
-        help='Sequence type [n, p]'
-    )
-    tounk_parser.add_argument(
-        '-l', '--lc',
-        help='Convert lower-case to unknown',
-        action='store_true',
-        default=False
-    )
-    tounk_parser.add_argument(
-        '--nir',
-        help='Nucleotide irregulars [default=(not ACGT)]',
-        default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
-    )
-    tounk_parser.add_argument(
-        '--pir',
-        help='Protein irregulars [default=BJOUZbjouz]',
-        default='BJOUXZbjouxz'
-    )
-    tounk_parser.add_argument(
-        '--nunk',
-        help='Nucleotide unknown character (default=N)',
-        default='N'
-    )
-    tounk_parser.add_argument(
-        '--punk',
-        help='Protein unknown character (default=X)',
-        default='X'
-    )
-    tounk_parser.set_defaults(func=tounk)
-
-def prettyprint_parser(subparsers, genusage):
-    prettyprint_parser = subparsers.add_parser(
-        'prettyprint',
-        usage=genusage.format('prettyprint'),
-        help='Prints fasta file in neat columns')
-    prettyprint_parser.add_argument(
-        'cwidth',
-        help='Output column width',
-        type=int,
-        default=60)
-    prettyprint_parser.set_defaults(func=prettyprint)
-
-def qstat_parser(subparsers, genusage):
-    qstat_parser = subparsers.add_parser(
-        'qstat',
-        usage=genusage.format('qstat'),
-        help="Gathers statistics on each sequence")
-    qstat_parser.add_argument(
-        '-f', '--fields',
-        help="Header fields by which each sequence is identified in output csv file",
-        nargs='+',
-        default=[])
-    qstat_parser.add_argument(
-        '-m', '--countmasked',
-        help="Count the number of masked (lowcase) characters",
-        action='store_true',
-        default=False)
-    qstat_parser.add_argument(
-        '-i', '--ignorecase',
-        help="Ignores case when counting characters",
-        action='store_true',
-        default=False)
-    qstat_parser.add_argument(
-        '-s', '--start-offset',
-        help='Number of letters to ignore at beginning (default=0)',
-        type=int,
-        default=0
-    )
-    qstat_parser.add_argument(
-        '-e', '--end-offset',
-        help='Number of letters to ignore at end (default=0)',
-        type=int,
-        default=0
-    )
-    qstat_parser.set_defaults(func=qstat)
-
-def retrieve_parser(subparsers, genusage):
-    retrieve_parser = subparsers.add_parser(
-        'retrieve',
-        usage=genusage.format('retrieve'),
-        help="Retrieve sequences with matches pattern"
-    )
-    retrieve_parser.add_argument(
-        '-p', '--pattern',
-        help="Perl regular expressions",
-        nargs='+'
-    )
-    retrieve_parser.add_argument(
-        '-P', '--patternfile',
-        help="Perl regular expressions"
-    )
-    retrieve_parser.add_argument(
-        '-g', '--groups',
-        help="The acceptable values for parenthesized groups",
-        nargs='*'
-    )
-    retrieve_parser.add_argument(
-        '-G', '--groupfile',
-        help="Read values from file"
-    )
-    retrieve_parser.add_argument(
-        '-v', '--invert',
-        help="Write sequences that don't match"
-    )
-    retrieve_parser.add_argument(
-        '-q', '--match-sequence',
-        help='Match sequence rather than header',
-        action='store_true',
-        default=False
-    )
-    retrieve_parser.add_argument(
-        '-c', '--color',
-        help='Color match',
-        action='store_true',
-        default=False
-    )
-    retrieve_parser.set_defaults(func=retrieve)
-
-def sample_parser(subparsers, genusage):
-    sample_parser = subparsers.add_parser(
-        'sample',
-        usage=genusage.format('sample'),
-        help="Randomly select entries from fasta file")
-    sample_parser.add_argument(
-        'n',
-        help="Sample size",
-        type=int,
-        default=1)
-    sample_parser.set_defaults(func=sample)
-
-def sort_parser(subparsers, genusage):
-    sort_parser = subparsers.add_parser(
-        'sort',
-        usage=genusage.format('sort'),
-        help="Sort sequences by given fields")
-    sort_parser.add_argument(
-        'fields',
-        help="Header fields by which to sort sequences",
-        nargs='+')
-    sort_parser.set_defaults(func=sort)
-
-def search_parser(subparsers, genusage):
-    search_parser = subparsers.add_parser(
-        'search',
-        usage=genusage.format('search'),
-        help='Search for pattern')
-    search_parser.add_argument(
-        'pattern',
-        help='Perl regular expression search pattern')
-    search_parser.add_argument(
-        '-i', '--invert',
-        help="Drop all not matching the pattern",
-        action='store_true',
-        default=False
-    )
-    search_parser.add_argument(
-        '-q', '--seq',
-        help='Search for pattern in the sequence',
-        action='store_true',
-        default=False
-    )
-    search_parser.add_argument(
-        '-c', '--color',
-        help='Highlight the matched sequence',
-        action='store_true',
-        default=False
-    )
-    search_parser.set_defaults(func=search)
-
-def split_parser(subparsers, genusage):
-    split_parser = subparsers.add_parser(
-        'split',
-        usage=genusage.format('split'),
-        help='Split a multifasta file into k smaller filers'
-    )
-    split_parser.add_argument(
-        '-n', '--nfiles',
-        help='Number of output files'
-    )
-    split_parser.add_argument(
-        '-p', '--prefix',
-        help='Prefix for output files',
-        default='xxx'
-    )
-    split_parser.set_defaults(func=split)
-
-def subseq_parser(subparsers, genusage):
-    subseq_parser = subparsers.add_parser(
-        'subseq',
-        usage=genusage.format('subseq'),
-        help="Extract subsequence from each entry")
-    subseq_parser.add_argument(
-        'bounds',
-        help="from and to values (indexed from 1)",
-        nargs=2,
-        type=int)
-    subseq_parser.add_argument(
-        '-r', '--revcomp',
-        help='Take the reverse complement if bounds[0] > bounds[1]',
-        action='store_true',
-        default=False)
-    subseq_parser.set_defaults(func=subseq)
-
-def fsubseq_parser(subparsers, genusage):
-    fsubseq_parser = subparsers.add_parser(
-        'fsubseq',
-        usage=genusage.format('fsubseq'),
-        help="Mass extraction of subsequences from first fasta entry")
-    fsubseq_parser.add_argument(
-        'file',
-        help="File containing bounds for subsequence extraction")
-    fsubseq_parser.add_argument(
-        '-r', '--revcomp',
-        help='Take the reverse complement if bounds[0] > bounds[1]',
-        action='store_true',
-        default=False)
-    fsubseq_parser.add_argument(
-        '-p', '--pattern-index',
-        help='Index of regex pattern in each row',
-        type=int,
-        default=-1)
-    fsubseq_parser.set_defaults(func=fsubseq)
-
-def fasta2csv_parser(subparsers, genusage):
-    fasta2csv_parser = subparsers.add_parser(
-        'fasta2csv',
-        usage=genusage.format('fasta2csv'),
-        help="Converts a fasta file to 2-column csv")
-    fasta2csv_parser.add_argument(
-        '-d', '--delimiter',
-        help="Set delimiter (',' by default)",
-        default=',')
-    fasta2csv_parser.add_argument(
-        '-r', '--header',
-        help='Write header (default=False)',
-        action='store_true',
-        default=False)
-    fasta2csv_parser.add_argument(
-        '-f', '--fields',
-        help='Extract given fields from the header',
-        nargs='+')
-    fasta2csv_parser.set_defaults(func=fasta2csv)
-
-def perm_parser(subparsers, genusage):
-    perm_parser = subparsers.add_parser(
-        'perm',
-        usage=genusage.format('perm'),
-        help="Randomly order sequence by words of length w"
-    )
-    perm_parser.add_argument(
-        '-w', '--word-size',
-        help='Size of each word (default=1)',
-        type=int,
-        default=1
-    )
-    perm_parser.add_argument(
-        '-s', '--start-offset',
-        help='Number of letters to ignore at beginning (default=0)',
-        type=int,
-        default=0
-    )
-    perm_parser.add_argument(
-        '-e', '--end-offset',
-        help='Number of letters to ignore at end (default=0)',
-        type=int,
-        default=0
-    )
-    perm_parser.add_argument(
-        '-f', '--field',
-        help="Header field (e.g. 'gi' or 'locus')"
-    )
-    perm_parser.set_defaults(func=perm)
-
-def simplifyheader_parser(subparsers, genusage):
-    simplifyheader_parser = subparsers.add_parser(
-        'rmfields',
-        usage=genusage.format('rmfields'),
-        help="Reduce header to given fields"
-    )
-    simplifyheader_parser.add_argument(
-        'fields',
-        help="Fields to retain",
-        nargs='+'
-    )
-    simplifyheader_parser.set_defaults(func=simplifyheader)
-
-def reverse_parser(subparsers, genusage):
-    reverse_parser = subparsers.add_parser(
-        'reverse',
-        usage=genusage.format('reverse'),
-        help="Reverse each sequence")
-    reverse_parser.set_defaults(func=reverse)
-
-def translate_parser(subparsers, genusage):
-    translate_parser = subparsers.add_parser(
-        'translate',
-        usage=genusage.format('translate'),
-        help="Translates DNA (wrapper for EMBOSS transeq)"
-    )
-    translate_parser.add_argument(
-        '-f', '--frame',
-        help="See EMBOSS transeq help",
-        default=1
-    )
-    translate_parser.add_argument(
-        '-t', '--table',
-        help="See EMBOSS transeq help",
-        default=0
-    )
-    translate_parser.add_argument(
-        '-r', '--regions',
-        help="See EMBOSS transeq help"
-    )
-    translate_parser.add_argument(
-        '-m', '--trim',
-        help="See EMBOSS transeq help",
-        action='store_true',
-        default=False
-    )
-    translate_parser.add_argument(
-        '-c', '--clean',
-        help="See EMBOSS transeq help",
-        action='store_true',
-        default=False
-    )
 
 
 # =================
@@ -739,7 +314,7 @@ class Subcommand:
         self.subparsers = parser_obj.subparsers
         self._parse()
 
-    def _parse(self, subparsers):
+    def _parse(self):
         raise NotImplemented
 
     def generator(self, args, gen):
@@ -820,6 +395,552 @@ class Chksum(Subcommand):
         # Print output hash for cumulative options
         if not args.each_sequence:
             yield md5hash.hexdigest()
+
+class Complexity(Subcommand):
+    def _parse(self):
+        cmd_name = 'complexity'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Calculates the complexity of the given sequences'
+        )
+        parser.add_argument(
+            '-k', '--alphabet-size',
+            help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
+            default=4
+        )
+        parser.add_argument(
+            '-w', '--window-length',
+            help='Window length (if provided, output will average of window complexities)',
+            default=100
+        )
+        parser.add_argument(
+            '-m', '--word-length',
+            help='Length of each word',
+            default=1
+        )
+        parser.add_argument(
+            '-j', '--jump',
+            help='Distance between adjacent windows',
+            default=1
+        )
+        parser.add_argument(
+            '-o', '--offset',
+            help='Index of start point',
+            default=0
+        )
+        parser.add_argument(
+            '-d', '--drop',
+            help="Drop sequence if contains this character (e.g. 'X' or 'N')",
+            default=None
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Fstat(Subcommand):
+    def _parse(self):
+        cmd_name = 'fstat'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Provides total counts for file sequence characters"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Unmask(Subcommand):
+    def _parse(self):
+        cmd_name = 'unmask'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Converts all letters to uppercase")
+        parser.add_argument(
+            '-x', '--to-x',
+            help="Convert lower case letters to X",
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Hstat(Subcommand):
+    def _parse(self):
+        cmd_name = 'hstat'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Extract info from headers (also seq length)")
+        parser.add_argument(
+            'fields',
+            help="Header fields to write to csv",
+            nargs='+')
+        parser.add_argument(
+            '--length',
+            help="Report length of each sequence",
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Idsearch(Subcommand):
+    def _parse(self):
+        cmd_name = 'idsearch'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Find sequences by field/value pair')
+        parser.add_argument(
+            'field',
+            help="Header field (e.g. 'gi' or 'locus')")
+        parser.add_argument(
+            'value',
+            help="Header field value (e.g. '15237703' or 'AT5G64430')")
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Tounk(Subcommand):
+    def _parse(self):
+        cmd_name = 'tounk'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Convert irregular characters to unknown character'
+        )
+        parser.add_argument(
+            '-t', '--type',
+            help='Sequence type [n, p]'
+        )
+        parser.add_argument(
+            '-l', '--lc',
+            help='Convert lower-case to unknown',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '--nir',
+            help='Nucleotide irregulars [default=(not ACGT)]',
+            default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
+        )
+        parser.add_argument(
+            '--pir',
+            help='Protein irregulars [default=BJOUZbjouz]',
+            default='BJOUXZbjouxz'
+        )
+        parser.add_argument(
+            '--nunk',
+            help='Nucleotide unknown character (default=N)',
+            default='N'
+        )
+        parser.add_argument(
+            '--punk',
+            help='Protein unknown character (default=X)',
+            default='X'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Prettyprint(Subcommand):
+    def _parse(self):
+        cmd_name = 'prettyprint'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Prints fasta file in neat columns')
+        parser.add_argument(
+            'cwidth',
+            help='Output column width',
+            type=int,
+            default=60)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Qstat(Subcommand):
+    def _parse(self):
+        cmd_name = 'qstat'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Gathers statistics on each sequence")
+        parser.add_argument(
+            '-f', '--fields',
+            help="Header fields by which each sequence is identified in output csv file",
+            nargs='+',
+            default=[])
+        parser.add_argument(
+            '-m', '--countmasked',
+            help="Count the number of masked (lowcase) characters",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-i', '--ignorecase',
+            help="Ignores case when counting characters",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-s', '--start-offset',
+            help='Number of letters to ignore at beginning (default=0)',
+            type=int,
+            default=0
+        )
+        parser.add_argument(
+            '-e', '--end-offset',
+            help='Number of letters to ignore at end (default=0)',
+            type=int,
+            default=0
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Retrieve(Subcommand):
+    def _parse(self):
+        cmd_name = 'retrieve'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Retrieve sequences with matches pattern"
+        )
+        parser.add_argument(
+            '-p', '--pattern',
+            help="Perl regular expressions",
+            nargs='+'
+        )
+        parser.add_argument(
+            '-P', '--patternfile',
+            help="Perl regular expressions"
+        )
+        parser.add_argument(
+            '-g', '--groups',
+            help="The acceptable values for parenthesized groups",
+            nargs='*'
+        )
+        parser.add_argument(
+            '-G', '--groupfile',
+            help="Read values from file"
+        )
+        parser.add_argument(
+            '-v', '--invert',
+            help="Write sequences that don't match"
+        )
+        parser.add_argument(
+            '-q', '--match-sequence',
+            help='Match sequence rather than header',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-c', '--color',
+            help='Color match',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Sample(Subcommand):
+    def _parse(self):
+        cmd_name = 'sample'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Randomly select entries from fasta file")
+        parser.add_argument(
+            'n',
+            help="Sample size",
+            type=int,
+            default=1)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Sort sequences by given fields")
+        parser.add_argument(
+            'fields',
+            help="Header fields by which to sort sequences",
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Search(Subcommand):
+    def _parse(self):
+        cmd_name = 'search'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Search for pattern')
+        parser.add_argument(
+            'pattern',
+            help='Perl regular expression search pattern')
+        parser.add_argument(
+            '-i', '--invert',
+            help="Drop all not matching the pattern",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-q', '--seq',
+            help='Search for pattern in the sequence',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-c', '--color',
+            help='Highlight the matched sequence',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Split(Subcommand):
+    def _parse(self):
+        cmd_name = 'split'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Split a multifasta file into k smaller filers'
+        )
+        parser.add_argument(
+            '-n', '--nfiles',
+            help='Number of output files'
+        )
+        parser.add_argument(
+            '-p', '--prefix',
+            help='Prefix for output files',
+            default='xxx'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Subseq(Subcommand):
+    def _parse(self):
+        cmd_name = 'subseq'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Extract subsequence from each entry")
+        parser.add_argument(
+            'bounds',
+            help="from and to values (indexed from 1)",
+            nargs=2,
+            type=int)
+        parser.add_argument(
+            '-r', '--revcomp',
+            help='Take the reverse complement if bounds[0] > bounds[1]',
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Fsubseq(Subcommand):
+    def _parse(self):
+        cmd_name = 'fsubseq'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Mass extraction of subsequences from first fasta entry")
+        parser.add_argument(
+            'file',
+            help="File containing bounds for subsequence extraction")
+        parser.add_argument(
+            '-r', '--revcomp',
+            help='Take the reverse complement if bounds[0] > bounds[1]',
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-p', '--pattern-index',
+            help='Index of regex pattern in each row',
+            type=int,
+            default=-1)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Fasta2csv(Subcommand):
+    def _parse(self):
+        cmd_name = 'fasta2csv'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Converts a fasta file to 2-column csv")
+        parser.add_argument(
+            '-d', '--delimiter',
+            help="Set delimiter (',' by default)",
+            default=',')
+        parser.add_argument(
+            '-r', '--header',
+            help='Write header (default=False)',
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-f', '--fields',
+            help='Extract given fields from the header',
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Perm(Subcommand):
+    def _parse(self):
+        cmd_name = 'perm'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Randomly order sequence by words of length w"
+        )
+        parser.add_argument(
+            '-w', '--word-size',
+            help='Size of each word (default=1)',
+            type=int,
+            default=1
+        )
+        parser.add_argument(
+            '-s', '--start-offset',
+            help='Number of letters to ignore at beginning (default=0)',
+            type=int,
+            default=0
+        )
+        parser.add_argument(
+            '-e', '--end-offset',
+            help='Number of letters to ignore at end (default=0)',
+            type=int,
+            default=0
+        )
+        parser.add_argument(
+            '-f', '--field',
+            help="Header field (e.g. 'gi' or 'locus')"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Simplifyheader(Subcommand):
+    def _parse(self):
+        cmd_name = 'rmfields'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Reduce header to given fields"
+        )
+        parser.add_argument(
+            'fields',
+            help="Fields to retain",
+            nargs='+'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Reverse(Subcommand):
+    def _parse(self):
+        cmd_name = 'reverse'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Reverse each sequence")
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+class Translate(Subcommand):
+    def _parse(self):
+        cmd_name = 'translate'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Translates DNA (wrapper for EMBOSS transeq)"
+        )
+        parser.add_argument(
+            '-f', '--frame',
+            help="See EMBOSS transeq help",
+            default=1
+        )
+        parser.add_argument(
+            '-t', '--table',
+            help="See EMBOSS transeq help",
+            default=0
+        )
+        parser.add_argument(
+            '-r', '--regions',
+            help="See EMBOSS transeq help"
+        )
+        parser.add_argument(
+            '-m', '--trim',
+            help="See EMBOSS transeq help",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-c', '--clean',
+            help="See EMBOSS transeq help",
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for j in ['1','2','3']:
+            yield j
+
+
+
+
 
 
 def complexity(args, gen):
