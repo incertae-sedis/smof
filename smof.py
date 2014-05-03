@@ -14,25 +14,45 @@ __version__ = "1.0"
 # Argument Parsing
 # ================
 
+class Parser:
+    def __init__(self):
+        self.parser = self._build_base_parser()
+        self.subparsers = self._build_subparsers()
+        self.usage = '<fastafile> | smof {} <options>'
+
+    def _build_base_parser(self):
+        import argparse
+        parser = argparse.ArgumentParser(
+            prog='smof',
+            usage='<fastafile> | smof <subcommand> <options>',
+            description='Tools for studying and manipulating fasta files')
+
+        parser.add_argument(
+            '-v', '--version',
+            action='version',
+            version='%(prog)s {}'.format(__version__))
+        return(parser)
+
+    def _build_subparsers(self):
+        subparsers = self.parser.add_subparsers(
+            metavar='[ for help on each: smof <subcommand> -h ]',
+            title='subcommands')
+        return(subparsers)
+
+
 def parse(argv=None):
-    import argparse
-    parser = argparse.ArgumentParser(
-        prog='smof',
-        usage='<fastafile> | smof <subcommand> <options>',
-        description='Tools for studying and manipulating fasta files')
 
-    parser.add_argument(
-        '-v', '--version',
-        action='version',
-        version='%(prog)s {}'.format(__version__))
+    parser = Parser()
 
-    subparsers = parser.add_subparsers(
-        metavar='[ for help on each: smof <subcommand> -h ]',
-        title='subcommands')
+    if(len(sys.argv) == 1):
+        parser.parser.print_help()
+        raise SystemExit
 
-    genusage = '<fastafile> | smof {} <options>'
+    Chksum(parser)
 
-    chsum_parser(subparsers, genusage)
+    genusage = parser.usage
+    subparsers = parser.subparsers
+
     complexity_parser(subparsers, genusage)
     fstat_parser(subparsers, genusage)
     unmask_parser(subparsers, genusage)
@@ -54,54 +74,11 @@ def parse(argv=None):
     reverse_parser(subparsers, genusage)
     translate_parser(subparsers, genusage)
 
-    if(len(sys.argv) == 1):
-        parser.print_help()
-        raise SystemExit
 
-    args = parser.parse_args(argv)
+    args = parser.parser.parse_args(argv)
 
     return(args)
 
-
-def chsum_parser(subparsers, genusage):
-    # CHSUM
-    chsum_parser = subparsers.add_parser(
-        'chksum',
-        usage=genusage.format('chksum'),
-        help="Calculate an md5 checksum for the input sequences"
-    )
-    chsum_parser.add_argument(
-        '-i', '--ignore-case',
-        help='Convert all to uppercase, before hashing',
-        action='store_true',
-        default=False
-    )
-    method = chsum_parser.add_mutually_exclusive_group(required=False)
-    method.add_argument(
-        '-w', '--whole-file',
-        help='Calculate single md5sum for all headers and sequences (default action)',
-        action='store_true',
-        default=False
-    )
-    method.add_argument(
-        '-q', '--each-sequence',
-        help='Calculate md5sum for each sequence, write as TAB delimited list',
-        action='store_true',
-        default=False
-    )
-    method.add_argument(
-        '-s', '--all-sequences',
-        help='Calculate single md5sum for all sequences',
-        action='store_true',
-        default=False
-    )
-    method.add_argument(
-        '-d', '--all-headers',
-        help='Calculate single md5sum for all headers',
-        action='store_true',
-        default=False
-    )
-    chsum_parser.set_defaults(func=chsum)
 
 def complexity_parser(subparsers, genusage):
     complexity_parser = subparsers.add_parser(
@@ -755,36 +732,95 @@ def csvrowGenerator(filename):
 # ONE-BY-ONE FUNCTIONS
 # ====================
 
-def chsum(args, gen):
-    '''
-    Prints various hashes of the input fasta file
-    '''
-    import hashlib
-    h = hashlib.md5()
-    # Hash the sequences only (in input order)
-    if(args.all_sequences):
-        fun = lambda s: h.update(s.seq.encode('ascii'))
-    # Hash the headers only (in input order)
-    elif(args.all_headers):
-        fun = lambda s: h.update(s.header.encode('ascii'))
-    # Write <header>\t<sequence hash> for each sequence
-    elif(args.each_sequence):
-        fun = lambda s: print('\t'.join((s.header, hashlib.md5(s.seq.encode('ascii')).hexdigest())))
-    # DEFAULT: Hash each header-sequence pair
-    else:
-        fun = lambda s: h.update('\n'.join((s.header, s.seq)).encode('ascii'))
+class Subcommand:
+    def __init__(self, parser_obj, write=True):
+        self.func = self.write if write else self.generator
+        self.usage = parser_obj.usage
+        self.subparsers = parser_obj.subparsers
+        self._parse()
 
-    for seq in gen.next():
-        if args.ignore_case:
-            if args.all_headers or args.whole_file :
-                seq.header_upper()
-            if not args.all_headers:
-                seq.seq_upper()
-        fun(seq)
+    def _parse(self, subparsers):
+        raise NotImplemented
 
-    # Print output hash for cumulative options
-    if not args.each_sequence:
-        print(h.hexdigest())
+    def generator(self, args, gen):
+        raise NotImplemented
+
+    def write(self, args, gen):
+        for r in self.generator(args, gen):
+            print(r)
+
+class Chksum(Subcommand):
+    def _parse(self):
+        cmd_name = 'chksum'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Calculate an md5 checksum for the input sequences"
+        )
+        parser.add_argument(
+            '-i', '--ignore-case',
+            help='Convert all to uppercase, before hashing',
+            action='store_true',
+            default=False
+        )
+        method = parser.add_mutually_exclusive_group(required=False)
+        method.add_argument(
+            '-w', '--whole-file',
+            help='Calculate single md5sum for all headers and sequences (default action)',
+            action='store_true',
+            default=False
+        )
+        method.add_argument(
+            '-q', '--each-sequence',
+            help='Calculate md5sum for each sequence, write as TAB delimited list',
+            action='store_true',
+            default=False
+        )
+        method.add_argument(
+            '-s', '--all-sequences',
+            help='Calculate single md5sum for all sequences',
+            action='store_true',
+            default=False
+        )
+        method.add_argument(
+            '-d', '--all-headers',
+            help='Calculate single md5sum for all headers',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        from hashlib import md5
+        md5hash = md5()
+        # Hash the sequences only (in input order)
+        if(args.all_sequences):
+            fun = lambda s,h: md5hash.update(s)
+        # Hash the headers only (in input order)
+        elif(args.all_headers):
+            fun = lambda s,h: md5hash.update(h)
+        # DEFAULT: Hash each header-sequence pair
+        else:
+            fun = lambda s,h: md5hash.update(h + b'\n' + s)
+
+        for seq in gen.next():
+            if args.ignore_case:
+                if args.all_headers or args.whole_file :
+                    seq.header_upper()
+                if not args.all_headers:
+                    seq.seq_upper()
+            s = seq.seq.encode('ascii')
+            h = seq.header.encode('ascii')
+            # Write <header>\t<sequence hash> for each sequence
+            if(args.each_sequence):
+                yield h.decode() + '\t' + md5(s).hexdigest()
+            else:
+                fun(s,h)
+
+        # Print output hash for cumulative options
+        if not args.each_sequence:
+            yield md5hash.hexdigest()
+
 
 def complexity(args, gen):
     try:
