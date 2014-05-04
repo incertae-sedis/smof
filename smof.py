@@ -862,7 +862,6 @@ class Retrieve(Subcommand):
             if(seq.colseq.seq or seq.colheader.seq):
                 yield seq
 
-
 class Search(Subcommand):
     def _parse(self):
         cmd_name = 'search'
@@ -894,8 +893,24 @@ class Search(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        '''
+        Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
+        '''
+        prog = re.compile(args.pattern)
+        for seq in gen.next():
+            text = seq.seq if args.seq else seq.header
+            m = prog.search(text)
+            if (not m and not args.invert) or (m and args.invert):
+                continue
+            if(args.color and not args.invert):
+                if(args.seq):
+                    seq.colseq.setseq(text)
+                    seq.colseq.colormatch(prog)
+                else:
+                    seq.colheader.setseq(text)
+                    seq.colheader.colormatch(prog)
+            yield seq
+
 
 class Split(Subcommand):
     def _parse(self):
@@ -1138,24 +1153,6 @@ def reverse(args, gen):
         rseq.print()
 
 
-def search(args, gen):
-    '''
-    Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
-    '''
-    prog = re.compile(args.pattern)
-    for seq in gen.next():
-        text = seq.seq if args.seq else seq.header
-        m = prog.search(text)
-        if (not m and not args.invert) or (m and args.invert):
-            continue
-        if(args.color and not args.invert):
-            if(args.seq):
-                seq.colseq.setseq(text)
-                seq.colseq.colormatch(prog)
-            else:
-                seq.colheader.setseq(text)
-                seq.colheader.colormatch(prog)
-        seq.print()
 
 def simplifyheader(args, gen):
     if(hasattr(args.fields, '__upper__')):
