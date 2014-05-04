@@ -494,8 +494,19 @@ class Fstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        stats = Stat()
+        nseqs = 0
+        nchars = 0
+        for seq in gen.next():
+            nseqs += 1
+            nchars += len(seq.seq)
+            stats.update_counts(seq)
+        for k, v in sorted(stats.getdict().items(), key=lambda x: x[1], reverse=True):
+            yield "{}: {} {}".format(k, v, round(v/nchars, 4))
+        yield "nseqs: {}".format(nseqs)
+        yield "nchars: {}".format(nchars)
+        yield "mean length: {}".format(round(nchars/nseqs, 4))
+
 
 class Unmask(Subcommand):
     def _parse(self):
@@ -1000,20 +1011,6 @@ def fasta2csv(args, gen):
         else:
             elements = [seq.header]
         w.writerow(tuple(elements + [seq.seq]))
-
-def fstat(args, gen):
-    stats = Stat()
-    nseqs = 0
-    nchars = 0
-    for seq in gen.next():
-        nseqs += 1
-        nchars += len(seq.seq)
-        stats.update_counts(seq)
-    for k, v in sorted(stats.getdict().items(), key=lambda x: x[1], reverse=True):
-        print("{}: {} {}".format(k, v, round(v/nchars, 4)))
-    print("nseqs: {}".format(nseqs))
-    print("nchars: {}".format(nchars))
-    print("mean length: {}".format(round(nchars/nseqs, 4)))
 
 def hstat(args, gen):
     ''' Writes chosen header and seq length data to csv '''
