@@ -1014,7 +1014,6 @@ class Fsubseq(Subcommand):
                         newseq = seq.seq[(a-1):b]
                     yield FSeq(seq.header, newseq)
 
-
 class Fasta2csv(Subcommand):
     def _parse(self):
         cmd_name = 'fasta2csv'
@@ -1038,8 +1037,24 @@ class Fasta2csv(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(args.header):
+            if(args.fields):
+                yield args.fields + ['seq']
+            else:
+                yield ['header', 'seq']
+        for seq in gen.next():
+            if(args.fields):
+                row = [seq.getvalue(field) for field in args.fields]
+            else:
+                row = [seq.header]
+            yield tuple(row + [seq.seq])
+
+    def write(self, args, gen):
+        w = csv.writer(sys.stdout, delimiter=args.delimiter)
+        for row in self.generator(args, gen):
+            w.writerow(row)
+
+
 
 class Perm(Subcommand):
     def _parse(self):
@@ -1196,20 +1211,6 @@ def simplifyheader(args, gen):
 
 
 
-def fasta2csv(args, gen):
-    w = csv.writer(sys.stdout, delimiter=args.delimiter)
-    out = []
-    if(args.header):
-        if(args.fields):
-            w.writerow(args.fields + ['seq'])
-        else:
-            w.writerow(['header', 'seq'])
-    for seq in gen.next():
-        if(args.fields):
-            elements = [seq.getvalue(field) for field in args.fields]
-        else:
-            elements = [seq.header]
-        w.writerow(tuple(elements + [seq.seq]))
 
 
 # ==============
