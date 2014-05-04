@@ -1054,8 +1054,6 @@ class Fasta2csv(Subcommand):
         for row in self.generator(args, gen):
             w.writerow(row)
 
-
-
 class Perm(Subcommand):
     def _parse(self):
         cmd_name = 'perm'
@@ -1109,7 +1107,6 @@ class Perm(Subcommand):
                 header=seq.header
             yield FSeq(header, out)
 
-
 class Simplifyheader(Subcommand):
     def _parse(self):
         cmd_name = 'rmfields'
@@ -1126,8 +1123,14 @@ class Simplifyheader(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(hasattr(args.fields, '__upper__')):
+            args.fields = (args.fields, )
+        for seq in gen.next():
+            values = [seq.getvalue(field) for field in args.fields]
+            pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
+            header = '|'.join(pairs)
+            yield FSeq(header, seq.seq)
+
 
 class Reverse(Subcommand):
     def _parse(self):
@@ -1197,14 +1200,6 @@ def reverse(args, gen):
 
 
 
-def simplifyheader(args, gen):
-    if(hasattr(args.fields, '__upper__')):
-        args.fields = (args.fields, )
-    for seq in gen.next():
-        values = [seq.getvalue(field) for field in args.fields]
-        pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
-        header = '|'.join(pairs)
-        FSeq(header, seq.seq).print()
 
 
 
