@@ -8,7 +8,7 @@ import sys
 import string
 from collections import defaultdict
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 # ================
 # Argument Parsing
@@ -321,8 +321,11 @@ class Subcommand:
         raise NotImplemented
 
     def write(self, args, gen):
-        for r in self.generator(args, gen):
-            print(r)
+        for out in self.generator(args, gen):
+            if(isinstance(out, FSeq)):
+                out.print()
+            else:
+                print(out)
 
 class Chksum(Subcommand):
     def _parse(self):
@@ -437,8 +440,50 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        try:
+            w = int(args.window_length)
+            m = int(args.word_length)
+            k = pow(int(args.alphabet_size), m)
+            p = int(args.jump)
+            offset = int(args.offset)
+        except ValueError:
+            print('All values must be integers', file=sys.stderr)
+            raise SystemExit
+
+        # Calculates the variable component of a single window's score
+        def varscore_generator(seq, words):
+            for i in range(offset, len(seq) - w + 1, p):
+                counts = defaultdict(int)
+                for j in range(i, i+w):
+                    try:
+                        counts[words[j]] += 1
+                    except IndexError:
+                        break
+                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
+
+        w_fact = math.log(math.factorial(w), k)
+
+        seq_id = 0
+        for seq in gen.next():
+            seq_id += 1
+            mean = 'NA'
+            var = 'NA'
+            if(len(seq.seq) < w + offset): pass
+            elif(args.drop and args.drop in seq.seq): pass
+            else:
+                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
+                varscores = tuple(score for score in varscore_generator(seq.seq, words))
+                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
+                mean = sum(winscores) / len(winscores)
+                try:
+                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
+                except ZeroDivisionError:
+                    var = 'NA'
+                try:
+                    col1 = seq.getvalue('gb', quiet=True)
+                except:
+                    col1 = seq_id
+                yield "{},{},{}".format(col1, mean, var)
 
 class Fstat(Subcommand):
     def _parse(self):
@@ -451,26 +496,18 @@ class Fstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
-class Unmask(Subcommand):
-    def _parse(self):
-        cmd_name = 'unmask'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Converts all letters to uppercase")
-        parser.add_argument(
-            '-x', '--to-x',
-            help="Convert lower case letters to X",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        stats = Stat()
+        nseqs = 0
+        nchars = 0
+        for seq in gen.next():
+            nseqs += 1
+            nchars += len(seq.seq)
+            stats.update_counts(seq)
+        for k, v in sorted(stats.getdict().items(), key=lambda x: x[1], reverse=True):
+            yield "{}: {} {}".format(k, v, round(v/nchars, 4))
+        yield "nseqs: {}".format(nseqs)
+        yield "nchars: {}".format(nchars)
+        yield "mean length: {}".format(round(nchars/nseqs, 4))
 
 class Hstat(Subcommand):
     def _parse(self):
@@ -491,8 +528,51 @@ class Hstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Writes chosen header and seq length data to csv '''
+        fieldnames = self._get_fieldnames(args)
+        for seq in gen.next():
+            row = {}
+            for field in args.fields:
+                row[field] = seq.getvalue(field)
+            if(args.length):
+                row['length'] = len(seq.seq)
+            yield row
+
+    def _get_fieldnames(self, args):
+        fieldnames = list(args.fields)
+        if(args.length):
+            fieldnames.append('length')
+        return(fieldnames)
+
+    def write(self, args, gen):
+        fieldnames = self._get_fieldnames(args)
+        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+        w.writeheader()
+        for row in self.generator(args, gen):
+            w.writerow(row)
+
+class Unmask(Subcommand):
+    def _parse(self):
+        cmd_name = 'unmask'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Converts all letters to uppercase")
+        parser.add_argument(
+            '-x', '--to-x',
+            help="Convert lower case letters to X",
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        ''' Converts to upcase '''
+        for seq in gen.next():
+            if(args.to_x):
+                unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
+            else:
+                unmasked_seq = FSeq(seq.header, seq.seq.upper())
+            yield unmasked_seq
 
 class Idsearch(Subcommand):
     def _parse(self):
@@ -510,8 +590,10 @@ class Idsearch(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Print entries whose headers contain a field with a given value '''
+        for seq in gen.next():
+            if(seq.field_is(args.field, args.value)):
+                yield seq
 
 class Tounk(Subcommand):
     def _parse(self):
@@ -554,8 +636,18 @@ class Tounk(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(args.type.lower()[0] in ['a', 'p']):
+            irr = args.pir
+            unk = args.punk
+        elif(args.type.lower()[0] in ['n', 'd']):
+            irr = args.nir
+            unk = args.nunk
+        if(args.lc):
+            irr = ''.join(set(irr) | set(string.ascii_lowercase))
+        trans = str.maketrans(irr, unk * len(irr))
+        for seq in gen.next():
+            seq.seq = seq.seq.translate(trans)
+            yield seq
 
 class Prettyprint(Subcommand):
     def _parse(self):
@@ -572,8 +664,13 @@ class Prettyprint(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Print each sequence with even columns of length cwidth '''
+        for seq in gen.next():
+            yield seq
+
+    def write(self, args, gen):
+        for seq in self.generator(args, gen):
+            seq.print(args.cwidth)
 
 class Qstat(Subcommand):
     def _parse(self):
@@ -612,8 +709,59 @@ class Qstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        class Result:
+            def __init__(self, seq, args):
+                self.stats = self._getstats(seq, args)
+                self.other = self._getother(seq, args)
+                try:
+                    self.fields = {x:seq.getvalue(x) for x in args.fields}
+                except:
+                    self.fields = {}
+
+            def _getstats(self, seq, args):
+                seqstats = Stat()
+                seqstats.update_counts(seq, ignoreCase=args.ignorecase)
+                return(seqstats)
+
+            def _getother(self, seq, args):
+                others = {}
+                if(args.countmasked):
+                    others['masked'] = seq.countmasked()
+                others['length'] = len(seq.seq)
+                return(others)
+
+            def getdict(self, charset):
+                d = {k:v for k,v in self.fields.items()}
+                for k,v in self.other.items():
+                    d[k] = v
+                for k, v in self.stats.getdict(charset=charset, getlength=False).items():
+                    d[k] = v
+                return(d)
+
+            def getfields(self, charset):
+                names = sorted(self.fields.keys()) + \
+                        sorted(self.other.keys()) + \
+                        sorted(charset)
+                return(names)
+
+        results = []
+        # Fill a list with Stat objects
+        for seq in gen.next():
+            # Trim the beginning and end of the sequence, as specified
+            trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
+            seq = FSeq(seq.header, trunc_seq)
+            yield Result(seq, args)
+
+    def write(self, args, gen):
+        results = list(self.generator(args, gen))
+        # Set of all unique characters seen in the fasta file
+        charset = Stat.getcharset([result.stats for result in results])
+        # Rownames for the csv file
+        fieldnames = results[0].getfields(charset)
+        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+        w.writeheader()
+        for result in results:
+            w.writerow(result.getdict(charset))
 
 class Retrieve(Subcommand):
     def _parse(self):
@@ -660,43 +808,59 @@ class Retrieve(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        '''
+        Extracts sequences matching a certain pattern
+        '''
+        def getset(values, filename):
+            s = set()
+            if filename:
+                with open(filename, 'r') as f:
+                    s.update([line.rstrip('\n') for line in f.readlines()])
+            if values:
+                s.update(values)
+            return(s)
 
-class Sample(Subcommand):
-    def _parse(self):
-        cmd_name = 'sample'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Randomly select entries from fasta file")
-        parser.add_argument(
-            'n',
-            help="Sample size",
-            type=int,
-            default=1)
-        parser.set_defaults(func=self.func)
+        groups = getset(args.groups, args.groupfile)
+        pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
 
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(len(pat) > 1 and groups):
+            print('Cannot process multiple patterns with groups', file=sys.stderr)
+            raise SystemExit
+        if not pat:
+            print('Please provide a pattern (-p <regex>)', file=sys.stderr)
 
-class Sort(Subcommand):
-    def _parse(self):
-        cmd_name = 'sort'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
-        parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        for seq in gen.next():
+            if(args.match_sequence):
+                text = seq.seq
+            else:
+                text = seq.header
+            for p in pat:
+                m = re.search(p, text)
+                if not m and not args.invert:
+                    continue
+                elif groups:
+                    try:
+                        # If at least one group defined
+                        match = m.group(1)
+                    except:
+                        # If no groups defined
+                        match = m.group(0)
+                    if (match in groups and args.invert) or \
+                    (match not in groups and not args.invert):
+                        continue
+                if not args.color or args.invert:
+                    yield seq
+                    break
+                # KLUDGE, TODO: Make seq and header classes
+                else:
+                    if(args.match_sequence):
+                        seq.colseq.setseq(text)
+                        seq.colseq.colormatch(p)
+                    else:
+                        seq.colheader.setseq(text)
+                        seq.colheader.colormatch(p)
+            if(seq.colseq.seq or seq.colheader.seq):
+                yield seq
 
 class Search(Subcommand):
     def _parse(self):
@@ -729,31 +893,23 @@ class Search(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
-class Split(Subcommand):
-    def _parse(self):
-        cmd_name = 'split'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller filers'
-        )
-        parser.add_argument(
-            '-n', '--nfiles',
-            help='Number of output files'
-        )
-        parser.add_argument(
-            '-p', '--prefix',
-            help='Prefix for output files',
-            default='xxx'
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        '''
+        Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
+        '''
+        prog = re.compile(args.pattern)
+        for seq in gen.next():
+            text = seq.seq if args.seq else seq.header
+            m = prog.search(text)
+            if (not m and not args.invert) or (m and args.invert):
+                continue
+            if(args.color and not args.invert):
+                if(args.seq):
+                    seq.colseq.setseq(text)
+                    seq.colseq.colormatch(prog)
+                else:
+                    seq.colheader.setseq(text)
+                    seq.colheader.colormatch(prog)
+            yield seq
 
 class Subseq(Subcommand):
     def _parse(self):
@@ -775,8 +931,23 @@ class Subseq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Index starting from 1 (not 0) '''
+        for seq in gen.next():
+            a = args.bounds[0]
+            b = args.bounds[1]
+            # If a > b, take reverse complement if that option is enabled,
+            # if not die
+            if(a > b):
+                if(args.revcomp):
+                    newseq = FSeq.getrevcomp(seq.seq[b-1:a])
+                else:
+                    print('Lower bound cannot be greater than upper bound ' + \
+                        '(do you want reverse complement? See options)', file=sys.stderr)
+                    sys.exit()
+            # If b >= a, this is a normal forward sequence
+            else:
+                newseq = seq.seq[a-1:b]
+            yield FSeq(seq.header, newseq)
 
 class Fsubseq(Subcommand):
     def _parse(self):
@@ -801,8 +972,47 @@ class Fsubseq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        '''
+        Extracts many subsequences. Positional argument file
+        '''
+        bounds = defaultdict(list)
+        for row in csvrowGenerator(args.file):
+            if(args.pattern_index >= 0):
+                try:
+                    pat = row[args.pattern_index]
+                    del row[args.pattern_index]
+                except IndexError:
+                    print("Given pattern index doesn't exist, fuck you!",
+                          file=sys.stderr)
+                    raise SystemExit
+            else:
+                pat = '.*'
+            try:
+                a,b = [int(x) for x in row]
+            except TypeError:
+                print("Bounds must be pair of integers", file=sys.stderr)
+                raise SystemExit
+            bounds[pat].append((a,b))
+
+        for seq in gen.next():
+            for pat in bounds.keys():
+                if(not re.search(pat, seq.header)):
+                    continue
+                for a,b in bounds[pat]:
+                    # If a > b, take reverse complement if that option is enabled,
+                    # if not die
+                    if(a > b):
+                        if(args.revcomp):
+                            newseq = FSeq.getrevcomp(seq.seq[(b-1):a])
+                        else:
+                            print('Lower bound cannot be greater than upper bound '
+                                  '(do you want reverse complement? See options)',
+                                  file=sys.stderr)
+                            raise SystemExit
+                    # If b >= a, this is a normal forward sequence
+                    else:
+                        newseq = seq.seq[(a-1):b]
+                    yield FSeq(seq.header, newseq)
 
 class Fasta2csv(Subcommand):
     def _parse(self):
@@ -827,8 +1037,22 @@ class Fasta2csv(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(args.header):
+            if(args.fields):
+                yield args.fields + ['seq']
+            else:
+                yield ['header', 'seq']
+        for seq in gen.next():
+            if(args.fields):
+                row = [seq.getvalue(field) for field in args.fields]
+            else:
+                row = [seq.header]
+            yield tuple(row + [seq.seq])
+
+    def write(self, args, gen):
+        w = csv.writer(sys.stdout, delimiter=args.delimiter)
+        for row in self.generator(args, gen):
+            w.writerow(row)
 
 class Perm(Subcommand):
     def _parse(self):
@@ -863,8 +1087,25 @@ class Perm(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        w = args.word_size
+        start = args.start_offset
+        end = args.end_offset
+        for seq in gen.next():
+            s = seq.seq
+            L = len(s)
+            prefix = s[0:start]
+            suffix = s[L-end:L]
+            rseq = s[start:L-end]
+            M = len(rseq)
+            words = list(rseq[i:i+w] for i in range(0, M - w + 1, w))
+            words.append(rseq[(M - M % w):M])
+            random.shuffle(words)
+            out = ''.join(prefix + ''.join(words) + suffix)
+            if(args.field):
+                header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
+            else:
+                header=seq.header
+            yield FSeq(header, out)
 
 class Simplifyheader(Subcommand):
     def _parse(self):
@@ -882,8 +1123,13 @@ class Simplifyheader(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(hasattr(args.fields, '__upper__')):
+            args.fields = (args.fields, )
+        for seq in gen.next():
+            values = [seq.getvalue(field) for field in args.fields]
+            pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
+            header = '|'.join(pairs)
+            yield FSeq(header, seq.seq)
 
 class Reverse(Subcommand):
     def _parse(self):
@@ -895,8 +1141,9 @@ class Reverse(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Reverse each sequence '''
+        for seq in gen.next():
+            yield FSeq(seq.header, seq.seq[::-1])
 
 class Translate(Subcommand):
     def _parse(self):
@@ -935,391 +1182,87 @@ class Translate(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
-
-
-
-
-
-def complexity(args, gen):
-    try:
-        w = int(args.window_length)
-        m = int(args.word_length)
-        k = pow(int(args.alphabet_size), m)
-        p = int(args.jump)
-        offset = int(args.offset)
-    except ValueError:
-        print('All values must be integers')
-        raise SystemExit
-
-    # Calculates the variable component of a single window's score
-    def varscore_generator(seq, words):
-        for i in range(offset, len(seq) - w + 1, p):
-            counts = defaultdict(int)
-            for j in range(i, i+w):
-                try:
-                    counts[words[j]] += 1
-                except IndexError:
-                    break
-            yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-    w_fact = math.log(math.factorial(w), k)
-
-    seq_id = 0
-    for seq in gen.next():
-        seq_id += 1
-        mean = 'NA'
-        var = 'NA'
-        if(len(seq.seq) < w + offset): pass
-        elif(args.drop and args.drop in seq.seq): pass
-        else:
-            words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-            varscores = tuple(score for score in varscore_generator(seq.seq, words))
-            winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-            mean = sum(winscores) / len(winscores)
-            try:
-                var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-            except ZeroDivisionError:
-                var = 'NA'
-            try:
-                col1 = seq.getvalue('gb', quiet=True)
-            except:
-                col1 = seq_id
-            print("{},{},{}".format(col1, mean, var))
-
-def fasta2csv(args, gen):
-    w = csv.writer(sys.stdout, delimiter=args.delimiter)
-    out = []
-    if(args.header):
-        if(args.fields):
-            w.writerow(args.fields + ['seq'])
-        else:
-            w.writerow(['header', 'seq'])
-    for seq in gen.next():
-        if(args.fields):
-            elements = [seq.getvalue(field) for field in args.fields]
-        else:
-            elements = [seq.header]
-        w.writerow(tuple(elements + [seq.seq]))
-
-def fstat(args, gen):
-    stats = Stat()
-    nseqs = 0
-    nchars = 0
-    for seq in gen.next():
-        nseqs += 1
-        nchars += len(seq.seq)
-        stats.update_counts(seq)
-    for k, v in sorted(stats.getdict().items(), key=lambda x: x[1], reverse=True):
-        print("{}: {} {}".format(k, v, round(v/nchars, 4)))
-    print("nseqs: {}".format(nseqs))
-    print("nchars: {}".format(nchars))
-    print("mean length: {}".format(round(nchars/nseqs, 4)))
-
-def hstat(args, gen):
-    ''' Writes chosen header and seq length data to csv '''
-    fieldnames = list(args.fields)
-    if(args.length):
-        fieldnames.append('length')
-    w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-    w.writeheader()
-    for seq in gen.next():
-        row = {}
-        for field in args.fields:
-            row[field] = seq.getvalue(field)
-        if(args.length):
-            row['length'] = len(seq.seq)
-        w.writerow(row)
-
-def idsearch(args, gen):
-    ''' Print entries whose headers contain a field with a given value '''
-    # TODO make mass search
-    for seq in gen.next():
-        if(seq.field_is(args.field, args.value)):
-            seq.print()
-
-def perm(args, gen):
-    w = args.word_size
-    start = args.start_offset
-    end = args.end_offset
-    for seq in gen.next():
-        s = seq.seq
-        L = len(s)
-        prefix = s[0:start]
-        suffix = s[L-end:L]
-        rseq = s[start:L-end]
-        M = len(rseq)
-        words = list(rseq[i:i+w] for i in range(0, M - w + 1, w))
-        words.append(rseq[(M - M % w):M])
-        random.shuffle(words)
-        out = ''.join(prefix + ''.join(words) + suffix)
-        if(args.field):
-            header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
-        else:
-            header=seq.header
-        FSeq(header, out).print()
-
-def prettyprint(args, gen):
-    ''' Print each sequence with even columns of length cwidth '''
-    for seq in gen.next():
-        seq.print(args.cwidth)
-
-def qstat(args, gen):
-    class Result:
-        def __init__(self, seq, args):
-            self.stats = self._getstats(seq, args)
-            self.other = self._getother(seq, args)
-            try:
-                self.fields = {x:seq.getvalue(x) for x in args.fields}
-            except:
-                self.fields = {}
-
-        def _getstats(self, seq, args):
-            seqstats = Stat()
-            seqstats.update_counts(seq, ignoreCase=args.ignorecase)
-            return(seqstats)
-
-        def _getother(self, seq, args):
-            others = {}
-            if(args.countmasked):
-                others['masked'] = seq.countmasked()
-            others['length'] = len(seq.seq)
-            return(others)
-
-        def getdict(self, charset):
-            d = {k:v for k,v in self.fields.items()}
-            for k,v in self.other.items():
-                d[k] = v
-            for k, v in self.stats.getdict(charset=charset, getlength=False).items():
-                d[k] = v
-            return(d)
-
-        def getfields(self, charset):
-            names = sorted(self.fields.keys()) + \
-                    sorted(self.other.keys()) + \
-                    sorted(charset)
-            return(names)
-
-    results = []
-    # Fill a list with Stat objects
-    for seq in gen.next():
-        # Trim the beginning and end of the sequence, as specified
-        trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
-        seq = FSeq(seq.header, trunc_seq)
-        results.append(Result(seq, args))
-    # Set of all unique characters seen in the fasta file
-    charset = Stat.getcharset([result.stats for result in results])
-    # Rownames for the csv file
-    fieldnames = results[0].getfields(charset)
-    w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-    w.writeheader()
-    [ w.writerow(r.getdict(charset)) for r in results ]
-
-def reverse(args, gen):
-    ''' Reverse each sequence '''
-    for seq in gen.next():
-        rseq = FSeq(seq.header, seq.seq[::-1])
-        rseq.print()
-
-def retrieve(args, gen):
-    '''
-    Extracts sequences matching a certain pattern
-    '''
-    def getset(values, filename):
-        s = set()
-        if filename:
-            with open(filename, 'r') as f:
-                s.update([line.rstrip('\n') for line in f.readlines()])
-        if values:
-            s.update(values)
-        return(s)
-
-    groups = getset(args.groups, args.groupfile)
-    pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
-
-    if(len(pat) > 1 and groups):
-        print('Cannot process multiple patterns with groups', file=sys.stderr)
-        raise SystemExit
-    if not pat:
-        print('Please provide a pattern (-p <regex>)', file=sys.stderr)
-
-    for seq in gen.next():
-        if(args.match_sequence):
-            text = seq.seq
-        else:
-            text = seq.header
-        for p in pat:
-            m = re.search(p, text)
-            if not m and not args.invert:
-                continue
-            elif groups:
-                try:
-                    # If at least one group defined
-                    match = m.group(1)
-                except:
-                    # If no groups defined
-                    match = m.group(0)
-                if (match in groups and args.invert) or \
-                   (match not in groups and not args.invert):
-                    continue
-            if not args.color or args.invert:
-                seq.print()
-                break
-            # KLUDGE, TODO: Make seq and header classes
-            else:
-                if(args.match_sequence):
-                    seq.colseq.setseq(text)
-                    seq.colseq.colormatch(p)
-                else:
-                    seq.colheader.setseq(text)
-                    seq.colheader.colormatch(p)
-        if(seq.colseq.seq or seq.colheader.seq):
-            seq.print()
-
-def search(args, gen):
-    '''
-    Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
-    '''
-    prog = re.compile(args.pattern)
-    for seq in gen.next():
-        text = seq.seq if args.seq else seq.header
-        m = prog.search(text)
-        if (not m and not args.invert) or (m and args.invert):
-            continue
-        if(args.color and not args.invert):
-            if(args.seq):
-                seq.colseq.setseq(text)
-                seq.colseq.colormatch(prog)
-            else:
-                seq.colheader.setseq(text)
-                seq.colheader.colormatch(prog)
-        seq.print()
-
-def simplifyheader(args, gen):
-    if(hasattr(args.fields, '__upper__')):
-        args.fields = (args.fields, )
-    for seq in gen.next():
-        values = [seq.getvalue(field) for field in args.fields]
-        pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
-        header = '|'.join(pairs)
-        FSeq(header, seq.seq).print()
-
-def split(args, gen):
-    k = int(args.nfiles)
-    p = args.prefix
-    seqs = []
-    for seq in gen.next():
-        seqs.append(seq)
-    for i in range(0, k):
-        begin = i * (len(seqs) // k + 1)
-        end = min(len(seqs), (i+1) * (len(seqs) // k + 1))
-        outfile = p + str(i) + '.fasta'
-        with open(outfile, 'w+') as fo:
-            for seq in (seqs[x] for x in range(begin, end)):
-                fo.write(seq.get_pretty_string() + '\n')
-
-def subseq(args, gen):
-    ''' Index starting from 1 (not 0) '''
-    for seq in gen.next():
-        a = args.bounds[0]
-        b = args.bounds[1]
-        # If a > b, take reverse complement if that option is enabled,
-        # if not die
-        if(a > b):
-            if(args.revcomp):
-                newseq = FSeq.getrevcomp(seq.seq[b-1:a])
-            else:
-                print('Lower bound cannot be greater than upper bound ' + \
-                      '(do you want reverse complement? See options)', file=sys.stderr)
-                sys.exit()
-        # If b >= a, this is a normal forward sequence
-        else:
-            newseq = seq.seq[a-1:b]
-        FSeq(seq.header, newseq).print()
-
-def tounk(args, gen):
-    if(args.type.lower()[0] in ['a', 'p']):
-        irr = args.pir
-        unk = args.punk
-    elif(args.type.lower()[0] in ['n', 'd']):
-        irr = args.nir
-        unk = args.nunk
-    if(args.lc):
-        irr = ''.join(set(irr) | set(string.ascii_lowercase))
-    trans = str.maketrans(irr, unk * len(irr))
-    for seq in gen.next():
-        seq.seq = seq.seq.translate(trans)
-        seq.print()
-
-def fsubseq(args, gen):
-    '''
-    Extracts many subsequences. Positional argument file
-    '''
-    bounds = defaultdict(list)
-    for row in csvrowGenerator(args.file):
-        if(args.pattern_index >= 0):
-            try:
-                pat = row[args.pattern_index]
-                del row[args.pattern_index]
-            except IndexError as e:
-                print(e)
-                print("Given pattern index doesn't exist, fuck you!")
-                sys.exit()
-        else:
-            pat = '.*'
-        try:
-            a,b = [int(x) for x in row]
-        except TypeError as e:
-            print(e)
-            print("Bounds must be pair of integers")
-            sys.exit()
-        bounds[pat].append((a,b))
-
-    for seq in gen.next():
-        for pat in bounds.keys():
-            if(not re.search(pat, seq.header)):
-                continue
-            for a,b in bounds[pat]:
-                # If a > b, take reverse complement if that option is enabled,
-                # if not die
-                if(a > b):
-                    if(args.revcomp):
-                        newseq = FSeq.getrevcomp(seq.seq[(b-1):a])
-                    else:
-                        print('Lower bound cannot be greater than upper bound ' + \
-                            '(do you want reverse complement? See options)', file=sys.stderr)
-                        sys.exit()
-                # If b >= a, this is a normal forward sequence
-                else:
-                    newseq = seq.seq[(a-1):b]
-                FSeq(seq.header, newseq).print()
-
-def unmask(args, gen):
-    ''' Converts to upcase '''
-    for seq in gen.next():
-        if(args.to_x):
-            unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
-        else:
-            unmasked_seq = FSeq(seq.header, seq.seq.upper())
-        unmasked_seq.print()
+        raise NotImplemented
 
 
 # ==============
 # FULL FUNCTIONS
 # ==============
 
-def sample(args, gen):
-    ''' Randomly sample n entries from input file '''
-    seqs = [s for s in gen.next()]
-    sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
-    [seqs[i].print() for i in sample_indices]
+class Sample(Subcommand):
+    def _parse(self):
+        cmd_name = 'sample'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Randomly select entries from fasta file")
+        parser.add_argument(
+            'n',
+            help="Sample size",
+            type=int,
+            default=1)
+        parser.set_defaults(func=self.func)
 
-def sort(args, gen):
-    seqs = [s for s in gen.next()]
-    seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
-    [s.print() for s in seqs]
+    def generator(self, args, gen):
+        ''' Randomly sample n entries from input file '''
+        seqs = [s for s in gen.next()]
+        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
+        for i in sample_indices:
+            yield seqs[i]
+
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Sort sequences by given fields")
+        parser.add_argument(
+            'fields',
+            help="Header fields by which to sort sequences",
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = [s for s in gen.next()]
+        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
+        for s in seqs:
+            yield s
+
+class Split(Subcommand):
+    def _parse(self):
+        cmd_name = 'split'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Split a multifasta file into k smaller filers'
+        )
+        parser.add_argument(
+            '-n', '--nfiles',
+            help='Number of output files'
+        )
+        parser.add_argument(
+            '-p', '--prefix',
+            help='Prefix for output files',
+            default='xxx'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for s in gen.next():
+            yield s
+
+    def write(self, args, gen):
+        k = int(args.nfiles)
+        p = args.prefix
+        seqs = list(self.generator(args, gen))
+        for i in range(0, k):
+            begin = i * (len(seqs) // k + 1)
+            end = min(len(seqs), (i+1) * (len(seqs) // k + 1))
+            outfile = p + str(i) + '.fasta'
+            with open(outfile, 'w+') as fo:
+                for seq in (seqs[x] for x in range(begin, end)):
+                    fo.write(seq.get_pretty_string() + '\n')
 
 
 # =======
