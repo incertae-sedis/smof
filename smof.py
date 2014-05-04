@@ -1145,7 +1145,6 @@ class Reverse(Subcommand):
         for seq in gen.next():
             yield FSeq(seq.header, seq.seq[::-1])
 
-
 class Translate(Subcommand):
     def _parse(self):
         cmd_name = 'translate'
@@ -1183,22 +1182,7 @@ class Translate(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        raise NotImplemented
 
 
 # ==============
