@@ -548,7 +548,6 @@ class Hstat(Subcommand):
         for row in self.generator(args, gen):
             w.writerow(row)
 
-
 class Unmask(Subcommand):
     def _parse(self):
         cmd_name = 'unmask'
@@ -575,7 +574,6 @@ class Unmask(Subcommand):
     def write(self, args, gen):
         for seq in self.generator(args, gen):
             seq.print()
-
 
 class Idsearch(Subcommand):
     def _parse(self):
@@ -643,8 +641,23 @@ class Tounk(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        if(args.type.lower()[0] in ['a', 'p']):
+            irr = args.pir
+            unk = args.punk
+        elif(args.type.lower()[0] in ['n', 'd']):
+            irr = args.nir
+            unk = args.nunk
+        if(args.lc):
+            irr = ''.join(set(irr) | set(string.ascii_lowercase))
+        trans = str.maketrans(irr, unk * len(irr))
+        for seq in gen.next():
+            seq.seq = seq.seq.translate(trans)
+            yield seq
+
+    def write(self, args, gen):
+        for seq in self.generator(args, gen):
+            seq.print()
+
 
 class Prettyprint(Subcommand):
     def _parse(self):
@@ -1231,20 +1244,6 @@ def subseq(args, gen):
         else:
             newseq = seq.seq[a-1:b]
         FSeq(seq.header, newseq).print()
-
-def tounk(args, gen):
-    if(args.type.lower()[0] in ['a', 'p']):
-        irr = args.pir
-        unk = args.punk
-    elif(args.type.lower()[0] in ['n', 'd']):
-        irr = args.nir
-        unk = args.nunk
-    if(args.lc):
-        irr = ''.join(set(irr) | set(string.ascii_lowercase))
-    trans = str.maketrans(irr, unk * len(irr))
-    for seq in gen.next():
-        seq.seq = seq.seq.translate(trans)
-        seq.print()
 
 def fsubseq(args, gen):
     '''
