@@ -710,8 +710,59 @@ class Qstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        class Result:
+            def __init__(self, seq, args):
+                self.stats = self._getstats(seq, args)
+                self.other = self._getother(seq, args)
+                try:
+                    self.fields = {x:seq.getvalue(x) for x in args.fields}
+                except:
+                    self.fields = {}
+
+            def _getstats(self, seq, args):
+                seqstats = Stat()
+                seqstats.update_counts(seq, ignoreCase=args.ignorecase)
+                return(seqstats)
+
+            def _getother(self, seq, args):
+                others = {}
+                if(args.countmasked):
+                    others['masked'] = seq.countmasked()
+                others['length'] = len(seq.seq)
+                return(others)
+
+            def getdict(self, charset):
+                d = {k:v for k,v in self.fields.items()}
+                for k,v in self.other.items():
+                    d[k] = v
+                for k, v in self.stats.getdict(charset=charset, getlength=False).items():
+                    d[k] = v
+                return(d)
+
+            def getfields(self, charset):
+                names = sorted(self.fields.keys()) + \
+                        sorted(self.other.keys()) + \
+                        sorted(charset)
+                return(names)
+
+        results = []
+        # Fill a list with Stat objects
+        for seq in gen.next():
+            # Trim the beginning and end of the sequence, as specified
+            trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
+            seq = FSeq(seq.header, trunc_seq)
+            yield Result(seq, args)
+
+    def write(self, args, gen):
+        results = list(self.generator(args, gen))
+        # Set of all unique characters seen in the fasta file
+        charset = Stat.getcharset([result.stats for result in results])
+        # Rownames for the csv file
+        fieldnames = results[0].getfields(charset)
+        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+        w.writeheader()
+        for result in results:
+            w.writerow(result.getdict(charset))
 
 class Retrieve(Subcommand):
     def _parse(self):
@@ -1063,57 +1114,6 @@ def perm(args, gen):
             header=seq.header
         FSeq(header, out).print()
 
-
-def qstat(args, gen):
-    class Result:
-        def __init__(self, seq, args):
-            self.stats = self._getstats(seq, args)
-            self.other = self._getother(seq, args)
-            try:
-                self.fields = {x:seq.getvalue(x) for x in args.fields}
-            except:
-                self.fields = {}
-
-        def _getstats(self, seq, args):
-            seqstats = Stat()
-            seqstats.update_counts(seq, ignoreCase=args.ignorecase)
-            return(seqstats)
-
-        def _getother(self, seq, args):
-            others = {}
-            if(args.countmasked):
-                others['masked'] = seq.countmasked()
-            others['length'] = len(seq.seq)
-            return(others)
-
-        def getdict(self, charset):
-            d = {k:v for k,v in self.fields.items()}
-            for k,v in self.other.items():
-                d[k] = v
-            for k, v in self.stats.getdict(charset=charset, getlength=False).items():
-                d[k] = v
-            return(d)
-
-        def getfields(self, charset):
-            names = sorted(self.fields.keys()) + \
-                    sorted(self.other.keys()) + \
-                    sorted(charset)
-            return(names)
-
-    results = []
-    # Fill a list with Stat objects
-    for seq in gen.next():
-        # Trim the beginning and end of the sequence, as specified
-        trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
-        seq = FSeq(seq.header, trunc_seq)
-        results.append(Result(seq, args))
-    # Set of all unique characters seen in the fasta file
-    charset = Stat.getcharset([result.stats for result in results])
-    # Rownames for the csv file
-    fieldnames = results[0].getfields(charset)
-    w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-    w.writeheader()
-    [ w.writerow(r.getdict(charset)) for r in results ]
 
 def reverse(args, gen):
     ''' Reverse each sequence '''
