@@ -911,7 +911,6 @@ class Search(Subcommand):
                     seq.colheader.colormatch(prog)
             yield seq
 
-
 class Subseq(Subcommand):
     def _parse(self):
         cmd_name = 'subseq'
@@ -932,8 +931,24 @@ class Subseq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Index starting from 1 (not 0) '''
+        for seq in gen.next():
+            a = args.bounds[0]
+            b = args.bounds[1]
+            # If a > b, take reverse complement if that option is enabled,
+            # if not die
+            if(a > b):
+                if(args.revcomp):
+                    newseq = FSeq.getrevcomp(seq.seq[b-1:a])
+                else:
+                    print('Lower bound cannot be greater than upper bound ' + \
+                        '(do you want reverse complement? See options)', file=sys.stderr)
+                    sys.exit()
+            # If b >= a, this is a normal forward sequence
+            else:
+                newseq = seq.seq[a-1:b]
+            yield FSeq(seq.header, newseq)
+
 
 class Fsubseq(Subcommand):
     def _parse(self):
@@ -1140,25 +1155,6 @@ def simplifyheader(args, gen):
         header = '|'.join(pairs)
         FSeq(header, seq.seq).print()
 
-
-def subseq(args, gen):
-    ''' Index starting from 1 (not 0) '''
-    for seq in gen.next():
-        a = args.bounds[0]
-        b = args.bounds[1]
-        # If a > b, take reverse complement if that option is enabled,
-        # if not die
-        if(a > b):
-            if(args.revcomp):
-                newseq = FSeq.getrevcomp(seq.seq[b-1:a])
-            else:
-                print('Lower bound cannot be greater than upper bound ' + \
-                      '(do you want reverse complement? See options)', file=sys.stderr)
-                sys.exit()
-        # If b >= a, this is a normal forward sequence
-        else:
-            newseq = seq.seq[a-1:b]
-        FSeq(seq.header, newseq).print()
 
 def fsubseq(args, gen):
     '''
