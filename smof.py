@@ -506,7 +506,6 @@ class Fstat(Subcommand):
         yield "nchars: {}".format(nchars)
         yield "mean length: {}".format(round(nchars/nseqs, 4))
 
-
 class Hstat(Subcommand):
     def _parse(self):
         cmd_name = 'hstat'
@@ -549,6 +548,7 @@ class Hstat(Subcommand):
         for row in self.generator(args, gen):
             w.writerow(row)
 
+
 class Unmask(Subcommand):
     def _parse(self):
         cmd_name = 'unmask'
@@ -564,8 +564,18 @@ class Unmask(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Converts to upcase '''
+        for seq in gen.next():
+            if(args.to_x):
+                unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
+            else:
+                unmasked_seq = FSeq(seq.header, seq.seq.upper())
+            yield unmasked_seq
+
+    def write(self, args, gen):
+        for seq in self.generator(args, gen):
+            seq.print()
+
 
 class Idsearch(Subcommand):
     def _parse(self):
@@ -1279,14 +1289,6 @@ def fsubseq(args, gen):
                     newseq = seq.seq[(a-1):b]
                 FSeq(seq.header, newseq).print()
 
-def unmask(args, gen):
-    ''' Converts to upcase '''
-    for seq in gen.next():
-        if(args.to_x):
-            unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
-        else:
-            unmasked_seq = FSeq(seq.header, seq.seq.upper())
-        unmasked_seq.print()
 
 def fasta2csv(args, gen):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
