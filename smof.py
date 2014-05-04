@@ -649,7 +649,6 @@ class Tounk(Subcommand):
             seq.seq = seq.seq.translate(trans)
             yield seq
 
-
 class Prettyprint(Subcommand):
     def _parse(self):
         cmd_name = 'prettyprint'
@@ -665,8 +664,14 @@ class Prettyprint(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Print each sequence with even columns of length cwidth '''
+        for seq in gen.next():
+            yield seq
+
+    def write(self, args, gen):
+        for seq in self.generator(args, gen):
+            seq.print(args.cwidth)
+
 
 class Qstat(Subcommand):
     def _parse(self):
@@ -1058,10 +1063,6 @@ def perm(args, gen):
             header=seq.header
         FSeq(header, out).print()
 
-def prettyprint(args, gen):
-    ''' Print each sequence with even columns of length cwidth '''
-    for seq in gen.next():
-        seq.print(args.cwidth)
 
 def qstat(args, gen):
     class Result:
