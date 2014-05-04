@@ -482,7 +482,6 @@ class Complexity(Subcommand):
                     col1 = seq_id
                 yield "{},{},{}".format(col1, mean, var)
 
-
 class Fstat(Subcommand):
     def _parse(self):
         cmd_name = 'fstat'
@@ -508,24 +507,6 @@ class Fstat(Subcommand):
         yield "mean length: {}".format(round(nchars/nseqs, 4))
 
 
-class Unmask(Subcommand):
-    def _parse(self):
-        cmd_name = 'unmask'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Converts all letters to uppercase")
-        parser.add_argument(
-            '-x', '--to-x',
-            help="Convert lower case letters to X",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
 class Hstat(Subcommand):
     def _parse(self):
         cmd_name = 'hstat'
@@ -540,6 +521,44 @@ class Hstat(Subcommand):
         parser.add_argument(
             '--length',
             help="Report length of each sequence",
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        ''' Writes chosen header and seq length data to csv '''
+        fieldnames = self._get_fieldnames(args)
+        for seq in gen.next():
+            row = {}
+            for field in args.fields:
+                row[field] = seq.getvalue(field)
+            if(args.length):
+                row['length'] = len(seq.seq)
+            yield row
+
+    def _get_fieldnames(self, args):
+        fieldnames = list(args.fields)
+        if(args.length):
+            fieldnames.append('length')
+        return(fieldnames)
+
+    def write(self, args, gen):
+        fieldnames = self._get_fieldnames(args)
+        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+        w.writeheader()
+        for row in self.generator(args, gen):
+            w.writerow(row)
+
+class Unmask(Subcommand):
+    def _parse(self):
+        cmd_name = 'unmask'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Converts all letters to uppercase")
+        parser.add_argument(
+            '-x', '--to-x',
+            help="Convert lower case letters to X",
             action='store_true',
             default=False)
         parser.set_defaults(func=self.func)
@@ -997,36 +1016,6 @@ class Translate(Subcommand):
 
 
 
-def fasta2csv(args, gen):
-    w = csv.writer(sys.stdout, delimiter=args.delimiter)
-    out = []
-    if(args.header):
-        if(args.fields):
-            w.writerow(args.fields + ['seq'])
-        else:
-            w.writerow(['header', 'seq'])
-    for seq in gen.next():
-        if(args.fields):
-            elements = [seq.getvalue(field) for field in args.fields]
-        else:
-            elements = [seq.header]
-        w.writerow(tuple(elements + [seq.seq]))
-
-def hstat(args, gen):
-    ''' Writes chosen header and seq length data to csv '''
-    fieldnames = list(args.fields)
-    if(args.length):
-        fieldnames.append('length')
-    w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-    w.writeheader()
-    for seq in gen.next():
-        row = {}
-        for field in args.fields:
-            row[field] = seq.getvalue(field)
-        if(args.length):
-            row['length'] = len(seq.seq)
-        w.writerow(row)
-
 def idsearch(args, gen):
     ''' Print entries whose headers contain a field with a given value '''
     # TODO make mass search
@@ -1298,6 +1287,21 @@ def unmask(args, gen):
         else:
             unmasked_seq = FSeq(seq.header, seq.seq.upper())
         unmasked_seq.print()
+
+def fasta2csv(args, gen):
+    w = csv.writer(sys.stdout, delimiter=args.delimiter)
+    out = []
+    if(args.header):
+        if(args.fields):
+            w.writerow(args.fields + ['seq'])
+        else:
+            w.writerow(['header', 'seq'])
+    for seq in gen.next():
+        if(args.fields):
+            elements = [seq.getvalue(field) for field in args.fields]
+        else:
+            elements = [seq.header]
+        w.writerow(tuple(elements + [seq.seq]))
 
 
 # ==============

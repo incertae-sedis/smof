@@ -1,4 +1,6 @@
-unmask needs --to-n option
-Make Header and Seq classes
-Demonolithize the parser
-Make semi-auto incrementing version system
+* unmask needs --to-n option
+* Make Header and Seq classes
+* Demonolithize the parser
+* Make semi-auto incrementing version system
+* Fix the fields selection methods, perhaps add pattern system
+    * adapt hstat, idsearch, maybe others
