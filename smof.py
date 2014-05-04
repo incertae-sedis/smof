@@ -912,29 +912,6 @@ class Search(Subcommand):
             yield seq
 
 
-class Split(Subcommand):
-    def _parse(self):
-        cmd_name = 'split'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller filers'
-        )
-        parser.add_argument(
-            '-n', '--nfiles',
-            help='Number of output files'
-        )
-        parser.add_argument(
-            '-p', '--prefix',
-            help='Prefix for output files',
-            default='xxx'
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
 class Subseq(Subcommand):
     def _parse(self):
         cmd_name = 'subseq'
@@ -1163,19 +1140,6 @@ def simplifyheader(args, gen):
         header = '|'.join(pairs)
         FSeq(header, seq.seq).print()
 
-def split(args, gen):
-    k = int(args.nfiles)
-    p = args.prefix
-    seqs = []
-    for seq in gen.next():
-        seqs.append(seq)
-    for i in range(0, k):
-        begin = i * (len(seqs) // k + 1)
-        end = min(len(seqs), (i+1) * (len(seqs) // k + 1))
-        outfile = p + str(i) + '.fasta'
-        with open(outfile, 'w+') as fo:
-            for seq in (seqs[x] for x in range(begin, end)):
-                fo.write(seq.get_pretty_string() + '\n')
 
 def subseq(args, gen):
     ''' Index starting from 1 (not 0) '''
@@ -1299,6 +1263,41 @@ class Sort(Subcommand):
         seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
         for s in seqs:
             yield s
+
+class Split(Subcommand):
+    def _parse(self):
+        cmd_name = 'split'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='Split a multifasta file into k smaller filers'
+        )
+        parser.add_argument(
+            '-n', '--nfiles',
+            help='Number of output files'
+        )
+        parser.add_argument(
+            '-p', '--prefix',
+            help='Prefix for output files',
+            default='xxx'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for s in gen.next():
+            yield s
+
+    def write(self, args, gen):
+        k = int(args.nfiles)
+        p = args.prefix
+        seqs = list(self.generator(args, gen))
+        for i in range(0, k):
+            begin = i * (len(seqs) // k + 1)
+            end = min(len(seqs), (i+1) * (len(seqs) // k + 1))
+            outfile = p + str(i) + '.fasta'
+            with open(outfile, 'w+') as fo:
+                for seq in (seqs[x] for x in range(begin, end)):
+                    fo.write(seq.get_pretty_string() + '\n')
 
 
 # =======
