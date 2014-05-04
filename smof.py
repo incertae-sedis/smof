@@ -672,7 +672,6 @@ class Prettyprint(Subcommand):
         for seq in self.generator(args, gen):
             seq.print(args.cwidth)
 
-
 class Qstat(Subcommand):
     def _parse(self):
         cmd_name = 'qstat'
@@ -809,8 +808,60 @@ class Retrieve(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        '''
+        Extracts sequences matching a certain pattern
+        '''
+        def getset(values, filename):
+            s = set()
+            if filename:
+                with open(filename, 'r') as f:
+                    s.update([line.rstrip('\n') for line in f.readlines()])
+            if values:
+                s.update(values)
+            return(s)
+
+        groups = getset(args.groups, args.groupfile)
+        pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
+
+        if(len(pat) > 1 and groups):
+            print('Cannot process multiple patterns with groups', file=sys.stderr)
+            raise SystemExit
+        if not pat:
+            print('Please provide a pattern (-p <regex>)', file=sys.stderr)
+
+        for seq in gen.next():
+            if(args.match_sequence):
+                text = seq.seq
+            else:
+                text = seq.header
+            for p in pat:
+                m = re.search(p, text)
+                if not m and not args.invert:
+                    continue
+                elif groups:
+                    try:
+                        # If at least one group defined
+                        match = m.group(1)
+                    except:
+                        # If no groups defined
+                        match = m.group(0)
+                    if (match in groups and args.invert) or \
+                    (match not in groups and not args.invert):
+                        continue
+                if not args.color or args.invert:
+                    yield seq
+                    break
+                # KLUDGE, TODO: Make seq and header classes
+                else:
+                    if(args.match_sequence):
+                        seq.colseq.setseq(text)
+                        seq.colseq.colormatch(p)
+                    else:
+                        seq.colheader.setseq(text)
+                        seq.colheader.colormatch(p)
+            if(seq.colseq.seq or seq.colheader.seq):
+                yield seq
+
 
 class Sample(Subcommand):
     def _parse(self):
@@ -1121,60 +1172,6 @@ def reverse(args, gen):
         rseq = FSeq(seq.header, seq.seq[::-1])
         rseq.print()
 
-def retrieve(args, gen):
-    '''
-    Extracts sequences matching a certain pattern
-    '''
-    def getset(values, filename):
-        s = set()
-        if filename:
-            with open(filename, 'r') as f:
-                s.update([line.rstrip('\n') for line in f.readlines()])
-        if values:
-            s.update(values)
-        return(s)
-
-    groups = getset(args.groups, args.groupfile)
-    pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
-
-    if(len(pat) > 1 and groups):
-        print('Cannot process multiple patterns with groups', file=sys.stderr)
-        raise SystemExit
-    if not pat:
-        print('Please provide a pattern (-p <regex>)', file=sys.stderr)
-
-    for seq in gen.next():
-        if(args.match_sequence):
-            text = seq.seq
-        else:
-            text = seq.header
-        for p in pat:
-            m = re.search(p, text)
-            if not m and not args.invert:
-                continue
-            elif groups:
-                try:
-                    # If at least one group defined
-                    match = m.group(1)
-                except:
-                    # If no groups defined
-                    match = m.group(0)
-                if (match in groups and args.invert) or \
-                   (match not in groups and not args.invert):
-                    continue
-            if not args.color or args.invert:
-                seq.print()
-                break
-            # KLUDGE, TODO: Make seq and header classes
-            else:
-                if(args.match_sequence):
-                    seq.colseq.setseq(text)
-                    seq.colseq.colormatch(p)
-                else:
-                    seq.colheader.setseq(text)
-                    seq.colheader.colormatch(p)
-        if(seq.colseq.seq or seq.colheader.seq):
-            seq.print()
 
 def search(args, gen):
     '''
