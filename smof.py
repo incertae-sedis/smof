@@ -863,41 +863,6 @@ class Retrieve(Subcommand):
                 yield seq
 
 
-class Sample(Subcommand):
-    def _parse(self):
-        cmd_name = 'sample'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Randomly select entries from fasta file")
-        parser.add_argument(
-            'n',
-            help="Sample size",
-            type=int,
-            default=1)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
-class Sort(Subcommand):
-    def _parse(self):
-        cmd_name = 'sort'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
-        parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
-
 class Search(Subcommand):
     def _parse(self):
         cmd_name = 'search'
@@ -1298,16 +1263,45 @@ def fasta2csv(args, gen):
 # FULL FUNCTIONS
 # ==============
 
-def sample(args, gen):
-    ''' Randomly sample n entries from input file '''
-    seqs = [s for s in gen.next()]
-    sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
-    [seqs[i].print() for i in sample_indices]
+class Sample(Subcommand):
+    def _parse(self):
+        cmd_name = 'sample'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Randomly select entries from fasta file")
+        parser.add_argument(
+            'n',
+            help="Sample size",
+            type=int,
+            default=1)
+        parser.set_defaults(func=self.func)
 
-def sort(args, gen):
-    seqs = [s for s in gen.next()]
-    seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
-    [s.print() for s in seqs]
+    def generator(self, args, gen):
+        ''' Randomly sample n entries from input file '''
+        seqs = [s for s in gen.next()]
+        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
+        for i in sample_indices:
+            yield seqs[i]
+
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Sort sequences by given fields")
+        parser.add_argument(
+            'fields',
+            help="Header fields by which to sort sequences",
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = [s for s in gen.next()]
+        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
+        for s in seqs:
+            yield s
 
 
 # =======
