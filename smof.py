@@ -321,8 +321,11 @@ class Subcommand:
         raise NotImplemented
 
     def write(self, args, gen):
-        for r in self.generator(args, gen):
-            print(r)
+        for out in self.generator(args, gen):
+            if(isinstance(out, FSeq)):
+                out.print()
+            else:
+                print(out)
 
 class Chksum(Subcommand):
     def _parse(self):
@@ -571,10 +574,6 @@ class Unmask(Subcommand):
                 unmasked_seq = FSeq(seq.header, seq.seq.upper())
             yield unmasked_seq
 
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print()
-
 class Idsearch(Subcommand):
     def _parse(self):
         cmd_name = 'idsearch'
@@ -595,10 +594,6 @@ class Idsearch(Subcommand):
         for seq in gen.next():
             if(seq.field_is(args.field, args.value)):
                 yield seq
-
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print()
 
 class Tounk(Subcommand):
     def _parse(self):
@@ -653,10 +648,6 @@ class Tounk(Subcommand):
         for seq in gen.next():
             seq.seq = seq.seq.translate(trans)
             yield seq
-
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print()
 
 
 class Prettyprint(Subcommand):
