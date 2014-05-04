@@ -437,8 +437,51 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        try:
+            w = int(args.window_length)
+            m = int(args.word_length)
+            k = pow(int(args.alphabet_size), m)
+            p = int(args.jump)
+            offset = int(args.offset)
+        except ValueError:
+            print('All values must be integers', file=sys.stderr)
+            raise SystemExit
+
+        # Calculates the variable component of a single window's score
+        def varscore_generator(seq, words):
+            for i in range(offset, len(seq) - w + 1, p):
+                counts = defaultdict(int)
+                for j in range(i, i+w):
+                    try:
+                        counts[words[j]] += 1
+                    except IndexError:
+                        break
+                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
+
+        w_fact = math.log(math.factorial(w), k)
+
+        seq_id = 0
+        for seq in gen.next():
+            seq_id += 1
+            mean = 'NA'
+            var = 'NA'
+            if(len(seq.seq) < w + offset): pass
+            elif(args.drop and args.drop in seq.seq): pass
+            else:
+                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
+                varscores = tuple(score for score in varscore_generator(seq.seq, words))
+                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
+                mean = sum(winscores) / len(winscores)
+                try:
+                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
+                except ZeroDivisionError:
+                    var = 'NA'
+                try:
+                    col1 = seq.getvalue('gb', quiet=True)
+                except:
+                    col1 = seq_id
+                yield "{},{},{}".format(col1, mean, var)
+
 
 class Fstat(Subcommand):
     def _parse(self):
@@ -942,52 +985,6 @@ class Translate(Subcommand):
 
 
 
-
-def complexity(args, gen):
-    try:
-        w = int(args.window_length)
-        m = int(args.word_length)
-        k = pow(int(args.alphabet_size), m)
-        p = int(args.jump)
-        offset = int(args.offset)
-    except ValueError:
-        print('All values must be integers')
-        raise SystemExit
-
-    # Calculates the variable component of a single window's score
-    def varscore_generator(seq, words):
-        for i in range(offset, len(seq) - w + 1, p):
-            counts = defaultdict(int)
-            for j in range(i, i+w):
-                try:
-                    counts[words[j]] += 1
-                except IndexError:
-                    break
-            yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-    w_fact = math.log(math.factorial(w), k)
-
-    seq_id = 0
-    for seq in gen.next():
-        seq_id += 1
-        mean = 'NA'
-        var = 'NA'
-        if(len(seq.seq) < w + offset): pass
-        elif(args.drop and args.drop in seq.seq): pass
-        else:
-            words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-            varscores = tuple(score for score in varscore_generator(seq.seq, words))
-            winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-            mean = sum(winscores) / len(winscores)
-            try:
-                var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-            except ZeroDivisionError:
-                var = 'NA'
-            try:
-                col1 = seq.getvalue('gb', quiet=True)
-            except:
-                col1 = seq_id
-            print("{},{},{}".format(col1, mean, var))
 
 def fasta2csv(args, gen):
     w = csv.writer(sys.stdout, delimiter=args.delimiter)
