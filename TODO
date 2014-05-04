@@ -4,3 +4,4 @@
 * Make semi-auto incrementing version system
 * Fix the fields selection methods, perhaps add pattern system
     * adapt hstat, idsearch, maybe others
+* Make idsearch high-thoughput

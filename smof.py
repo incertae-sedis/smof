@@ -593,8 +593,14 @@ class Idsearch(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Print entries whose headers contain a field with a given value '''
+        for seq in gen.next():
+            if(seq.field_is(args.field, args.value)):
+                yield seq
+
+    def write(self, args, gen):
+        for seq in self.generator(args, gen):
+            seq.print()
 
 class Tounk(Subcommand):
     def _parse(self):
@@ -1026,12 +1032,6 @@ class Translate(Subcommand):
 
 
 
-def idsearch(args, gen):
-    ''' Print entries whose headers contain a field with a given value '''
-    # TODO make mass search
-    for seq in gen.next():
-        if(seq.field_is(args.field, args.value)):
-            seq.print()
 
 def perm(args, gen):
     w = args.word_size
