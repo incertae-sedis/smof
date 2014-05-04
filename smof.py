@@ -1131,7 +1131,6 @@ class Simplifyheader(Subcommand):
             header = '|'.join(pairs)
             yield FSeq(header, seq.seq)
 
-
 class Reverse(Subcommand):
     def _parse(self):
         cmd_name = 'reverse'
@@ -1142,8 +1141,10 @@ class Reverse(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        ''' Reverse each sequence '''
+        for seq in gen.next():
+            yield FSeq(seq.header, seq.seq[::-1])
+
 
 class Translate(Subcommand):
     def _parse(self):
@@ -1192,11 +1193,6 @@ class Translate(Subcommand):
 
 
 
-def reverse(args, gen):
-    ''' Reverse each sequence '''
-    for seq in gen.next():
-        rseq = FSeq(seq.header, seq.seq[::-1])
-        rseq.print()
 
 
 
