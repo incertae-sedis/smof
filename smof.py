@@ -1089,8 +1089,26 @@ class Perm(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for j in ['1','2','3']:
-            yield j
+        w = args.word_size
+        start = args.start_offset
+        end = args.end_offset
+        for seq in gen.next():
+            s = seq.seq
+            L = len(s)
+            prefix = s[0:start]
+            suffix = s[L-end:L]
+            rseq = s[start:L-end]
+            M = len(rseq)
+            words = list(rseq[i:i+w] for i in range(0, M - w + 1, w))
+            words.append(rseq[(M - M % w):M])
+            random.shuffle(words)
+            out = ''.join(prefix + ''.join(words) + suffix)
+            if(args.field):
+                header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
+            else:
+                header=seq.header
+            yield FSeq(header, out)
+
 
 class Simplifyheader(Subcommand):
     def _parse(self):
@@ -1169,27 +1187,6 @@ class Translate(Subcommand):
 
 
 
-
-def perm(args, gen):
-    w = args.word_size
-    start = args.start_offset
-    end = args.end_offset
-    for seq in gen.next():
-        s = seq.seq
-        L = len(s)
-        prefix = s[0:start]
-        suffix = s[L-end:L]
-        rseq = s[start:L-end]
-        M = len(rseq)
-        words = list(rseq[i:i+w] for i in range(0, M - w + 1, w))
-        words.append(rseq[(M - M % w):M])
-        random.shuffle(words)
-        out = ''.join(prefix + ''.join(words) + suffix)
-        if(args.field):
-            header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
-        else:
-            header=seq.header
-        FSeq(header, out).print()
 
 
 def reverse(args, gen):
