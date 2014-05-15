@@ -67,6 +67,7 @@ def parse(argv=None):
     Fasta2csv(parser)
     Perm(parser)
     Simplifyheader(parser)
+    Sniff(parser)
     Reverse(parser)
     Translate(parser)
 
@@ -1130,6 +1131,43 @@ class Simplifyheader(Subcommand):
             pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
             header = '|'.join(pairs)
             yield FSeq(header, seq.seq)
+
+class Sniff(Subcommand):
+    def _parse(self):
+        cmd_name = 'sniff'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Reduce header to given fields"
+        )
+
+    def generator(self, args, gen):
+        # from hashlib import md5
+        # pro = {}
+        for seq in gen.next():
+            pass
+            # seqhash = md5(seq.seq).hexdigest()
+
+    def _seq_type(self, seq):
+        pass
+
+    def _has_initial_ATG(self, seq):
+        pass
+
+    def _ends_in_stop(self, seq):
+        pass
+
+    def _multiple_of_three(self, seq):
+        pass
+
+    def _no_internal_stop(self, seq):
+        pass
+
+    def _is_gapped(self, seq):
+        pass
+
+    def _is_masked(self, seq):
+        pass
 
 class Reverse(Subcommand):
     def _parse(self):
