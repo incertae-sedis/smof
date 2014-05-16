@@ -81,6 +81,18 @@ def parse(argv=None):
 # CLASS DEFINITIONS
 # =================
 
+class Alphabets:
+    PROT = 'ACDEFGHIKLMNPQRSTVW'
+    PROT_UNK = 'X'
+    PROT_AMB = 'BZJ'
+    DNA = 'ACGT'
+    DNA_UNK = 'N'
+    DNA_AMB = 'RYSWKMDBHVN'
+    RNA = 'AUGT'
+    RNA_UNK = 'N'
+    RNA_AMB = 'RYSWKMDBHVN'
+    GAP = '.-_'
+
 class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
         self.fh = fh
@@ -179,7 +191,7 @@ class FSeq:
             print('>' + self.header)
 
     def ungap(self):
-        self.seq = re.sub('[_-]', '', self.seq)
+        self.seq = re.sub('[._-]', '', self.seq)
 
     def print(self, column_width=80):
         if self.colheader.seq:
@@ -294,30 +306,54 @@ class SeqSummary:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
-        self.lengths = {}
-        self.nunk_char = 0
-        self.nseqs = 0
-        self.nprot = 0
-        self.ndna = 0
-        self.nrna = 0
-        self.nbad = 0
-        self.nunk = 0
+        self.lengths = defaultdict(int)
         self.ngapped = 0
+        self.ntype = {'prot':0, 'dna':0, 'rna':0, 'bad':0, 'ugly':0}
+        self.nunk = 0
         self.nmasked = 0
         self.nstart = 0
         self.nstop = 0
         self.nistop = 0
-        self.triple = 0
+        self.ntriple = 0
 
     def add_seq(self, seq):
         '''
         Calculates properties for one sequence
         @type seq: FSeq object
         '''
+
+        # Add md5 hashes of sequences and headers to respective sets
         seqs.update(md5(seq.seq).digest())
         headers.update(md5(seq.header).digest())
-        self.nseqs += 1
-        ngaps = seq.seq.count('_')
+
+        # Count the gaps [_-], if any are present, ungap the sequence
+        ngaps = seq.seq.count('_') + seq.seq.count('-')
+        if ngaps:
+            self.ngapped += 1
+            seq.ungap()
+
+        #TODO count lowcase
+
+        #TODO unmask seq
+
+        s = seq.seq
+
+        self.lengths[len(s)] += 1
+        # ('prot'|'dna'|'rna'|'ugly'|'bad')
+        stype = self._s_type(s)
+
+        self.ntype[stype] += 1
+
+        #TODO count unknowns
+
+        #TODO check for ATG/M
+
+        #TODO check for STOP/*
+
+        #TODO check for internal STOP/*
+
+        #TODO if DNA, check for triple
+
 
     def _s_type(self, s):
         pass
