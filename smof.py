@@ -178,6 +178,9 @@ class FSeq:
             print("Unknown error in extraction of subsequence ({}, {}) from".format(a,b))
             print('>' + self.header)
 
+    def ungap(self):
+        self.seq = re.sub('[_-]', '', self.seq)
+
     def print(self, column_width=80):
         if self.colheader.seq:
             self.colheader.print(column_width)
@@ -314,29 +317,27 @@ class SeqSummary:
         seqs.update(md5(seq.seq).digest())
         headers.update(md5(seq.header).digest())
         self.nseqs += 1
+        ngaps = seq.seq.count('_')
 
-    def _count_gaps(self, seq):
+    def _s_type(self, s):
         pass
 
-    def _seq_type(self, seq):
+    def _has_initial_ATG(self, s):
         pass
 
-    def _has_initial_ATG(self, seq):
+    def _ends_in_stop(self, s):
         pass
 
-    def _ends_in_stop(self, seq):
+    def _multiple_of_three(self, s):
         pass
 
-    def _multiple_of_three(self, seq):
+    def _no_internal_stop(self, s):
         pass
 
-    def _no_internal_stop(self, seq):
+    def _length(self, s):
         pass
 
-    def _length(self, seq):
-        pass
-
-    def _is_masked(self, seq):
+    def _is_masked(self, s):
         pass
 
 
