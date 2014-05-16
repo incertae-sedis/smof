@@ -286,6 +286,59 @@ class ColorString:
             b = m.start() + len(m.group())
             self.colorpos(list(range(a,b)), col)
 
+class SeqSummary:
+    from hashlib import md5
+    def __init__(self):
+        self.seqs = set()
+        self.headers = set()
+        self.lengths = {}
+        self.nunk_char = 0
+        self.nseqs = 0
+        self.nprot = 0
+        self.ndna = 0
+        self.nrna = 0
+        self.nbad = 0
+        self.nunk = 0
+        self.ngapped = 0
+        self.nmasked = 0
+        self.nstart = 0
+        self.nstop = 0
+        self.nistop = 0
+        self.triple = 0
+
+    def add_seq(self, seq):
+        '''
+        Calculates properties for one sequence
+        @type seq: FSeq object
+        '''
+        seqs.update(md5(seq.seq).digest())
+        headers.update(md5(seq.header).digest())
+        self.nseqs += 1
+
+    def _count_gaps(self, seq):
+        pass
+
+    def _seq_type(self, seq):
+        pass
+
+    def _has_initial_ATG(self, seq):
+        pass
+
+    def _ends_in_stop(self, seq):
+        pass
+
+    def _multiple_of_three(self, seq):
+        pass
+
+    def _no_internal_stop(self, seq):
+        pass
+
+    def _length(self, seq):
+        pass
+
+    def _is_masked(self, seq):
+        pass
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -1147,27 +1200,6 @@ class Sniff(Subcommand):
         for seq in gen.next():
             pass
             # seqhash = md5(seq.seq).hexdigest()
-
-    def _seq_type(self, seq):
-        pass
-
-    def _has_initial_ATG(self, seq):
-        pass
-
-    def _ends_in_stop(self, seq):
-        pass
-
-    def _multiple_of_three(self, seq):
-        pass
-
-    def _no_internal_stop(self, seq):
-        pass
-
-    def _is_gapped(self, seq):
-        pass
-
-    def _is_masked(self, seq):
-        pass
 
 class Reverse(Subcommand):
     def _parse(self):
