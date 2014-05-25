@@ -65,7 +65,6 @@ def parse(argv=None):
     Simplifyheader(parser)
     Sniff(parser)
     Reverse(parser)
-    Translate(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
@@ -1250,45 +1249,6 @@ class Reverse(Subcommand):
         ''' Reverse each sequence '''
         for seq in gen.next():
             yield FSeq(seq.header, seq.seq[::-1])
-
-class Translate(Subcommand):
-    def _parse(self):
-        cmd_name = 'translate'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Translates DNA (wrapper for EMBOSS transeq)"
-        )
-        parser.add_argument(
-            '-f', '--frame',
-            help="See EMBOSS transeq help",
-            default=1
-        )
-        parser.add_argument(
-            '-t', '--table',
-            help="See EMBOSS transeq help",
-            default=0
-        )
-        parser.add_argument(
-            '-r', '--regions',
-            help="See EMBOSS transeq help"
-        )
-        parser.add_argument(
-            '-m', '--trim',
-            help="See EMBOSS transeq help",
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-c', '--clean',
-            help="See EMBOSS transeq help",
-            action='store_true',
-            default=False
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        raise NotImplemented
 
 
 # ==============
