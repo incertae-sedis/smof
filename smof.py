@@ -43,10 +43,6 @@ def parse(argv=None):
 
     parser = Parser()
 
-    if(len(sys.argv) == 1):
-        parser.parser.print_help()
-        raise SystemExit
-
     Chksum(parser)
 
     Complexity(parser)
@@ -71,6 +67,9 @@ def parse(argv=None):
     Reverse(parser)
     Translate(parser)
 
+    if(len(sys.argv) == 1):
+        parser.parser.print_help()
+        raise SystemExit
 
     args = parser.parser.parse_args(argv)
 
