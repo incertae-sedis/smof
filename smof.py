@@ -1283,14 +1283,6 @@ class Sniff(Subcommand):
         yield seqsum
 
     def write(self, args, gen):
-        # ngapped = 0
-        # nunk = 0
-        # nstart = 0
-        # ntstop = 0
-        # nistop = 0
-        # ntriple = 0
-        # nselenocysteine = 0
-
         seqsum = next(self.generator(args, gen))
         nseqs = sum(seqsum.ncase.values())
 
@@ -1305,17 +1297,17 @@ class Sniff(Subcommand):
         if has_degen_seqs:
             print("{} uniq sequences ({} total)".format(len(seqsum.seqs), nseqs))
 
-        def write_dict(d, name):
+        def write_dict(d, name, N):
             uniq = [[k,v] for  k,v in d.items() if v != 0]
             if len(uniq) == 1:
                 print("All {}".format(uniq[0][0]))
             else:
                 print("{}:".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
-                    print("  {}: {}".format(k, v))
+                    print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, 100*v/N))
 
-        write_dict(seqsum.ntype, 'Sequence types')
-        write_dict(seqsum.ncase, 'Sequences cases')
+        write_dict(seqsum.ntype, 'Sequence types', nseqs)
+        write_dict(seqsum.ncase, 'Sequences cases', nseqs)
 
         nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'amb_dna', 'rna'}])
         nprot = sum([v for k,v in seqsum.ntype.items() if k in {'prot', 'amb_prot'}])
@@ -1323,16 +1315,16 @@ class Sniff(Subcommand):
         if nnucl:
             print("Nucleotide Features:")
             for k,v in seqsum.nfeat.items():
-                print("  {}: {}/{}".format(k,v,nnucl))
+                print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, v/nnucl))
 
         if nprot:
             print("Protein Features:")
             for k,v in seqsum.pfeat.items():
-                print("  {}: {}/{}".format(k,v,nprot))
+                print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, v/nprot))
 
         print("Universal Features:")
         for k,v in seqsum.ufeat.items():
-            print("  {}: {}/{}".format(k,v,nseqs))
+            print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, 100*v/nseqs))
 
 class Reverse(Subcommand):
     def _parse(self):
