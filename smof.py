@@ -309,11 +309,11 @@ class SeqSummary:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
-        self.ntype = {'prot':0, 'dna':0, 'rna':0, 'bad':0, 'amb_nucl':0, 'amb_prot':0, 'amb':0}
+        self.ntype = {'prot':0, 'dna':0, 'rna':0, 'bad':0, 'amb':0}
         self.ncase = {'uppercase':0, 'lowercase':0, 'mixedcase':0}
         self.pfeat = {'nselenocysteine':0}
         self.nfeat = {'ntriple':0}
-        self.ufeat = {'ngapped':0, 'nunk':0, 'nstart':0, 'ntstop':0, 'nistop':0}
+        self.ufeat = {'ngapped':0, 'nunk':0, 'nstart':0, 'ntstop':0, 'nistop':0, 'namb':0}
 
     def add_seq(self, seq):
         '''
@@ -342,15 +342,17 @@ class SeqSummary:
         # ('prot'|'dna'|'rna'|'amb'|'bad')
         stype = self._handle_type(counts)
 
-        if stype in ('prot', 'amb_prot'):
+        if stype == 'prot':
             self.ufeat['nunk'] += 'X' in counts
+            self.ufeat['namb'] += bool(Alphabet.PROT_AMB & set(counts))
             self.pfeat['nselenocysteine'] += 'U' in counts
             self.ufeat['nstart'] += 'M' == seq.seq[0].upper()
             tstop = '*' == seq.seq[-1]
             self.ufeat['ntstop'] += tstop
             self.ufeat['nistop'] += (counts['*'] - tstop) > 0
-        elif stype in ('dna', 'rna', 'amb_nucl'):
+        elif stype in ('dna', 'rna'):
             self.ufeat['nunk'] += 'N' in counts
+            self.ufeat['namb'] += bool(Alphabet.DNA_AMB & set(counts))
             self.ufeat['nstart'] += 'ATG' == seq.seq[0:3].upper()
             ntriple = len(seq.seq) % 3 == 0
             if ntriple:
@@ -386,17 +388,15 @@ class SeqSummary:
             stype = 'rna'
         # If has any chars unique to proteins (EFILQPXJZ*)
         elif set(counts) & Alphabet.PROT_EXC:
-            if set(counts) <= Alphabet.PROT:
+            if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
                 stype = 'prot'
-            elif set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
-                stype = 'amb_prot'
             else:
                 stype = 'bad'
         # If all the residues could be aa, DNA, or RNA
         elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
             # If more than 80% look like nucleic acids, set 'amb_nucl'
             if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-                stype = 'amb_nucl'
+                stype = 'rna' if 'U' in counts else 'dna'
             # Otherwise set as ambibuous
             else:
                 stype = 'amb'
@@ -1309,8 +1309,8 @@ class Sniff(Subcommand):
         write_dict(seqsum.ntype, 'Sequence types', nseqs)
         write_dict(seqsum.ncase, 'Sequences cases', nseqs)
 
-        nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'amb_dna', 'rna'}])
-        nprot = sum([v for k,v in seqsum.ntype.items() if k in {'prot', 'amb_prot'}])
+        nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'rna'}])
+        nprot = sum([v for k,v in seqsum.ntype.items() if k == 'prot'])
 
         if nnucl:
             print("Nucleotide Features:")
