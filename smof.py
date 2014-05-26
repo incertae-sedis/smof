@@ -61,6 +61,7 @@ def parse(argv=None):
     Search(parser)
     Split(parser)
     Subseq(parser)
+    Sniff(parser)
     Fsubseq(parser)
     Fasta2csv(parser)
     Perm(parser)
@@ -103,16 +104,22 @@ class FSeqGenerator:
     def next(self):
         seq_list = []
         header = ''
+        nseqs = 0
         for line in self.fh:
             line = line.strip()
             if ">" in line:
                 if(seq_list):
                     yield FSeq(header, ''.join(seq_list))
+                    nseqs += 1
                 seq_list = []
                 header = line.split('>')[1]
             else:
                 seq_list.append(line)
-        yield FSeq(header, ''.join(seq_list))
+        if header:
+            yield FSeq(header, ''.join(seq_list))
+        if not nseqs:
+            print("smof could not retrieve any sequence from this file, exiting")
+            raise SystemExit
 
 class FSeq:
     # The translator for taking reverse complements
