@@ -1290,12 +1290,15 @@ class Sniff(Subcommand):
         has_degen_seqs = nseqs != len(seqsum.seqs)
         has_bad = seqsum.ntype['bad'] != 0
 
+        if has_degen_seqs:
+            print("{} uniq sequences ({} total)".format(len(seqsum.seqs), nseqs))
+        else:
+            print("Total sequences: {}".format(nseqs))
+
         if has_degen_headers:
             print("WARNING: headers are not unique ({}/{})".format(len(seqsum.headers), nseqs))
         if has_bad:
             print("WARNING: illegal characters found")
-        if has_degen_seqs:
-            print("{} uniq sequences ({} total)".format(len(seqsum.seqs), nseqs))
 
         def write_dict(d, name, N):
             uniq = [[k,v] for  k,v in d.items() if v != 0]
