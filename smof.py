@@ -309,11 +309,36 @@ class SeqSummary:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
-        self.ntype = {'prot':0, 'dna':0, 'rna':0, 'bad':0, 'amb':0}
-        self.ncase = {'uppercase':0, 'lowercase':0, 'mixedcase':0}
-        self.pfeat = {'nselenocysteine':0}
-        self.nfeat = {'ntriple':0}
-        self.ufeat = {'ngapped':0, 'nunk':0, 'nstart':0, 'ntstop':0, 'nistop':0, 'namb':0}
+        self.ntype = {
+            'prot':0,
+            'dna':0,
+            'rna':0,
+            'illegal':0,
+            'ambiguous':0}
+        self.ncase = {
+            'uppercase':0,
+            'lowercase':0,
+            'mixedcase':0}
+        self.pfeat = {
+            'selenocysteine':0,
+            'initial-Met':0,
+            'internal-stop':0,
+            'terminal-stop':0}
+        self.nfeat = {
+            'start|coding|stop':0,
+            'start|coding':0,
+            'start|nonsense|stop':0,
+            'start|nonsense':0,
+            'coding|stop':0,
+            'nonsense|stop':0,
+            'start|n|stop':0,
+            'start':0,
+            'stop':0,
+            'not-CDS':0}
+        self.ufeat = {
+            'gapped':0,
+            'unknown':0,
+            'ambiguous':0}
 
     def add_seq(self, seq):
         '''
@@ -343,22 +368,48 @@ class SeqSummary:
         stype = self._handle_type(counts)
 
         if stype == 'prot':
-            self.ufeat['nunk'] += 'X' in counts
-            self.ufeat['namb'] += bool(Alphabet.PROT_AMB & set(counts))
-            self.pfeat['nselenocysteine'] += 'U' in counts
-            self.ufeat['nstart'] += 'M' == seq.seq[0].upper()
+            self.ufeat['unknown'] += 'X' in counts
+            self.ufeat['ambiguous'] += bool(Alphabet.PROT_AMB & set(counts))
+            self.pfeat['selenocysteine'] += 'U' in counts
+            self.pfeat['initial-Met'] += 'M' == seq.seq[0].upper()
             tstop = '*' == seq.seq[-1]
-            self.ufeat['ntstop'] += tstop
-            self.ufeat['nistop'] += (counts['*'] - tstop) > 0
+            self.pfeat['terminal-stop'] += tstop
+            self.pfeat['internal-stop'] += (counts['*'] - tstop) > 0
         elif stype in ('dna', 'rna'):
-            self.ufeat['nunk'] += 'N' in counts
-            self.ufeat['namb'] += bool(Alphabet.DNA_AMB & set(counts))
-            self.ufeat['nstart'] += 'ATG' == seq.seq[0:3].upper()
-            ntriple = len(seq.seq) % 3 == 0
-            if ntriple:
-                self.nfeat['ntriple'] += 1
-                self.ufeat['ntstop'] += seq.seq[-3:].upper() in Alphabet.STOP
-                self.ufeat['nistop'] += self._dna_istop(seq.seq)
+            self.ufeat['unknown'] += 'N' in counts
+            self.ufeat['ambiguous'] += bool(Alphabet.DNA_AMB & set(counts))
+            triple = len(seq.seq) % 3 == 0
+            # Is last three bases STOP?
+            tstop = seq.seq[-3:].upper() in Alphabet.STOP
+
+            codons_1 = [seq.seq[i:i+3].upper() for i in range(0, len(seq.seq) - 3, 3)]
+            start_1 = 'ATG' == codons_1[0]
+            stop_1 = codons_1[-1] in Alphabet.STOP
+            internal_stop_1 = bool(set(codons_1[:-1]) & Alphabet.STOP)
+
+            # Triplet and START-STOP
+            if start_1 and triple and stop_1 and not internal_stop_1:
+                self.nfeat['start|coding|stop'] += 1
+            elif start_1 and triple and stop_1 and internal_stop_1:
+                self.nfeat['start|nonsense|stop'] += 1
+            # Triplet and START
+            elif start_1 and triple and not stop_1 and not internal_stop_1:
+                self.nfeat['start|coding'] += 1
+            elif start_1 and triple and not stop_1 and internal_stop_1:
+                self.nfeat['start|nonsense'] += 1
+            # Triplet and STOP
+            elif not start_1 and tstop and triple and not internal_stop_1:
+                self.nfeat['coding|stop'] += 1
+
+            # START and terminal-STOP
+            elif start_1 and tstop and not triple:
+                self.nfeat['start|n|stop'] += 1
+            elif start_1 and not tstop:
+                self.nfeat['start'] += 1
+            elif not start_1 and not tstop:
+                self.nfeat['stop'] += 1
+            else:
+                self.nfeat['not-CDS'] += 1
 
     def _handle_gaps(self, seq, counts):
         # Handle gaps
@@ -391,7 +442,7 @@ class SeqSummary:
             if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
                 stype = 'prot'
             else:
-                stype = 'bad'
+                stype = 'illegal'
         # If all the residues could be aa, DNA, or RNA
         elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
             # If more than 80% look like nucleic acids, set 'amb_nucl'
@@ -399,20 +450,14 @@ class SeqSummary:
                 stype = 'rna' if 'U' in counts else 'dna'
             # Otherwise set as ambibuous
             else:
-                stype = 'amb'
+                stype = 'ambiguous'
         # If none of these match, something is horribly wrong with your
         # sequence
         else:
-            stype = 'bad'
+            stype = 'illegal'
         self.ntype[stype] += 1
         return(stype)
 
-    def _dna_istop(self, seq):
-        icodons = {seq[i:i+3] for i in range(0, len(seq) - 3, 3)}
-        if len(Alphabet.STOP & icodons) != 0:
-            return(True)
-        else:
-            return(False)
 
 # =================
 # UTILITY FUNCTIONS
@@ -1267,13 +1312,6 @@ class Sniff(Subcommand):
             usage=self.usage.format(cmd_name),
             help="Extract info about the sequence"
         )
-        # TODO Make verbose not the default
-        # parser.add_argument(
-        #     '-v', '--verbose',
-        #     help='Print lots of human readable stuff',
-        #     action='store_true',
-        #     default=False
-        # )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1288,7 +1326,7 @@ class Sniff(Subcommand):
 
         has_degen_headers = nseqs != len(seqsum.headers)
         has_degen_seqs = nseqs != len(seqsum.seqs)
-        has_bad = seqsum.ntype['bad'] != 0
+        has_bad = seqsum.ntype['illegal'] != 0
 
         if has_degen_seqs:
             print("{} uniq sequences ({} total)".format(len(seqsum.seqs), nseqs))
@@ -1307,7 +1345,7 @@ class Sniff(Subcommand):
             else:
                 print("{}:".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
-                    print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, 100*v/N))
+                    print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
 
         write_dict(seqsum.ntype, 'Sequence types', nseqs)
         write_dict(seqsum.ncase, 'Sequences cases', nseqs)
@@ -1315,19 +1353,16 @@ class Sniff(Subcommand):
         nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'rna'}])
         nprot = sum([v for k,v in seqsum.ntype.items() if k == 'prot'])
 
-        if nnucl:
-            print("Nucleotide Features:")
-            for k,v in seqsum.nfeat.items():
-                print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, v/nnucl))
+        def write_feat(d, text, N):
+            if not N:
+                return(0)
+            print(text)
+            for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
+                print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
 
-        if nprot:
-            print("Protein Features:")
-            for k,v in seqsum.pfeat.items():
-                print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, v/nprot))
-
-        print("Universal Features:")
-        for k,v in seqsum.ufeat.items():
-            print("  {:<20} {:<10} {:>0.4f}%".format(k + ':', v, 100*v/nseqs))
+        write_feat(seqsum.nfeat, "Nucleotide Features:", nnucl)
+        write_feat(seqsum.pfeat, "Protein Features:", nprot)
+        write_feat(seqsum.ufeat, "Universal Features:", nseqs)
 
 class Reverse(Subcommand):
     def _parse(self):
