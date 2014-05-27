@@ -67,6 +67,7 @@ def parse(argv=None):
     Perm(parser)
     Simplifyheader(parser)
     Reverse(parser)
+    Winnow(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
@@ -1362,6 +1363,34 @@ class Reverse(Subcommand):
         ''' Reverse each sequence '''
         for seq in gen.next():
             yield FSeq(seq.header, seq.seq[::-1])
+
+class Winnow(Subcommand):
+    def _parse(self):
+        cmd_name = 'winnow'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Remove sequence which meet given conditions"
+        )
+        parser.add_argument(
+            '-c', '--contain',
+            help="Remove if contains any of these characters"
+        )
+        parser.add_argument(
+            '-v', '--invert',
+            help="Invert selection",
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for seq in gen.next():
+            keep = [1]
+            if args.contain:
+                keep.append(not bool(set(args.contain) & set(seq.seq)))
+            if (not all(keep) and args.invert) or (all(keep) and not args.invert):
+                yield seq
 
 
 # ==============
