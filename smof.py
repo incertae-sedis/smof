@@ -651,6 +651,11 @@ class Fstat(Subcommand):
             usage=self.usage.format(cmd_name),
             help="Provides total counts for file sequence characters"
         )
+        parser.add_argument(
+            '-i', '--ignorecase',
+            help="Ignores case when counting characters",
+            action='store_true',
+            default=False)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -659,6 +664,9 @@ class Fstat(Subcommand):
         for seq in gen.next():
             nseqs += 1
             counts.update(seq.seq)
+
+        if args.ignorecase:
+            counts = counter_caser(counts)
 
         nchars = sum(counts.values())
         for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True):
@@ -898,14 +906,14 @@ class Qstat(Subcommand):
             chars = sorted(chars)
 
         headerfields = args.fields if args.fields else []
-        fieldnames = headerfields
+        fieldnames = ['length'] + headerfields
         fieldnames += ['masked'] if args.masked else []
         fieldnames += chars
 
         w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
         w.writeheader()
         for fields,counts,masked in results:
-            row = dict(counts)
+            row = {'length':sum(counts.values())}
             if headerfields:
                 for i in range(len(fields)):
                     row[headerfields[i]] = str(fields[i])
