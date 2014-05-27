@@ -170,13 +170,15 @@ class FSeq:
             print("Header lacks field {}".format(field), file=sys.stderr)
             print(self.header, file=sys.stderr)
 
-    def getvalue(self, field, quiet=False):
-        if(not self.headerfields):
+    def getvalue(self, field, quiet=False, missing=''):
+        if not self.headerfields:
             self.parse_header()
         try:
             return(self.headerfields[field])
         except:
-            if(not quiet):
+            if missing:
+                return missing
+            if not quiet:
                 print("Header lacks field '{}'".format(field), file=sys.stderr)
                 print(self.header, file=sys.stderr)
             raise SystemExit
@@ -231,43 +233,6 @@ class FSeq:
     @classmethod
     def getrevcomp(cls, seq):
         return(seq[::-1].translate(FSeq.revcomp_translator))
-
-class Stat:
-    def __init__(self, fields=[]):
-        self.counts = defaultdict(int)
-        self.fields = {}
-        self.length = 0
-
-    def update_counts(self, seq, ignoreCase=False):
-        s = seq.seq
-        if(ignoreCase):
-            s = s.upper()
-        for c in s:
-            self.counts[c] += 1
-        self.length += len(s)
-
-    def update_fields(self, seq, fields):
-        for field in fields:
-            self.fields[field] = seq.getvalue(field)
-
-    def getdict(self, charset=None, getlength=False):
-        if(not charset):
-            charset = self.counts.keys()
-        out = {}
-        for k in charset:
-            out[k] = self.counts[k]
-        for k, v in self.fields.items():
-            out[k] = v
-        if(getlength):
-            out['length'] = self.length
-        return(out)
-
-    @classmethod
-    def getcharset(cls, statlist):
-        charset = set()
-        for s in statlist:
-            charset.update(s.counts.keys())
-        return(charset)
 
 class Colors:
     HIGHLIGHT = chr(27) + '[32m'
@@ -367,8 +332,7 @@ class SeqSummary:
         scase = self._handle_case(counts)
         # Sum upper and lowercase
         if scase not in 'upper':
-            counts = Counter({k:v for k,v in counts.items() if k.isupper()}) + \
-                     Counter({k.upper():v for k,v in counts.items() if k.islower()})
+            counts = counter_caser(counts)
 
         # ('prot'|'dna'|'rna'|'amb'|'bad')
         stype = self._handle_type(counts)
@@ -481,6 +445,17 @@ def csvrowGenerator(filename):
     for row in reader:
         yield row
 
+def counter_caser(counter, lower=False):
+    '''
+    Sums cases in Collections.Counter object
+    '''
+    if lower:
+        counts_obj = Counter({k:v for k,v in counter.items() if k.islower()}) + \
+                     Counter({k.lower():v for k,v in counter.items() if k.isupper()})
+    else:
+        counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
+                     Counter({k.upper():v for k,v in counter.items() if k.islower()})
+    return(counts_obj)
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -675,14 +650,14 @@ class Fstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        stats = Stat()
+        counts = Counter()
         nseqs = 0
-        nchars = 0
         for seq in gen.next():
             nseqs += 1
-            nchars += len(seq.seq)
-            stats.update_counts(seq)
-        for k, v in sorted(stats.getdict().items(), key=lambda x: x[1], reverse=True):
+            counts.update(seq.seq)
+
+        nchars = sum(counts.values())
+        for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True):
             yield "{}: {} {}".format(k, v, round(v/nchars, 4))
         yield "nseqs: {}".format(nseqs)
         yield "nchars: {}".format(nchars)
@@ -864,8 +839,8 @@ class Qstat(Subcommand):
             nargs='+',
             default=[])
         parser.add_argument(
-            '-m', '--countmasked',
-            help="Count the number of masked (lowcase) characters",
+            '-m', '--masked',
+            help="Count the number of masked (lowercase) characters",
             action='store_true',
             default=False)
         parser.add_argument(
@@ -888,59 +863,51 @@ class Qstat(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        class Result:
-            def __init__(self, seq, args):
-                self.stats = self._getstats(seq, args)
-                self.other = self._getother(seq, args)
-                try:
-                    self.fields = {x:seq.getvalue(x) for x in args.fields}
-                except:
-                    self.fields = {}
-
-            def _getstats(self, seq, args):
-                seqstats = Stat()
-                seqstats.update_counts(seq, ignoreCase=args.ignorecase)
-                return(seqstats)
-
-            def _getother(self, seq, args):
-                others = {}
-                if(args.countmasked):
-                    others['masked'] = seq.countmasked()
-                others['length'] = len(seq.seq)
-                return(others)
-
-            def getdict(self, charset):
-                d = {k:v for k,v in self.fields.items()}
-                for k,v in self.other.items():
-                    d[k] = v
-                for k, v in self.stats.getdict(charset=charset, getlength=False).items():
-                    d[k] = v
-                return(d)
-
-            def getfields(self, charset):
-                names = sorted(self.fields.keys()) + \
-                        sorted(self.other.keys()) + \
-                        sorted(charset)
-                return(names)
-
-        results = []
-        # Fill a list with Stat objects
         for seq in gen.next():
+            if args.fields:
+                fields = tuple(seq.getvalue(x, missing='NA') for x in args.fields)
+            else:
+                fields = []
+
             # Trim the beginning and end of the sequence, as specified
-            trunc_seq = seq.seq[args.start_offset:len(seq.seq) - args.end_offset]
-            seq = FSeq(seq.header, trunc_seq)
-            yield Result(seq, args)
+            count = Counter(seq.seq[args.start_offset:len(seq.seq) - args.end_offset])
+
+            if args.masked:
+                nmasked = sum([v for c,v in count.items() if c in string.ascii_lower])
+            else:
+                nmasked = None
+
+            if args.ignorecase:
+                count = counter_caser(count)
+
+            yield (fields, count, nmasked)
 
     def write(self, args, gen):
         results = list(self.generator(args, gen))
         # Set of all unique characters seen in the fasta file
-        charset = Stat.getcharset([result.stats for result in results])
-        # Rownames for the csv file
-        fieldnames = results[0].getfields(charset)
+        chars = set()
+        for f,c,m in results:
+            chars.update(c.keys())
+        if args.ignorecase:
+            chars = sorted(set(''.join(chars).upper()))
+        else:
+            chars = sorted(chars)
+
+        headerfields = args.fields if args.fields else []
+        fieldnames = headerfields
+        fieldnames += ['masked'] if args.masked else []
+        fieldnames += chars
+
         w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
         w.writeheader()
-        for result in results:
-            w.writerow(result.getdict(charset))
+        for fields,counts,masked in results:
+            row = dict(counts)
+            if headerfields:
+                for i in range(len(fields)):
+                    row[headerfields[i]] = str(fields[i])
+            for k,v in counts.items():
+                row[k] = str(v)
+            w.writerow(row)
 
 class Retrieve(Subcommand):
     def _parse(self):
