@@ -10,7 +10,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.0"
+__version__ = "1.2.1"
 
 # ================
 # Argument Parsing
@@ -107,18 +107,22 @@ class FSeqGenerator:
         nseqs = 0
         for line in self.fh:
             line = line.strip()
-            if ">" in line:
+            if ">" == line[0]:
                 if(seq_list):
-                    yield FSeq(header, ''.join(seq_list))
                     nseqs += 1
+                    yield FSeq(header, ''.join(seq_list))
                 seq_list = []
                 header = line.split('>')[1]
-            else:
+            elif header:
                 seq_list.append(line)
+            else:
+                print("First line must begin with '>'", file=sys.stderr)
+                raise SystemExit
         if header:
+            nseqs += 1
             yield FSeq(header, ''.join(seq_list))
         if not nseqs:
-            print("smof could not retrieve any sequence from this file, exiting")
+            print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
             raise SystemExit
 
 class FSeq:
