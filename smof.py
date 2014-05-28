@@ -1377,19 +1377,72 @@ class Winnow(Subcommand):
             help="Remove if contains any of these characters"
         )
         parser.add_argument(
+            '-C', '--not-contain',
+            help="Remove if contains any of these characters"
+        )
+        parser.add_argument(
+            '-s', '--shorter-than',
+            help="Remove if sequence is shorter than i",
+            type=int
+        )
+        parser.add_argument(
+            '-S', '--longer-than',
+            help="Remove if sequence is longer than i",
+            type=int
+        )
+        parser.add_argument(
             '-v', '--invert',
             help="Invert selection",
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '-p', '--composition',
+            help="Composition (e.g. -p 'GC < 0.5')"
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        tests = []
+        if args.contain:
+            tests.append(lambda s: reject.append(bool(set(args.contain) & set(s))))
+        if args.not_contain:
+            tests.append(lambda s: reject.append(bool(set(args.not_contain) & set(s))))
+        if args.longer_than:
+            tests.append(lambda s: reject.append(len(s) > args.longer_than))
+        if args.shorter_than:
+            tests.append(lambda s: reject.append(len(s) < args.shorter_than))
+        if args.composition:
+            try:
+                ch,sign,per = args.composition.split()
+            except ValueError:
+                print('Composition argument have 3 values', file=sys.stderr)
+                raise SystemExit
+            legal_signs = ('<', '<=', '>=', '>', '==')
+            if not sign in legal_signs:
+                print("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')", file=sys.stderr)
+                raise SystemExit
+            try:
+                per = float(per)
+            except ValueError:
+                print("Third value must be a float")
+                raise SystemExit
+            if not 0 <= per <= 1:
+                print("Third value must be between 0 and 1")
+                raise SystemExit
+            ch = set(str(ch))
+
+            def evaluate(s):
+                c = Counter(s)
+                p = sum([c[x] for x in ch]) / len(s)
+                return(eval('p {} {}'.format(sign, per)))
+
+            tests.append(evaluate)
+
+
         for seq in gen.next():
-            keep = [1]
-            if args.contain:
-                keep.append(not bool(set(args.contain) & set(seq.seq)))
-            if (not all(keep) and args.invert) or (all(keep) and not args.invert):
+            reject = [x(seq.seq) for x in tests]
+            if (any(reject) and args.invert) or (not any(reject) and not args.invert):
                 yield seq
 
 
