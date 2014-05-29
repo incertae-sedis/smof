@@ -137,6 +137,10 @@ class FSeq:
     def __hash__(self):
         return(hash((self.header, self.seq)))
 
+    def __eq__(self, other):
+        return((self.header, self.seq) == (other.header, other.seq))
+
+
     def parse_header(self):
         '''
         Parses headers of the format:
@@ -1348,12 +1352,6 @@ class Uniq(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-i', '--ignore-case',
-            help='Ignore differences in case when comparing',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
             '-u', '--uniq',
             help='Print only unique entries',
             action='store_true',
@@ -1362,7 +1360,23 @@ class Uniq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        raise NotImplemented
+        seqs = defaultdict(int)
+        for seq in gen.next():
+            seqs[seq] += 1
+
+        if args.repeated:
+            sgen = ((k,v) for k,v in seqs.items() if v > 1)
+        elif args.uniq:
+            sgen = ((k,v) for k,v in seqs.items() if v == 1)
+        else:
+            sgen = seqs.items()
+
+        if args.count:
+            for k,v in sgen:
+                yield("{}\t{}".format(v, k.header))
+        else:
+            for k,v in sgen:
+                yield(k)
 
 class Wc(Subcommand):
     def _parse(self):
