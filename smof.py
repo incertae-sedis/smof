@@ -134,6 +134,9 @@ class FSeq:
         self.colseq = ColorString()
         self.colheader = ColorString()
 
+    def __hash__(self):
+        return(hash((self.header, self.seq)))
+
     def parse_header(self):
         '''
         Parses headers of the format:
@@ -1334,7 +1337,7 @@ class Uniq(Subcommand):
         )
         parser.add_argument(
             '-c', '--count',
-            help='Writes (count|header|sequence) in tab-delimited format',
+            help='Writes (count|header) in tab-delimited format',
             action='store_true',
             default=False
         )
