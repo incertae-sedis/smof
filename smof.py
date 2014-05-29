@@ -67,6 +67,9 @@ def parse(argv=None):
     Perm(parser)
     Simplifyheader(parser)
     Reverse(parser)
+    Grep(parser)
+    Uniq(parser)
+    Wc(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
@@ -1389,25 +1392,6 @@ class Sample(Subcommand):
         for i in sample_indices:
             yield seqs[i]
 
-class Sort(Subcommand):
-    def _parse(self):
-        cmd_name = 'sort'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
-        parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        seqs = [s for s in gen.next()]
-        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
-        for s in seqs:
-            yield s
-
 class Split(Subcommand):
     def _parse(self):
         cmd_name = 'split'
@@ -1442,6 +1426,158 @@ class Split(Subcommand):
             with open(outfile, 'w+') as fo:
                 for seq in (seqs[x] for x in range(begin, end)):
                     fo.write(seq.get_pretty_string() + '\n')
+
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Sort sequences by given fields")
+        parser.add_argument(
+            'fields',
+            help="Header fields by which to sort sequences",
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = [s for s in gen.next()]
+        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
+        for s in seqs:
+            yield s
+
+
+# ==============
+# UNIX EMULATORS
+# ==============
+
+class Grep(Subcommand):
+    def _parse(self):
+        cmd_name = 'grep'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Roughly emulates the UNIX grep command"
+        )
+        parser.add_argument(
+            '-f', '--file',
+            help='Obtain patterns from given file, one per line'
+        )
+        parser.add_argument(
+            '-w', '--pattern-wrapper',
+            help='A pattern that matches its capture against strings in FILE'
+        )
+        parser.add_argument(
+            '-i', '--ignore-case',
+            help='Ignore case distinctions',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-v', '--invert-match',
+            help='Print non-matching entries',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-c', '--count',
+            help='Print number of matching entries',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-o', '--only',
+            help='Print only matching parts of header of sequence',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-A', '--after-context',
+            help='Print INT characters after the match'
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-B', '--before-context',
+            help='Print INT characters before the match'
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-C', '--context',
+            help='Print INT characters after the match'
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '--color',
+            help='Print in color',
+            action='store_true',
+            default=False
+        )
+
+    def generator(self, args, gen):
+        raise NotImplemented
+
+class Uniq(Subcommand):
+    def _parse(self):
+        cmd_name = 'uniq'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Emulates the UNIX uniq command (doesn't require prior sorting)"
+        )
+        parser.add_argument(
+            '-c', '--count',
+            help='Writes (count|header|sequence) in tab-delimited format',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-d', '--repeated',
+            help='Print only repeated entries',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-i', '--ignore-case',
+            help='Ignore differences in case when comparing',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-u', '--uniq',
+            help='Print only unique entries'
+            action='store_true',
+            default=False
+        )
+
+    def generator(self, args, gen):
+        raise NotImplemented
+
+class Wc(Subcommand):
+    def _parse(self):
+        cmd_name = 'wc'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Roughly emulates the UNIX wc command"
+        )
+        parser.add_argument(
+            '-m', '--chars',
+            help='Writes the summed length of all sequences',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--lines',
+            help='Writes the total number of sequences',
+            action='store_true',
+            default=False
+        )
+
+    def generator(self, args, gen):
+        raise NotImplemented
 
 
 # =======
