@@ -51,22 +51,21 @@ def parse(argv=None):
     Fstat(parser)
     Unmask(parser)
     Hstat(parser)
-    Idsearch(parser)
     Tounk(parser)
     Prettyprint(parser)
     Qstat(parser)
-    Retrieve(parser)
     Sample(parser)
     Sort(parser)
-    Search(parser)
     Split(parser)
     Subseq(parser)
     Sniff(parser)
     Fsubseq(parser)
     Fasta2csv(parser)
     Perm(parser)
-    Simplifyheader(parser)
     Reverse(parser)
+    Grep(parser)
+    Uniq(parser)
+    Wc(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
@@ -134,6 +133,12 @@ class FSeq:
         self.headerfields = {}
         self.colseq = ColorString()
         self.colheader = ColorString()
+
+    def __hash__(self):
+        return(hash((self.header, self.seq)))
+
+    def __eq__(self, other):
+        return((self.header, self.seq) == (other.header, other.seq))
 
     def parse_header(self):
         '''
@@ -244,17 +249,32 @@ class Colors:
 
 class ColorString:
     def __init__(self,
+                 seq=None,
                  bgcolor=Colors.BACKGROUND,
                  default=Colors.HIGHLIGHT):
         self.bgcolor = bgcolor
         self.default = default
         self.seq = []
+        if seq:
+            self.setseq(seq)
 
     def setseq(self, seq):
+        '''
+        Pair every character in the input string with a color
+        @param seq: string that will ultimately be colored
+        @type seq: string
+        '''
         if not self.seq:
             self.seq = [[self.bgcolor, s] for s in seq]
 
     def colorpos(self, pos, col=None):
+        '''
+        Change color at specified positions
+        @param pos: indices to recolor
+        @type pos: iterable
+        @param col: new color
+        @type col: stringy thing that colorifies
+        '''
         col = self.default if not col else col
         for i in pos:
             self.seq[i][0] = col
@@ -460,6 +480,7 @@ def counter_caser(counter, lower=False):
         counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
                      Counter({k.upper():v for k,v in counter.items() if k.islower()})
     return(counts_obj)
+
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -740,27 +761,6 @@ class Unmask(Subcommand):
                 unmasked_seq = FSeq(seq.header, seq.seq.upper())
             yield unmasked_seq
 
-class Idsearch(Subcommand):
-    def _parse(self):
-        cmd_name = 'idsearch'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Find sequences by field/value pair')
-        parser.add_argument(
-            'field',
-            help="Header field (e.g. 'gi' or 'locus')")
-        parser.add_argument(
-            'value',
-            help="Header field value (e.g. '15237703' or 'AT5G64430')")
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Print entries whose headers contain a field with a given value '''
-        for seq in gen.next():
-            if(seq.field_is(args.field, args.value)):
-                yield seq
-
 class Tounk(Subcommand):
     def _parse(self):
         cmd_name = 'tounk'
@@ -920,154 +920,6 @@ class Qstat(Subcommand):
             for k,v in counts.items():
                 row[k] = str(v)
             w.writerow(row)
-
-class Retrieve(Subcommand):
-    def _parse(self):
-        cmd_name = 'retrieve'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Retrieve sequences with matches pattern"
-        )
-        parser.add_argument(
-            '-p', '--pattern',
-            help="Perl regular expressions",
-            nargs='+'
-        )
-        parser.add_argument(
-            '-P', '--patternfile',
-            help="Perl regular expressions"
-        )
-        parser.add_argument(
-            '-g', '--groups',
-            help="The acceptable values for parenthesized groups",
-            nargs='*'
-        )
-        parser.add_argument(
-            '-G', '--groupfile',
-            help="Read values from file"
-        )
-        parser.add_argument(
-            '-v', '--invert',
-            help="Write sequences that don't match"
-        )
-        parser.add_argument(
-            '-q', '--match-sequence',
-            help='Match sequence rather than header',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-c', '--color',
-            help='Color match',
-            action='store_true',
-            default=False
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        '''
-        Extracts sequences matching a certain pattern
-        '''
-        def getset(values, filename):
-            s = set()
-            if filename:
-                with open(filename, 'r') as f:
-                    s.update([line.rstrip('\n') for line in f.readlines()])
-            if values:
-                s.update(values)
-            return(s)
-
-        groups = getset(args.groups, args.groupfile)
-        pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
-
-        if(len(pat) > 1 and groups):
-            print('Cannot process multiple patterns with groups', file=sys.stderr)
-            raise SystemExit
-        if not pat:
-            print('Please provide a pattern (-p <regex>)', file=sys.stderr)
-
-        for seq in gen.next():
-            if(args.match_sequence):
-                text = seq.seq
-            else:
-                text = seq.header
-            for p in pat:
-                m = re.search(p, text)
-                if not m and not args.invert:
-                    continue
-                elif groups:
-                    try:
-                        # If at least one group defined
-                        match = m.group(1)
-                    except:
-                        # If no groups defined
-                        match = m.group(0)
-                    if (match in groups and args.invert) or \
-                    (match not in groups and not args.invert):
-                        continue
-                if not args.color or args.invert:
-                    yield seq
-                    break
-                # KLUDGE, TODO: Make seq and header classes
-                else:
-                    if(args.match_sequence):
-                        seq.colseq.setseq(text)
-                        seq.colseq.colormatch(p)
-                    else:
-                        seq.colheader.setseq(text)
-                        seq.colheader.colormatch(p)
-            if(seq.colseq.seq or seq.colheader.seq):
-                yield seq
-
-class Search(Subcommand):
-    def _parse(self):
-        cmd_name = 'search'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Search for pattern')
-        parser.add_argument(
-            'pattern',
-            help='Perl regular expression search pattern')
-        parser.add_argument(
-            '-i', '--invert',
-            help="Drop all not matching the pattern",
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-q', '--seq',
-            help='Search for pattern in the sequence',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-c', '--color',
-            help='Highlight the matched sequence',
-            action='store_true',
-            default=False
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        '''
-        Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
-        '''
-        prog = re.compile(args.pattern)
-        for seq in gen.next():
-            text = seq.seq if args.seq else seq.header
-            m = prog.search(text)
-            if (not m and not args.invert) or (m and args.invert):
-                continue
-            if(args.color and not args.invert):
-                if(args.seq):
-                    seq.colseq.setseq(text)
-                    seq.colseq.colormatch(prog)
-                else:
-                    seq.colheader.setseq(text)
-                    seq.colheader.colormatch(prog)
-            yield seq
 
 class Subseq(Subcommand):
     def _parse(self):
@@ -1265,30 +1117,6 @@ class Perm(Subcommand):
                 header=seq.header
             yield FSeq(header, out)
 
-class Simplifyheader(Subcommand):
-    def _parse(self):
-        cmd_name = 'rmfields'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Reduce header to given fields"
-        )
-        parser.add_argument(
-            'fields',
-            help="Fields to retain",
-            nargs='+'
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        if(hasattr(args.fields, '__upper__')):
-            args.fields = (args.fields, )
-        for seq in gen.next():
-            values = [seq.getvalue(field) for field in args.fields]
-            pairs = ['|'.join((args.fields[i], values[i])) for i in range(len(values))]
-            header = '|'.join(pairs)
-            yield FSeq(header, seq.seq)
-
 class Sniff(Subcommand):
     def _parse(self):
         cmd_name = 'sniff'
@@ -1389,25 +1217,6 @@ class Sample(Subcommand):
         for i in sample_indices:
             yield seqs[i]
 
-class Sort(Subcommand):
-    def _parse(self):
-        cmd_name = 'sort'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
-        parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        seqs = [s for s in gen.next()]
-        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
-        for s in seqs:
-            yield s
-
 class Split(Subcommand):
     def _parse(self):
         cmd_name = 'split'
@@ -1443,6 +1252,290 @@ class Split(Subcommand):
                 for seq in (seqs[x] for x in range(begin, end)):
                     fo.write(seq.get_pretty_string() + '\n')
 
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Sort sequences by given fields")
+        parser.add_argument(
+            'fields',
+            help="Header fields by which to sort sequences",
+            nargs='+')
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = [s for s in gen.next()]
+        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
+        for s in seqs:
+            yield s
+
+
+# ==============
+# UNIX EMULATORS
+# ==============
+
+class Grep(Subcommand):
+    def _parse(self):
+        cmd_name = 'grep'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Roughly emulates the UNIX grep command"
+        )
+        parser.add_argument(
+            'patterns',
+            help='Patterns to match',
+            nargs='*'
+        )
+        parser.add_argument(
+            '-q', '--match-sequence',
+            help='Match sequence rather than header',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-f', '--file',
+            help='Obtain patterns from given file, one per line'
+        )
+        parser.add_argument(
+            '-w', '--pattern-wrapper',
+            help='A pattern that matches its capture against the given patterns'
+        )
+        parser.add_argument(
+            '-i', '--ignore-case',
+            help='Ignore case distinctions',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-v', '--invert-match',
+            help='Print non-matching entries',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-c', '--count',
+            help='Print number of entries with matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-m', '--count-matches',
+            help='Print total number of matches',
+            action='store_true',
+            default=False
+        )
+        # parser.add_argument(
+        #     '-o', '--only',
+        #     help='Print only matching parts of header of sequence',
+        #     action='store_true',
+        #     default=False
+        # )
+        # parser.add_argument(
+        #     '-A', '--after-context',
+        #     help='Print INT characters after the match',
+        #     action='store_true',
+        #     default=False
+        # )
+        # parser.add_argument(
+        #     '-B', '--before-context',
+        #     help='Print INT characters before the match',
+        #     action='store_true',
+        #     default=False
+        # )
+        # parser.add_argument(
+        #     '-C', '--context',
+        #     help='Print INT characters after the match',
+        #     action='store_true',
+        #     default=False
+        # )
+        parser.add_argument(
+            '--color',
+            help='Print in color',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+
+        # Stop if there are any incompatible options
+        if args.count_matches and args.invert_match:
+            print('--count-matches argument is incompatible with --invert-matches',
+                    file=sys.stderr)
+            raise SystemExit
+
+        flags = re.IGNORECASE if args.ignore_case else 0
+
+        pat = set()
+        if args.file:
+            with open(args.file, 'r') as f:
+                pat.update([line.rstrip('\n') for line in f.readlines()])
+        if args.patterns:
+            pat.update(args.patterns)
+
+        if not pat:
+            print('Please provide a pattern', file=sys.stderr)
+            raise SystemExit
+
+        if args.pattern_wrapper:
+            wrapper = re.compile(args.pattern_wrapper, flags=flags)
+        else:
+            pat = set((re.compile(p, flags=flags) for p in pat))
+            wrapper = None
+
+        def swrpmatcher(text):
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    return(True)
+            return(False)
+
+        def spatmatcher(text):
+            for p in pat:
+                if re.search(p, text):
+                    return(True)
+            return(False)
+
+        def gwrpmatcher(text):
+            pos = []
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    pos.append((m.start(), m.end()))
+            return(pos)
+
+        def gpatmatcher(text):
+            pos = []
+            for p in pat:
+                for m in re.finditer(p, text):
+                    pos.append((m.start(), m.end()))
+            return(pos)
+
+        if args.count_matches or args.color:
+            matcher = gwrpmatcher if wrapper else gpatmatcher
+        else:
+            matcher = swrpmatcher if wrapper else spatmatcher
+
+        count, matches = 0, 0
+        for seq in gen.next():
+            if(args.match_sequence):
+                text = seq.seq
+            else:
+                text = seq.header
+
+            m = matcher(text)
+
+            if (m and not args.invert_match) or (not m and args.invert_match):
+                if args.count:
+                    count += 1
+                if args.count_matches:
+                    matches += len(m)
+                if not args.count and not args.count_matches:
+                    if args.color:
+                        coltext = ColorString(text)
+                        for region in m:
+                            coltext.colorpos(range(*region))
+                    if args.match_sequence:
+                        seq.colseq = coltext
+                    else:
+                        seq.colheader = coltext
+                    yield(seq)
+
+        if args.count and args.count_matches:
+            yield("{}\t{}".format(count, matches))
+        elif args.count:
+            yield(count)
+        elif args.count_matches:
+            yield(matches)
+
+class Uniq(Subcommand):
+    def _parse(self):
+        cmd_name = 'uniq'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Emulates UNIX uniq command (prior sorting needless)"
+        )
+        parser.add_argument(
+            '-c', '--count',
+            help='Writes (count|header) in tab-delimited format',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-d', '--repeated',
+            help='Print only repeated entries',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-u', '--uniq',
+            help='Print only unique entries',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = defaultdict(int)
+        for seq in gen.next():
+            seqs[seq] += 1
+
+        if args.repeated:
+            sgen = ((k,v) for k,v in seqs.items() if v > 1)
+        elif args.uniq:
+            sgen = ((k,v) for k,v in seqs.items() if v == 1)
+        else:
+            sgen = seqs.items()
+
+        if args.count:
+            for k,v in sgen:
+                yield("{}\t{}".format(v, k.header))
+        else:
+            for k,v in sgen:
+                yield(k)
+
+class Wc(Subcommand):
+    def _parse(self):
+        cmd_name = 'wc'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Roughly emulates the UNIX wc command"
+        )
+        parser.add_argument(
+            '-m', '--chars',
+            help='Writes the summed length of all sequences',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--lines',
+            help='Writes the total number of sequences',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        nchars, nseqs = 0, 0
+        for seq in gen.next():
+            nchars += len(seq.seq)
+            nseqs += 1
+        yield nseqs
+        yield nchars
+
+    def write(self, args, gen):
+        nseqs, nchars = list(self.generator(args, gen))
+        if args.chars and not args.lines:
+            print(nchars)
+        elif args.lines and not args.chars:
+            print(nseqs)
+        else:
+            print("{}\t{}".format(nseqs, nchars))
+
+
 
 # =======
 # EXECUTE
@@ -1452,3 +1545,105 @@ if __name__ == '__main__':
     gen = FSeqGenerator()
     args = parse()
     args.func(args, gen)
+
+# class Retrieve(Subcommand):
+#     def generator(self, args, gen):
+#         def getset(values, filename):
+#             s = set()
+#             if filename:
+#                 with open(filename, 'r') as f:
+#                     s.update([line.rstrip('\n') for line in f.readlines()])
+#             if values:
+#                 s.update(values)
+#             return(s)
+#
+#         groups = getset(args.groups, args.groupfile)
+#         pat = set((re.compile(p) for p in getset(args.pattern, args.patternfile)))
+#
+#         if(len(pat) > 1 and groups):
+#             print('Cannot process multiple patterns with groups', file=sys.stderr)
+#             raise SystemExit
+#         if not pat:
+#             print('Please provide a pattern (-p <regex>)', file=sys.stderr)
+#
+#         for seq in gen.next():
+#             if(args.match_sequence):
+#                 text = seq.seq
+#             else:
+#                 text = seq.header
+#             for p in pat:
+#                 m = re.search(p, text)
+#                 if not m and not args.invert:
+#                     continue
+#                 elif groups:
+#                     try:
+#                         # If at least one group defined
+#                         match = m.group(1)
+#                     except:
+#                         # If no groups defined
+#                         match = m.group(0)
+#                     if (match in groups and args.invert) or \
+#                     (match not in groups and not args.invert):
+#                         continue
+#                 if not args.color or args.invert:
+#                     yield seq
+#                     break
+#                 # KLUDGE, TODO: Make seq and header classes
+#                 else:
+#                     if(args.match_sequence):
+#                         seq.colseq.setseq(text)
+#                         seq.colseq.colormatch(p)
+#                     else:
+#                         seq.colheader.setseq(text)
+#                         seq.colheader.colormatch(p)
+#             if(seq.colseq.seq or seq.colheader.seq):
+#                 yield seq
+#
+# class Search(Subcommand):
+#     def _parse(self):
+#         cmd_name = 'search'
+#         parser = self.subparsers.add_parser(
+#             cmd_name,
+#             usage=self.usage.format(cmd_name),
+#             help='Search for pattern')
+#         parser.add_argument(
+#             'pattern',
+#             help='Perl regular expression search pattern')
+#         parser.add_argument(
+#             '-i', '--invert',
+#             help="Drop all not matching the pattern",
+#             action='store_true',
+#             default=False
+#         )
+#         parser.add_argument(
+#             '-q', '--seq',
+#             help='Search for pattern in the sequence',
+#             action='store_true',
+#             default=False
+#         )
+#         parser.add_argument(
+#             '-c', '--color',
+#             help='Highlight the matched sequence',
+#             action='store_true',
+#             default=False
+#         )
+#         parser.set_defaults(func=self.func)
+#
+#     def generator(self, args, gen):
+#         '''
+#         Print entries whose headers contain a given pattern. Similar to `retrieve` but lighterweight.
+#         '''
+#         prog = re.compile(args.pattern)
+#         for seq in gen.next():
+#             text = seq.seq if args.seq else seq.header
+#             m = prog.search(text)
+#             if (not m and not args.invert) or (m and args.invert):
+#                 continue
+#             if(args.color and not args.invert):
+#                 if(args.seq):
+#                     seq.colseq.setseq(text)
+#                     seq.colseq.colormatch(prog)
+#                 else:
+#                     seq.colheader.setseq(text)
+#                     seq.colheader.colormatch(prog)
+#             yield seq
