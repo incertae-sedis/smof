@@ -590,31 +590,42 @@ class Complexity(Subcommand):
         parser.add_argument(
             '-k', '--alphabet-size',
             help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
+            type=int,
+            metavar='INT',
             default=4
         )
         parser.add_argument(
             '-w', '--window-length',
             help='Window length (if provided, output will average of window complexities)',
+            type=int,
+            metavar='INT',
             default=100
         )
         parser.add_argument(
             '-m', '--word-length',
             help='Length of each word',
+            type=int,
+            metavar='INT',
             default=1
         )
         parser.add_argument(
             '-j', '--jump',
             help='Distance between adjacent windows',
+            type=int,
+            metavar='INT',
             default=1
         )
         parser.add_argument(
             '-o', '--offset',
             help='Index of start point',
+            type=int,
+            metavar='INT',
             default=0
         )
         parser.add_argument(
             '-d', '--drop',
             help="Drop sequence if contains this character (e.g. 'X' or 'N')",
+            metavar='CHAR',
             default=None
         )
         parser.set_defaults(func=self.func)
@@ -772,7 +783,8 @@ class Tounk(Subcommand):
         )
         parser.add_argument(
             '-t', '--type',
-            help='Sequence type [n, p]'
+            metavar='n|p',
+            help='Sequence type'
         )
         parser.add_argument(
             '-l', '--lc',
@@ -783,20 +795,24 @@ class Tounk(Subcommand):
         parser.add_argument(
             '--nir',
             help='Nucleotide irregulars [default=(not ACGT)]',
+            metavar='STR',
             default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
         )
         parser.add_argument(
             '--pir',
+            metavar='STR',
             help='Protein irregulars [default=BJOUZbjouz]',
             default='BJOUXZbjouxz'
         )
         parser.add_argument(
             '--nunk',
+            metavar='CHAR',
             help='Nucleotide unknown character (default=N)',
             default='N'
         )
         parser.add_argument(
             '--punk',
+            metavar='CHAR',
             help='Protein unknown character (default=X)',
             default='X'
         )
@@ -865,12 +881,14 @@ class Qstat(Subcommand):
             '-s', '--start-offset',
             help='Number of letters to ignore at beginning (default=0)',
             type=int,
+            metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
             help='Number of letters to ignore at end (default=0)',
             type=int,
+            metavar='INT',
             default=0
         )
         parser.set_defaults(func=self.func)
@@ -979,6 +997,7 @@ class Fsubseq(Subcommand):
             '-p', '--pattern-index',
             help='Index of regex pattern in each row',
             type=int,
+            metavar='INT',
             default=-1)
         parser.set_defaults(func=self.func)
 
@@ -1035,6 +1054,7 @@ class Fasta2csv(Subcommand):
         parser.add_argument(
             '-d', '--delimiter',
             help="Set delimiter (',' by default)",
+            metavar='CHAR',
             default=',')
         parser.add_argument(
             '-r', '--header',
@@ -1044,6 +1064,7 @@ class Fasta2csv(Subcommand):
         parser.add_argument(
             '-f', '--fields',
             help='Extract given fields from the header',
+            metavar='STR',
             nargs='+')
         parser.set_defaults(func=self.func)
 
@@ -1077,22 +1098,26 @@ class Perm(Subcommand):
             '-w', '--word-size',
             help='Size of each word (default=1)',
             type=int,
+            metavar='INT',
             default=1
         )
         parser.add_argument(
             '-s', '--start-offset',
             help='Number of letters to ignore at beginning (default=0)',
             type=int,
+            metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
             help='Number of letters to ignore at end (default=0)',
             type=int,
+            metavar='INT',
             default=0
         )
         parser.add_argument(
             '-f', '--field',
+            metavar='STR',
             help="Header field (e.g. 'gi' or 'locus')"
         )
         parser.set_defaults(func=self.func)
@@ -1202,20 +1227,24 @@ class Winnow(Subcommand):
         )
         parser.add_argument(
             '-c', '--contain',
+            metavar='STR',
             help="Remove if contains any of these characters"
         )
         parser.add_argument(
             '-C', '--not-contain',
+            metavar='STR',
             help="Remove if contains any of these characters"
         )
         parser.add_argument(
             '-s', '--shorter-than',
             help="Remove if sequence is shorter than i",
+            metavar='INT',
             type=int
         )
         parser.add_argument(
             '-S', '--longer-than',
             help="Remove if sequence is longer than i",
+            metavar='INT',
             type=int
         )
         parser.add_argument(
@@ -1226,6 +1255,7 @@ class Winnow(Subcommand):
         )
         parser.add_argument(
             '-p', '--composition',
+            metavar='EXPR',
             help="Composition (e.g. -p 'GC < 0.5')"
         )
         parser.set_defaults(func=self.func)
@@ -1379,10 +1409,12 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-f', '--file',
+            metavar='FILE',
             help='Obtain patterns from given file, one per line'
         )
         parser.add_argument(
             '-w', '--pattern-wrapper',
+            metavar='REGEX',
             help='A pattern to capture the given patterns'
         )
         parser.add_argument(
