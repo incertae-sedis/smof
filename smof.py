@@ -10,7 +10,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.2.2"
+__version__ = "1.3.0"
 
 # ================
 # Argument Parsing
@@ -42,6 +42,10 @@ class Parser:
         return(subparsers)
 
 def parse(argv=None):
+
+    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
+        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
+        raise SystemExit
 
     parser = Parser()
 
