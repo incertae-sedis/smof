@@ -107,6 +107,8 @@ class FSeqGenerator:
         nseqs = 0
         for line in self.fh:
             line = line.strip()
+            if not line:
+                continue
             if ">" == line[0]:
                 if(seq_list):
                     nseqs += 1
