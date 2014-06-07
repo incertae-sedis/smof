@@ -1186,7 +1186,7 @@ class Sniff(Subcommand):
             else:
                 print("{}:".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
-                    print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
+                    print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
 
         write_dict(seqsum.ntype, 'Sequence types', nseqs)
         write_dict(seqsum.ncase, 'Sequences cases', nseqs)
@@ -1199,7 +1199,7 @@ class Sniff(Subcommand):
                 return(0)
             print(text)
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
-                print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
+                print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
 
         write_feat(seqsum.nfeat, "Nucleotide Features:", nnucl)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
@@ -1528,10 +1528,10 @@ class Grep(Subcommand):
                         coltext = ColorString(text)
                         for region in m:
                             coltext.colorpos(range(*region))
-                    if args.match_sequence:
-                        seq.colseq = coltext
-                    else:
-                        seq.colheader = coltext
+                        if args.match_sequence:
+                            seq.colseq = coltext
+                        else:
+                            seq.colheader = coltext
                     yield(seq)
 
         if args.count and args.count_matches:
