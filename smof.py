@@ -293,7 +293,7 @@ class ColorString:
             print(''.join(self.seq[i]), end='')
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
-        print()
+        print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
