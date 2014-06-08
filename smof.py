@@ -1400,6 +1400,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             'patterns',
+            metavar='PATTERNS',
             help='Patterns to match',
             nargs='*'
         )
@@ -1412,12 +1413,18 @@ class Grep(Subcommand):
         parser.add_argument(
             '-f', '--file',
             metavar='FILE',
-            help='Obtain patterns from given file, one per line'
+            help='Obtain patterns from FILE, one per line'
         )
         parser.add_argument(
-            '-w', '--pattern-wrapper',
-            metavar='REGEX',
-            help='A pattern to capture the given patterns'
+            '-P', '--perl-regexp',
+            help='Treat PATTERNS as perl regular expressions',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-w', '--wrap',
+            metavar='REG',
+            help='A regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -1459,6 +1466,15 @@ class Grep(Subcommand):
                     file=sys.stderr)
             raise SystemExit
 
+        if args.wrap and args.perl_regexp:
+            print("PATTERNS found in --wrap captures must be literal ",
+                  "(-P option and -w are incompatible)", file=sys.stderr)
+            raise SystemExit
+
+        # If the user wants color and a count, ignore
+        if args.count_matches and args.color:
+            args.color = False
+
         flags = re.IGNORECASE if args.ignore_case else 0
 
         pat = set()
@@ -1472,24 +1488,32 @@ class Grep(Subcommand):
             print('Please provide a pattern', file=sys.stderr)
             raise SystemExit
 
-        if args.pattern_wrapper:
-            wrapper = re.compile(args.pattern_wrapper, flags=flags)
+        # TODO searching for perfect matches would be faster without using
+        # regex (just <str>.find(pat))
+        if not args.perl_regexp and not args.wrap:
+            pat = [re.escape(p) for p in pat]
+
+        if args.wrap:
+            wrapper = re.compile(args.wrap, flags=flags)
         else:
             pat = set((re.compile(p, flags=flags) for p in pat))
             wrapper = None
 
+        # Check existence for matches to wrapper captures
         def swrpmatcher(text):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
             return(False)
 
+        # Check existence of matches
         def spatmatcher(text):
             for p in pat:
                 if re.search(p, text):
                     return(True)
             return(False)
 
+        # Find locations of matches to wrappers
         def gwrpmatcher(text):
             pos = []
             for m in re.finditer(wrapper, text):
@@ -1497,6 +1521,7 @@ class Grep(Subcommand):
                     pos.append((m.start(), m.end()))
             return(pos)
 
+        # Find locations of matches
         def gpatmatcher(text):
             pos = []
             for p in pat:
@@ -1505,8 +1530,10 @@ class Grep(Subcommand):
             return(pos)
 
         if args.count_matches or args.color:
+            # print('1')
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
+            # print('2')
             matcher = swrpmatcher if wrapper else spatmatcher
 
         count, matches = 0, 0
