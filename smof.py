@@ -10,7 +10,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 # ================
 # Argument Parsing
@@ -111,6 +111,8 @@ class FSeqGenerator:
         nseqs = 0
         for line in self.fh:
             line = line.strip()
+            if not line:
+                continue
             if ">" == line[0]:
                 if(seq_list):
                     nseqs += 1
@@ -295,7 +297,7 @@ class ColorString:
             print(''.join(self.seq[i]), end='')
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
-        print()
+        print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
@@ -1188,7 +1190,7 @@ class Sniff(Subcommand):
             else:
                 print("{}:".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
-                    print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
+                    print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
 
         write_dict(seqsum.ntype, 'Sequence types', nseqs)
         write_dict(seqsum.ncase, 'Sequences cases', nseqs)
@@ -1201,7 +1203,7 @@ class Sniff(Subcommand):
                 return(0)
             print(text)
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
-                print("  {:<20} {:<10} {:>7.4f}%".format(k + ':', v, 100*v/N))
+                print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
 
         write_feat(seqsum.nfeat, "Nucleotide Features:", nnucl)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
@@ -1402,6 +1404,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             'patterns',
+            metavar='PATTERNS',
             help='Patterns to match',
             nargs='*'
         )
@@ -1414,12 +1417,18 @@ class Grep(Subcommand):
         parser.add_argument(
             '-f', '--file',
             metavar='FILE',
-            help='Obtain patterns from given file, one per line'
+            help='Obtain patterns from FILE, one per line'
         )
         parser.add_argument(
-            '-w', '--pattern-wrapper',
-            metavar='REGEX',
-            help='A pattern to capture the given patterns'
+            '-P', '--perl-regexp',
+            help='Treat PATTERNS as perl regular expressions',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-w', '--wrap',
+            metavar='REG',
+            help='A regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -1461,6 +1470,15 @@ class Grep(Subcommand):
                     file=sys.stderr)
             raise SystemExit
 
+        if args.wrap and args.perl_regexp:
+            print("PATTERNS found in --wrap captures must be literal ",
+                  "(-P option and -w are incompatible)", file=sys.stderr)
+            raise SystemExit
+
+        # If the user wants color and a count, ignore
+        if args.count_matches and args.color:
+            args.color = False
+
         flags = re.IGNORECASE if args.ignore_case else 0
 
         pat = set()
@@ -1474,24 +1492,32 @@ class Grep(Subcommand):
             print('Please provide a pattern', file=sys.stderr)
             raise SystemExit
 
-        if args.pattern_wrapper:
-            wrapper = re.compile(args.pattern_wrapper, flags=flags)
+        # TODO searching for perfect matches would be faster without using
+        # regex (just <str>.find(pat))
+        if not args.perl_regexp and not args.wrap:
+            pat = [re.escape(p) for p in pat]
+
+        if args.wrap:
+            wrapper = re.compile(args.wrap, flags=flags)
         else:
             pat = set((re.compile(p, flags=flags) for p in pat))
             wrapper = None
 
+        # Check existence for matches to wrapper captures
         def swrpmatcher(text):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
             return(False)
 
+        # Check existence of matches
         def spatmatcher(text):
             for p in pat:
                 if re.search(p, text):
                     return(True)
             return(False)
 
+        # Find locations of matches to wrappers
         def gwrpmatcher(text):
             pos = []
             for m in re.finditer(wrapper, text):
@@ -1499,6 +1525,7 @@ class Grep(Subcommand):
                     pos.append((m.start(), m.end()))
             return(pos)
 
+        # Find locations of matches
         def gpatmatcher(text):
             pos = []
             for p in pat:
@@ -1507,8 +1534,10 @@ class Grep(Subcommand):
             return(pos)
 
         if args.count_matches or args.color:
+            # print('1')
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
+            # print('2')
             matcher = swrpmatcher if wrapper else spatmatcher
 
         count, matches = 0, 0
@@ -1530,10 +1559,10 @@ class Grep(Subcommand):
                         coltext = ColorString(text)
                         for region in m:
                             coltext.colorpos(range(*region))
-                    if args.match_sequence:
-                        seq.colseq = coltext
-                    else:
-                        seq.colheader = coltext
+                        if args.match_sequence:
+                            seq.colseq = coltext
+                        else:
+                            seq.colheader = coltext
                     yield(seq)
 
         if args.count and args.count_matches:
