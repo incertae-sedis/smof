@@ -1661,23 +1661,26 @@ class Rename(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Roughly Larry Wall's rename for headers"
+            help="Larry Wall's rename pythonized for headers"
         )
         parser.add_argument(
             'pattern',
-            help="Pattern"
+            metavar='PATTERN',
+            help="Regex pattern"
         )
         parser.add_argument(
             'replacement',
+            metavar='REPLACEMENT',
             nargs='?',
             default='',
-            help="Replacement"
+            help="Regex replacement (default='', i.e. delete PATTERN)"
         )
         parser.add_argument(
             'headers',
+            metavar='HEADERS',
             nargs='?',
             default=None,
-            help="perl expression to select headers"
+            help="Regex to select headers (if not supplied, select all)"
         )
         parser.set_defaults(func=self.func)
 
