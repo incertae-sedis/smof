@@ -66,6 +66,7 @@ def parse(argv=None):
     Grep(parser)
     Uniq(parser)
     Wc(parser)
+    Rename(parser)
     Winnow(parser)
 
     if(len(sys.argv) == 1):
@@ -1653,6 +1654,39 @@ class Wc(Subcommand):
             print(nseqs)
         else:
             print("{}\t{}".format(nseqs, nchars))
+
+class Rename(Subcommand):
+    def _parse(self):
+        cmd_name = 'rename'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Roughly Larry Wall's rename for headers"
+        )
+        parser.add_argument(
+            'pattern',
+            help="Pattern"
+        )
+        parser.add_argument(
+            'replacement',
+            nargs='?',
+            default='',
+            help="Replacement"
+        )
+        parser.add_argument(
+            'headers',
+            nargs='?',
+            default=None,
+            help="perl expression to select headers"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        matcher = re.compile(args.headers) if args.headers else None
+        for seq in gen.next():
+            if not matcher or re.search(matcher, seq.header):
+                seq.header = re.sub(args.pattern, args.replacement, seq.header)
+            yield seq
 
 
 # =======
