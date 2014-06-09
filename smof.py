@@ -162,27 +162,6 @@ class FSeq:
             for i in range(0, len(fields), 2):
                 self.headerfields[fields[i].strip()] = fields[i+1].strip()
 
-    def has_field(self, field):
-        if(not self.headerfields):
-            self.parse_header()
-        if field in self.headerfields:
-            return True
-        else:
-            return False
-
-    def field_is(self, field, value):
-        value = str(value)
-        if(not self.headerfields):
-            self.parse_header()
-        try:
-            if(self.headerfields[field] == value):
-                return True
-            else:
-                return False
-        except:
-            print("Header lacks field {}".format(field), file=sys.stderr)
-            print(self.header, file=sys.stderr)
-
     def getvalue(self, field, quiet=False, missing=''):
         if not self.headerfields:
             self.parse_header()
@@ -195,15 +174,6 @@ class FSeq:
                 print("Header lacks field '{}'".format(field), file=sys.stderr)
                 print(self.header, file=sys.stderr)
             raise SystemExit
-
-    def countmasked(self):
-        '''
-        Masked sequences are lowercase, unmasked are uppercase. This function
-        simply counts the number of lowercase characters.
-        '''
-        # ASCII values: (97-122 for a-z), (65-90 for A-Z)
-        nmasked = sum(c > 90 for c in self.seq.encode('ascii'))
-        return(nmasked)
 
     def subseq(self, a, b):
         try:
