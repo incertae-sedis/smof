@@ -1428,12 +1428,17 @@ class Grep(Subcommand):
             action='store_true',
             default=False
         )
-        # parser.add_argument(
-        #     '--gff3',
-        #     help='Output matches in gff3 format',
-        #     action='store_true',
-        #     default=False
-        # )
+        parser.add_argument(
+            '--gff',
+            help='Output matches in gff format',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '--gff-type',
+            help='Name of searched feature',
+            default='pattern'
+        )
         parser.set_defaults(func=self.func)
 
     def _process_arguments(self, args):
@@ -1448,7 +1453,7 @@ class Grep(Subcommand):
                   "(-P option and -w are incompatible)", file=sys.stderr)
             raise SystemExit
 
-        # if args.gff3:
+        # if args.gff:
         #     args.color = False
         #     args.count = False
         #     args.count_matches = False
@@ -1491,7 +1496,7 @@ class Grep(Subcommand):
                     pos.append((m.start(), m.end()))
             return(pos)
 
-        if args.count_matches or args.color:
+        if args.gff or args.count_matches or args.color:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
@@ -1521,7 +1526,21 @@ class Grep(Subcommand):
         else:
             gettext = lambda x: x.header
 
-        if args.count or args.count_matches:
+        if args.gff:
+            def sgen(gen, matcher):
+                # TODO optionally search negative strands
+                row = [None,
+                       "smof-{}".format(__version__),
+                       args.gff_type,
+                       None, None, '.', '+', '.', '.']
+                for seq in gen.next():
+                    row[0] = re.sub('^>(\S+)', '\1', seq.header)
+                    for pos in matcher(seq.seq):
+                        row[3] = pos[0] + 1
+                        row[4] = pos[1]
+                        yield('\t'.join([str(s) for s in row]))
+
+        elif args.count or args.count_matches:
             def sgen(gen, matcher):
                 count, matches = 0, 0
                 for seq in gen.next():
