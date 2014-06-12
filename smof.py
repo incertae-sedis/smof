@@ -82,6 +82,21 @@ def parse(argv=None):
 # CLASS DEFINITIONS
 # =================
 
+class Maps:
+    DNA_AMB = {
+        'R':'AG',
+        'Y':'CT',
+        'S':'GC',
+        'W':'AT',
+        'K':'GT',
+        'M':'AC',
+        'B':'CGT',
+        'D':'AGT',
+        'H':'ACT',
+        'V':'ACG',
+        'N':'ACGT'
+    }
+
 class Alphabet:
     # Including U, for selenocysteine, and * for STOP
     PROT     = set('ACDEFGHIKLMNPQRSTUVWYX*')
@@ -1388,15 +1403,21 @@ class Grep(Subcommand):
             help='Obtain patterns from FILE, one per line'
         )
         parser.add_argument(
+            '-w', '--wrap',
+            metavar='REG',
+            help='A regular expression to capture PATTERNS'
+        )
+        parser.add_argument(
             '-P', '--perl-regexp',
             help='Treat PATTERNS as perl regular expressions',
             action='store_true',
             default=False
         )
         parser.add_argument(
-            '-w', '--wrap',
-            metavar='REG',
-            help='A regular expression to capture PATTERNS'
+            '-B', '--ambiguous-nucl',
+            help='Parse extended nucleotide alphabet',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -1460,15 +1481,20 @@ class Grep(Subcommand):
                   "(-P option and -w are incompatible)", file=sys.stderr)
             raise SystemExit
 
-        # if args.gff:
-        #     args.color = False
-        #     args.count = False
-        #     args.count_matches = False
-        #     args.match_sequence = True
+        if args.ambiguous_nucl:
+            args.perl_regexp = True
 
-        # If the user wants color and a count, ignore
-        if args.count_matches and args.color:
+        # Some things just don't make sense in header searches ...
+        if args.gff or args.ambiguous_nucl:
+            args.match_sequence = True
+
+        # Others don't make sense with color
+        if args.gff or args.count_matches and args.color:
             args.color = False
+
+        if args.gff:
+            args.count = False
+            args.count_matches = False
 
         return(args)
 
@@ -1528,6 +1554,15 @@ class Grep(Subcommand):
             pat.update([l.rstrip('\n') for l in args.file])
         if args.patterns:
             pat.update(args.patterns)
+
+        if args.ambiguous_nucl:
+            apat = set()
+            for p in pat:
+                perlpat = p
+                for k,v in Maps.DNA_AMB.items():
+                    perlpat = re.sub(k, '[%s]' % v, perlpat)
+                apat.update([perlpat])
+            pat = apat
 
         if not pat:
             print('Please provide a pattern', file=sys.stderr)
