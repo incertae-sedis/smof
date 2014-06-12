@@ -484,6 +484,15 @@ class FileStat:
         self.nseqs += 1
         self.lengths.append(stat.length)
 
+class ParseHeader:
+    def firstword(h):
+        return(re.sub('>(\S+).*', '\1', h))
+
+    def ncbi_format(h, fields):
+        raise NotImplemented
+
+    def regex_group(h, regex):
+        raise NotImplemented
 
 # =================
 # UTILITY FUNCTIONS
@@ -823,12 +832,12 @@ class Stat(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="Calculate sequence statistics")
-        # parser.add_argument(
-        #     '-q', '--foreach-sequence',
-        #     help='Write a line for each sequence',
-        #     default=False,
-        #     action='store_true'
-        # )
+        parser.add_argument(
+            '-q', '--foreach-sequence',
+            help='Write a line for each sequence',
+            default=False,
+            action='store_true'
+        )
         parser.add_argument(
             '-i', '--ignore-case',
             help='Ignore case',
@@ -853,8 +862,6 @@ class Stat(Subcommand):
         charser = set(g.counts)
 
         yield('stub')
-
-
 
 class Subseq(Subcommand):
     def _parse(self):
