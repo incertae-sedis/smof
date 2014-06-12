@@ -1420,8 +1420,8 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-i', '--ignore-case',
-            help='Ignore case distinctions',
+            '-I', '--case-sensitive',
+            help='DO NOT ignore case distinctions (ignore by default)',
             action='store_true',
             default=False
         )
@@ -1644,7 +1644,8 @@ class Grep(Subcommand):
 
         pat = self._get_pattern(args)
 
-        flags = re.IGNORECASE if args.ignore_case else 0
+        flags = re.IGNORECASE if not args.case_sensitive else 0
+
         if args.wrap:
             wrapper = re.compile(args.wrap, flags=flags)
         else:
