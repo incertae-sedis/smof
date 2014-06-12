@@ -11,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.2.1"
+__version__ = "1.4.1"
 
 # ================
 # Argument Parsing
@@ -43,22 +43,24 @@ class Parser:
 
 def parse(argv=None):
 
+    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
+        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
+        raise SystemExit
+
     parser = Parser()
 
     Chksum(parser)
 
     Complexity(parser)
-    Fstat(parser)
     Unmask(parser)
-    Hstat(parser)
     Tounk(parser)
     Prettyprint(parser)
-    Qstat(parser)
     Sample(parser)
     Sort(parser)
     Split(parser)
     Subseq(parser)
     Sniff(parser)
+    Stat(parser)
     Fsubseq(parser)
     Fasta2csv(parser)
     Perm(parser)
@@ -289,7 +291,7 @@ class ColorString:
             b = m.start() + len(m.group())
             self.colorpos(list(range(a,b)), col)
 
-class SeqSummary:
+class FileDescription:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
@@ -441,6 +443,80 @@ class SeqSummary:
         self.ntype[stype] += 1
         return(stype)
 
+class SeqStat:
+    def __init__(self, seq):
+        self.counts = Counter(seq.seq)
+        self.header = seq.header
+        self.length = len(seq.seq)
+
+    def aslist(self,
+               charset=None,
+               length=False,
+               masked=False,
+               header_fun=None,
+               ignorecase=False):
+
+        if not charset:
+            charset = set(self.counts)
+        line = []
+        if header_fun:
+            try:
+                line.append(header_fun(self.header))
+            except TypeError:
+                print ("Cannot process header: '{}'".format(self.header))
+                raise SystemExit
+        if length:
+            line.append(self.length)
+
+        if masked:
+            line.append(sum_lower(self.counts))
+
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+            self.counts = counter_caser(self.counts)
+
+        line += [self.counts[c] for c in sorted(charset)]
+
+        return(line)
+
+    @classmethod
+    def getheader(cls, charset, length=False, masked=False, ignorecase=False):
+        header = ['seqid']
+
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+
+        if length:
+            header += ['length']
+
+        if masked:
+            header += ['masked']
+
+        header += list(sorted(charset))
+
+        return(header)
+
+class FileStat:
+    def __init__(self):
+        self.counts = Counter()
+        self.nseqs = 0
+        self.lengths = []
+
+    def add_seq(self, stat):
+        self.counts += stat.counts
+        self.nseqs += 1
+        self.lengths.append(stat.length)
+
+class ParseHeader:
+    def firstword(h):
+        return(re.sub('>(\S+).*', '\1', h))
+
+    def ncbi_format(h, fields):
+        raise NotImplemented
+
+    def regex_group(h, regex):
+        raise NotImplemented
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -469,6 +545,10 @@ def counter_caser(counter, lower=False):
         counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
                      Counter({k.upper():v for k,v in counter.items() if k.islower()})
     return(counts_obj)
+
+def sum_lower(counter):
+    lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
+    return(sum(lc))
 
 
 # ====================
@@ -664,80 +744,6 @@ class Complexity(Subcommand):
                     col1 = seq_id
                 yield "{},{},{}".format(col1, mean, var)
 
-class Fstat(Subcommand):
-    def _parse(self):
-        cmd_name = 'fstat'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Provides total counts for file sequence characters"
-        )
-        parser.add_argument(
-            '-i', '--ignorecase',
-            help="Ignores case when counting characters",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        counts = Counter()
-        nseqs = 0
-        for seq in gen.next():
-            nseqs += 1
-            counts.update(seq.seq)
-
-        if args.ignorecase:
-            counts = counter_caser(counts)
-
-        nchars = sum(counts.values())
-        for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True):
-            yield "{}: {} {}".format(k, v, round(v/nchars, 4))
-        yield "nseqs: {}".format(nseqs)
-        yield "nchars: {}".format(nchars)
-        yield "mean length: {}".format(round(nchars/nseqs, 4))
-
-class Hstat(Subcommand):
-    def _parse(self):
-        cmd_name = 'hstat'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Extract info from headers (also seq length)")
-        parser.add_argument(
-            'fields',
-            help="Header fields to write to csv",
-            nargs='+')
-        parser.add_argument(
-            '--length',
-            help="Report length of each sequence",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Writes chosen header and seq length data to csv '''
-        fieldnames = self._get_fieldnames(args)
-        for seq in gen.next():
-            row = {}
-            for field in args.fields:
-                row[field] = seq.getvalue(field)
-            if(args.length):
-                row['length'] = len(seq.seq)
-            yield row
-
-    def _get_fieldnames(self, args):
-        fieldnames = list(args.fields)
-        if(args.length):
-            fieldnames.append('length')
-        return(fieldnames)
-
-    def write(self, args, gen):
-        fieldnames = self._get_fieldnames(args)
-        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-        w.writeheader()
-        for row in self.generator(args, gen):
-            w.writerow(row)
-
 class Unmask(Subcommand):
     def _parse(self):
         cmd_name = 'unmask'
@@ -843,90 +849,100 @@ class Prettyprint(Subcommand):
         for seq in self.generator(args, gen):
             seq.print(args.cwidth)
 
-class Qstat(Subcommand):
+class Stat(Subcommand):
     def _parse(self):
-        cmd_name = 'qstat'
+        cmd_name = 'stat'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Gathers statistics on each sequence")
+            help="Calculate sequence statistics")
         parser.add_argument(
-            '-f', '--fields',
-            help="Header fields by which each sequence is identified in output csv file",
-            nargs='+',
-            default=[])
-        parser.add_argument(
-            '-m', '--masked',
-            help="Count the number of masked (lowercase) characters",
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-i', '--ignorecase',
-            help="Ignores case when counting characters",
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-s', '--start-offset',
-            help='Number of letters to ignore at beginning (default=0)',
-            type=int,
-            metavar='INT',
-            default=0
+            '-q', '--byseq',
+            help='Write a line for each sequence',
+            default=False,
+            action='store_true'
         )
         parser.add_argument(
-            '-e', '--end-offset',
-            help='Number of letters to ignore at end (default=0)',
-            type=int,
-            metavar='INT',
-            default=0
+            '-I', '--case-sensitive',
+            help='Match case',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-m', '--count-lowercase',
+            help='Count the number of lowercase characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-c', '--counts',
+            help='Write counts of all characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-l', '--length',
+            help='Write sequence length',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-p', '--proportion',
+            help='Write proportion of each character',
+            default=False,
+            action='store_true'
         )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
+    def _byfile(self, args, gen):
+        g = FileStat()
         for seq in gen.next():
-            if args.fields:
-                fields = tuple(seq.getvalue(x, missing='NA') for x in args.fields)
-            else:
-                fields = []
+            g.add_seq(SeqStat(seq))
 
-            # Trim the beginning and end of the sequence, as specified
-            count = Counter(seq.seq[args.start_offset:len(seq.seq) - args.end_offset])
+        lower = sum_lower(g.counts) if args.count_lowercase else None
 
-            if args.masked:
-                nmasked = sum([v for c,v in count.items() if c in string.ascii_lower])
-            else:
-                nmasked = None
+        if not args.case_sensitive:
+            g.counts = counter_caser(g.counts)
 
-            if args.ignorecase:
-                count = counter_caser(count)
-
-            yield (fields, count, nmasked)
-
-    def write(self, args, gen):
-        results = list(self.generator(args, gen))
-        # Set of all unique characters seen in the fasta file
-        chars = set()
-        for f,c,m in results:
-            chars.update(c.keys())
-        if args.ignorecase:
-            chars = sorted(set(''.join(chars).upper()))
+        N = sum(v for v in g.counts.values())
+        if args.counts ^ args.proportion:
+            for k,v in g.counts.items():
+                val = v/N if args.proportion else v
+                yield("{}\t{}".format(k,val))
         else:
-            chars = sorted(chars)
+            for k,v in g.counts.items():
+                yield("{}\t{}\t{}".format(k,v,v/N))
 
-        headerfields = args.fields if args.fields else []
-        fieldnames = ['length'] + headerfields
-        fieldnames += ['masked'] if args.masked else []
-        fieldnames += chars
+    def _byseq(self, args, gen):
+        seqlist = []
+        charset = set()
+        for seq in gen.next():
+            seqstat = SeqStat(seq)
+            seqlist.append(seqstat)
+            charset.update(seqstat.counts)
 
-        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-        w.writeheader()
-        for fields,counts,masked in results:
-            row = {'length':sum(counts.values())}
-            if headerfields:
-                for i in range(len(fields)):
-                    row[headerfields[i]] = str(fields[i])
-            for k,v in counts.items():
-                row[k] = str(v)
-            w.writerow(row)
+        joiner = lambda s: ','.join([str(x) for x in s])
+
+        ignorecase = not args.case_sensitive
+        kwargs = {'masked':args.count_lowercase,
+                  'length':args.length,
+                  'ignorecase':ignorecase}
+
+        yield joiner(SeqStat.getheader(charset, **kwargs))
+
+        for q in seqlist:
+            line = q.aslist(charset=charset,
+                            header_fun=ParseHeader.firstword,
+                            **kwargs)
+            yield(joiner(line))
+
+    def generator(self, args, gen):
+        if args.byseq:
+            g = self._byseq(args, gen)
+        else:
+            g = self._byfile(args, gen)
+        for item in g:
+            yield(item)
 
 class Subseq(Subcommand):
     def _parse(self):
@@ -1142,7 +1158,7 @@ class Sniff(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqsum = SeqSummary()
+        seqsum = FileDescription()
         for seq in gen.next():
             seqsum.add_seq(seq)
         yield seqsum
