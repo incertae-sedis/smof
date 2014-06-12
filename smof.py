@@ -11,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 # ================
 # Argument Parsing
@@ -1448,8 +1448,14 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-r', '--reverse',
-            help='Also search for negative strand matches',
+            '-b', '--both-strands',
+            help='Search both strands',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--reverse-only',
+            help='Only search the reverse strand',
             action='store_true',
             default=False
         )
@@ -1504,14 +1510,14 @@ class Grep(Subcommand):
 
     def _create_matcher(self, args, pat, wrapper):
         # Check existence for matches to wrapper captures
-        def swrpmatcher(text):
+        def swrpmatcher(text, strand='.'):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
             return(False)
 
         # Check existence of matches
-        def spatmatcher(text):
+        def spatmatcher(text, strand='.'):
             for p in pat:
                 if re.search(p, text):
                     return(True)
@@ -1540,14 +1546,31 @@ class Grep(Subcommand):
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
 
-        if args.reverse:
-            def rmatcher(text):
-                fmatch = matcher(text, strand='+')
-                rmatch = []
-                for d in matcher(FSeq.getrevcomp(text), strand='-'):
-                    d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
-                    rmatch.append(d)
-                return(fmatch + rmatch)
+        if args.reverse_only or args.both_strands:
+            if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
+                if args.reverse_only:
+                    def rmatcher(text):
+                        match = matcher(FSeq.getrevcomp(text))
+                        return(match)
+                else:
+                    def rmatcher(text):
+                        match = matcher(text) + matcher(FSeq.getrevcomp(text))
+                        return(match)
+            else:
+                def rev(matcher, text):
+                    rmatch = []
+                    for d in matcher(FSeq.getrevcomp(text), strand='-'):
+                        d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                        rmatch.append(d)
+                    return(rmatch)
+                if args.reverse_only:
+                    def rmatcher(text):
+                        return(rev(matcher, text))
+                else:
+                    def rmatcher(text):
+                        fmatch = matcher(text)
+                        rmatch = rev(matcher, text)
+                        return(fmatch + rmatch)
             return(rmatcher)
         else:
             return(matcher)
