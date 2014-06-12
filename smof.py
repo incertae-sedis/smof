@@ -444,37 +444,60 @@ class FileDescription:
         return(stype)
 
 class SeqStat:
-    def __init__(seq):
+    def __init__(self, seq):
         self.counts = Counter(seq.seq)
         self.header = seq.header
         self.length = len(seq.seq)
 
     def aslist(self,
-               charset=set(self.counts),
+               charset=None,
                length=False,
                masked=False,
                header_fun=None,
                ignorecase=False):
+
+        if not charset:
+            charset = set(self.counts)
         line = []
         if header_fun:
             try:
-                line += header_fun(self.header)
+                line.append(header_fun(self.header))
             except TypeError:
                 print ("Cannot process header: '{}'".format(self.header))
                 raise SystemExit
         if length:
-            line += [self.length]
+            line.append(self.length)
 
         if masked:
-            line += sum_lower(self.counts)
+            line.append(sum_lower(self.counts))
 
-        for c in charset:
-            line += self.counts[c]
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+            self.counts = counter_caser(self.counts)
+
+        line += [self.counts[c] for c in sorted(charset)]
 
         return(line)
 
+    @classmethod
+    def getheader(cls, charset, length=False, masked=False, ignorecase=False):
+        header = ['seqid']
+
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+
+        if length:
+            header += ['length']
+
+        if masked:
+            header += ['masked']
+
+        header += list(sorted(charset))
+
+        return(header)
+
 class FileStat:
-    def __init__():
+    def __init__(self):
         self.counts = Counter()
         self.nseqs = 0
         self.lengths = []
@@ -493,6 +516,7 @@ class ParseHeader:
 
     def regex_group(h, regex):
         raise NotImplemented
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -833,14 +857,14 @@ class Stat(Subcommand):
             usage=self.usage.format(cmd_name),
             help="Calculate sequence statistics")
         parser.add_argument(
-            '-q', '--foreach-sequence',
+            '-q', '--byseq',
             help='Write a line for each sequence',
             default=False,
             action='store_true'
         )
         parser.add_argument(
-            '-i', '--ignore-case',
-            help='Ignore case',
+            '-I', '--case-sensitive',
+            help='Match case',
             default=False,
             action='store_true'
         )
@@ -850,18 +874,75 @@ class Stat(Subcommand):
             default=False,
             action='store_true'
         )
+        parser.add_argument(
+            '-c', '--counts',
+            help='Write counts of all characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-l', '--length',
+            help='Write sequence length',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-p', '--proportion',
+            help='Write proportion of each character',
+            default=False,
+            action='store_true'
+        )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
+    def _byfile(self, args, gen):
         g = FileStat()
-        q = []
         for seq in gen.next():
-            q.append(SeqStat(seq))
-            g.add_seq(s)
+            g.add_seq(SeqStat(seq))
 
-        charser = set(g.counts)
+        lower = sum_lower(g.counts) if args.count_lowercase else None
 
-        yield('stub')
+        if not args.case_sensitive:
+            g.counts = counter_caser(g.counts)
+
+        N = sum(v for v in g.counts.values())
+        if args.counts ^ args.proportion:
+            for k,v in g.counts.items():
+                val = v/N if args.proportion else v
+                yield("{}\t{}".format(k,val))
+        else:
+            for k,v in g.counts.items():
+                yield("{}\t{}\t{}".format(k,v,v/N))
+
+    def _byseq(self, args, gen):
+        seqlist = []
+        charset = set()
+        for seq in gen.next():
+            seqstat = SeqStat(seq)
+            seqlist.append(seqstat)
+            charset.update(seqstat.counts)
+
+        joiner = lambda s: ','.join([str(x) for x in s])
+
+        ignorecase = not args.case_sensitive
+        kwargs = {'masked':args.count_lowercase,
+                  'length':args.length,
+                  'ignorecase':ignorecase}
+
+        yield joiner(SeqStat.getheader(charset, **kwargs))
+
+        for q in seqlist:
+            line = q.aslist(charset=charset,
+                            header_fun=ParseHeader.firstword,
+                            **kwargs)
+            yield(joiner(line))
+
+    def generator(self, args, gen):
+        if args.byseq:
+            g = self._byseq(args, gen)
+        else:
+            g = self._byfile(args, gen)
+        for item in g:
+            yield(item)
 
 class Subseq(Subcommand):
     def _parse(self):
