@@ -1610,7 +1610,10 @@ class Grep(Subcommand):
                     m = matcher(text)
                     if (m and not args.invert_match) or (not m and args.invert_match):
                         count += 1
-                        matches += len(m)
+                        try:
+                            matches += len(m)
+                        except:
+                            pass
                 if args.count and args.count_matches:
                     yield "{}\t{}".format(count, matches)
                 elif args.count:
