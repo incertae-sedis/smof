@@ -1500,14 +1500,14 @@ class Grep(Subcommand):
 
     def _create_matcher(self, args, pat, wrapper):
         # Check existence for matches to wrapper captures
-        def swrpmatcher(text):
+        def swrpmatcher(text, strand='.'):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
             return(False)
 
         # Check existence of matches
-        def spatmatcher(text):
+        def spatmatcher(text, strand='.'):
             for p in pat:
                 if re.search(p, text):
                     return(True)
@@ -1537,13 +1537,18 @@ class Grep(Subcommand):
             matcher = swrpmatcher if wrapper else spatmatcher
 
         if args.reverse:
-            def rmatcher(text):
-                fmatch = matcher(text, strand='+')
-                rmatch = []
-                for d in matcher(FSeq.getrevcomp(text), strand='-'):
-                    d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
-                    rmatch.append(d)
-                return(fmatch + rmatch)
+            if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
+                def rmatcher(text):
+                    match = matcher(text) + matcher(FSeq.getrevcomp(text))
+                    return(match)
+            else:
+                def rmatcher(text):
+                    fmatch = matcher(text, strand='+')
+                    rmatch = []
+                    for d in matcher(FSeq.getrevcomp(text), strand='-'):
+                        d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                        rmatch.append(d)
+                    return(fmatch + rmatch)
             return(rmatcher)
         else:
             return(matcher)
