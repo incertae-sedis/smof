@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import argparse
 import csv
 import random
 import math
@@ -10,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.2.1"
+__version__ = "1.4.1"
 
 # ================
 # Argument Parsing
@@ -23,7 +24,6 @@ class Parser:
         self.usage = '<fastafile> | smof {} <options>'
 
     def _build_base_parser(self):
-        import argparse
         parser = argparse.ArgumentParser(
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
@@ -42,6 +42,10 @@ class Parser:
         return(subparsers)
 
 def parse(argv=None):
+
+    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
+        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
+        raise SystemExit
 
     parser = Parser()
 
@@ -79,6 +83,21 @@ def parse(argv=None):
 # =================
 # CLASS DEFINITIONS
 # =================
+
+class Maps:
+    DNA_AMB = {
+        'R':'AG',
+        'Y':'CT',
+        'S':'GC',
+        'W':'AT',
+        'K':'GT',
+        'M':'AC',
+        'B':'CGT',
+        'D':'AGT',
+        'H':'ACT',
+        'V':'ACG',
+        'N':'ACGT'
+    }
 
 class Alphabet:
     # Including U, for selenocysteine, and * for STOP
@@ -1308,7 +1327,13 @@ class Grep(Subcommand):
         parser.add_argument(
             '-f', '--file',
             metavar='FILE',
+            type=argparse.FileType('r'),
             help='Obtain patterns from FILE, one per line'
+        )
+        parser.add_argument(
+            '-w', '--wrap',
+            metavar='REG',
+            help='A regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
@@ -1317,13 +1342,14 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-w', '--wrap',
-            metavar='REG',
-            help='A regular expression to capture PATTERNS'
+            '-B', '--ambiguous-nucl',
+            help='Parse extended nucleotide alphabet',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
-            '-i', '--ignore-case',
-            help='Ignore case distinctions',
+            '-I', '--case-sensitive',
+            help='DO NOT ignore case distinctions (ignore by default)',
             action='store_true',
             default=False
         )
@@ -1341,7 +1367,19 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-m', '--count-matches',
-            help='Print total number of matches',
+            help='Print number of non-overlapping matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-b', '--both-strands',
+            help='Search both strands',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--reverse-only',
+            help='Only search the reverse strand',
             action='store_true',
             default=False
         )
@@ -1351,10 +1389,21 @@ class Grep(Subcommand):
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '--gff',
+            help='Output matches in gff format',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '--gff-type',
+            help='Name of searched feature',
+            metavar='STR',
+            default='regex_match'
+        )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
-
+    def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             print('--count-matches argument is incompatible with --invert-matches',
@@ -1366,18 +1415,105 @@ class Grep(Subcommand):
                   "(-P option and -w are incompatible)", file=sys.stderr)
             raise SystemExit
 
-        # If the user wants color and a count, ignore
-        if args.count_matches and args.color:
+        if args.ambiguous_nucl:
+            args.perl_regexp = True
+
+        # Some things just don't make sense in header searches ...
+        if args.gff or args.ambiguous_nucl:
+            args.match_sequence = True
+
+        # Others don't make sense with color
+        if args.gff or args.count_matches and args.color:
             args.color = False
 
-        flags = re.IGNORECASE if args.ignore_case else 0
+        if args.gff:
+            args.count = False
+            args.count_matches = False
 
+        return(args)
+
+    def _create_matcher(self, args, pat, wrapper):
+        # Check existence for matches to wrapper captures
+        def swrpmatcher(text, strand='.'):
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    return(True)
+            return(False)
+
+        # Check existence of matches
+        def spatmatcher(text, strand='.'):
+            for p in pat:
+                if re.search(p, text):
+                    return(True)
+            return(False)
+
+        # Find locations of matches to wrappers
+        def gwrpmatcher(text, strand='.'):
+            pos = []
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
+            return(pos)
+
+        # Find locations of matches
+        def gpatmatcher(text, strand='.'):
+            pos = []
+            for p in pat:
+                for m in re.finditer(p, text):
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
+            return(pos)
+
+        if args.gff or args.count_matches or args.color:
+            matcher = gwrpmatcher if wrapper else gpatmatcher
+        else:
+            matcher = swrpmatcher if wrapper else spatmatcher
+
+        if args.reverse_only or args.both_strands:
+            if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
+                if args.reverse_only:
+                    def rmatcher(text):
+                        match = matcher(FSeq.getrevcomp(text))
+                        return(match)
+                else:
+                    def rmatcher(text):
+                        match = matcher(text) + matcher(FSeq.getrevcomp(text))
+                        return(match)
+            else:
+                def rev(matcher, text):
+                    rmatch = []
+                    for d in matcher(FSeq.getrevcomp(text), strand='-'):
+                        d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                        rmatch.append(d)
+                    return(rmatch)
+                if args.reverse_only:
+                    def rmatcher(text):
+                        return(rev(matcher, text))
+                else:
+                    def rmatcher(text):
+                        fmatch = matcher(text)
+                        rmatch = rev(matcher, text)
+                        return(fmatch + rmatch)
+            return(rmatcher)
+        else:
+            return(matcher)
+
+    def _get_pattern(self, args):
         pat = set()
         if args.file:
-            with open(args.file, 'r') as f:
-                pat.update([line.rstrip('\n') for line in f.readlines()])
+            pat.update([l.rstrip('\n') for l in args.file])
         if args.patterns:
             pat.update(args.patterns)
+
+        if args.ambiguous_nucl:
+            apat = set()
+            for p in pat:
+                perlpat = p
+                for k,v in Maps.DNA_AMB.items():
+                    perlpat = re.sub(k, '[%s]' % v, perlpat)
+                apat.update([perlpat])
+            pat = apat
 
         if not pat:
             print('Please provide a pattern', file=sys.stderr)
@@ -1388,80 +1524,91 @@ class Grep(Subcommand):
         if not args.perl_regexp and not args.wrap:
             pat = [re.escape(p) for p in pat]
 
+        return(pat)
+
+    def _makegen(self, args):
+        if args.match_sequence:
+            gettext = lambda x: x.seq
+        else:
+            gettext = lambda x: x.header
+
+        if args.gff:
+            def sgen(gen, matcher):
+                source = "smof-{}".format(__version__)
+                gfftype = args.gff_type
+                row = [None,    #1 seqid
+                       source,  #2 source
+                       gfftype, #3 type
+                       None,    #4 start
+                       None,    #5 end
+                       '.',     #6 score
+                       None,    #7 strand
+                       '.',     #8 phase
+                       '.'      #9 attributes
+                      ]
+                for seq in gen.next():
+                    row[0] = re.sub('^>(\S+)', '\1', seq.header)
+                    for m in matcher(seq.seq):
+                        row[3] = m['pos'][0] + 1
+                        row[4] = m['pos'][1]
+                        row[6] = m['strand']
+                        yield('\t'.join([str(s) for s in row]))
+
+        elif args.count or args.count_matches:
+            def sgen(gen, matcher):
+                count, matches = 0, 0
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    if (m and not args.invert_match) or (not m and args.invert_match):
+                        count += 1
+                        try:
+                            matches += len(m)
+                        except:
+                            pass
+                if args.count and args.count_matches:
+                    yield "{}\t{}".format(count, matches)
+                elif args.count:
+                    yield count
+                elif args.count_matches:
+                    yield matches
+        else:
+            def sgen(gen, matcher):
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    if (m and not args.invert_match) or (not m and args.invert_match):
+                        if args.color:
+                            coltext = ColorString(text)
+                            for d in m:
+                                coltext.colorpos(range(*d['pos']))
+                            if args.match_sequence:
+                                seq.colseq = coltext
+                            else:
+                                seq.colheader = coltext
+                        yield(seq)
+        return(sgen)
+
+    def generator(self, args, gen):
+
+        args = self._process_arguments(args)
+
+        pat = self._get_pattern(args)
+
+        flags = re.IGNORECASE if not args.case_sensitive else 0
+
         if args.wrap:
             wrapper = re.compile(args.wrap, flags=flags)
         else:
             pat = set((re.compile(p, flags=flags) for p in pat))
             wrapper = None
 
-        # Check existence for matches to wrapper captures
-        def swrpmatcher(text):
-            for m in re.finditer(wrapper, text):
-                if m.group(1) in pat:
-                    return(True)
-            return(False)
+        matcher = self._create_matcher(args, pat, wrapper)
 
-        # Check existence of matches
-        def spatmatcher(text):
-            for p in pat:
-                if re.search(p, text):
-                    return(True)
-            return(False)
+        sgen = self._makegen(args)
 
-        # Find locations of matches to wrappers
-        def gwrpmatcher(text):
-            pos = []
-            for m in re.finditer(wrapper, text):
-                if m.group(1) in pat:
-                    pos.append((m.start(), m.end()))
-            return(pos)
-
-        # Find locations of matches
-        def gpatmatcher(text):
-            pos = []
-            for p in pat:
-                for m in re.finditer(p, text):
-                    pos.append((m.start(), m.end()))
-            return(pos)
-
-        if args.count_matches or args.color:
-            # print('1')
-            matcher = gwrpmatcher if wrapper else gpatmatcher
-        else:
-            # print('2')
-            matcher = swrpmatcher if wrapper else spatmatcher
-
-        count, matches = 0, 0
-        for seq in gen.next():
-            if(args.match_sequence):
-                text = seq.seq
-            else:
-                text = seq.header
-
-            m = matcher(text)
-
-            if (m and not args.invert_match) or (not m and args.invert_match):
-                if args.count:
-                    count += 1
-                if args.count_matches:
-                    matches += len(m)
-                if not args.count and not args.count_matches:
-                    if args.color:
-                        coltext = ColorString(text)
-                        for region in m:
-                            coltext.colorpos(range(*region))
-                        if args.match_sequence:
-                            seq.colseq = coltext
-                        else:
-                            seq.colheader = coltext
-                    yield(seq)
-
-        if args.count and args.count_matches:
-            yield("{}\t{}".format(count, matches))
-        elif args.count:
-            yield(count)
-        elif args.count_matches:
-            yield(matches)
+        for item in sgen(gen, matcher):
+            yield item
 
 class Uniq(Subcommand):
     def _parse(self):
