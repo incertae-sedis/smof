@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import argparse
 import csv
 import random
 import math
@@ -10,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 # ================
 # Argument Parsing
@@ -23,7 +24,6 @@ class Parser:
         self.usage = '<fastafile> | smof {} <options>'
 
     def _build_base_parser(self):
-        import argparse
         parser = argparse.ArgumentParser(
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
@@ -70,6 +70,7 @@ def parse(argv=None):
     Grep(parser)
     Uniq(parser)
     Wc(parser)
+    Rename(parser)
     Winnow(parser)
 
     if(len(sys.argv) == 1):
@@ -84,6 +85,21 @@ def parse(argv=None):
 # =================
 # CLASS DEFINITIONS
 # =================
+
+class Maps:
+    DNA_AMB = {
+        'R':'AG',
+        'Y':'CT',
+        'S':'GC',
+        'W':'AT',
+        'K':'GT',
+        'M':'AC',
+        'B':'CGT',
+        'D':'AGT',
+        'H':'ACT',
+        'V':'ACG',
+        'N':'ACGT'
+    }
 
 class Alphabet:
     # Including U, for selenocysteine, and * for STOP
@@ -165,27 +181,6 @@ class FSeq:
             for i in range(0, len(fields), 2):
                 self.headerfields[fields[i].strip()] = fields[i+1].strip()
 
-    def has_field(self, field):
-        if(not self.headerfields):
-            self.parse_header()
-        if field in self.headerfields:
-            return True
-        else:
-            return False
-
-    def field_is(self, field, value):
-        value = str(value)
-        if(not self.headerfields):
-            self.parse_header()
-        try:
-            if(self.headerfields[field] == value):
-                return True
-            else:
-                return False
-        except:
-            print("Header lacks field {}".format(field), file=sys.stderr)
-            print(self.header, file=sys.stderr)
-
     def getvalue(self, field, quiet=False, missing=''):
         if not self.headerfields:
             self.parse_header()
@@ -198,15 +193,6 @@ class FSeq:
                 print("Header lacks field '{}'".format(field), file=sys.stderr)
                 print(self.header, file=sys.stderr)
             raise SystemExit
-
-    def countmasked(self):
-        '''
-        Masked sequences are lowercase, unmasked are uppercase. This function
-        simply counts the number of lowercase characters.
-        '''
-        # ASCII values: (97-122 for a-z), (65-90 for A-Z)
-        nmasked = sum(c > 90 for c in self.seq.encode('ascii'))
-        return(nmasked)
 
     def subseq(self, a, b):
         try:
@@ -1417,7 +1403,13 @@ class Grep(Subcommand):
         parser.add_argument(
             '-f', '--file',
             metavar='FILE',
+            type=argparse.FileType('r'),
             help='Obtain patterns from FILE, one per line'
+        )
+        parser.add_argument(
+            '-w', '--wrap',
+            metavar='REG',
+            help='A regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
@@ -1426,13 +1418,14 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-w', '--wrap',
-            metavar='REG',
-            help='A regular expression to capture PATTERNS'
+            '-B', '--ambiguous-nucl',
+            help='Parse extended nucleotide alphabet',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
-            '-i', '--ignore-case',
-            help='Ignore case distinctions',
+            '-I', '--case-sensitive',
+            help='DO NOT ignore case distinctions (ignore by default)',
             action='store_true',
             default=False
         )
@@ -1450,7 +1443,13 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-m', '--count-matches',
-            help='Print total number of matches',
+            help='Print number of non-overlapping matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--reverse',
+            help='Also search for negative strand matches',
             action='store_true',
             default=False
         )
@@ -1460,10 +1459,21 @@ class Grep(Subcommand):
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '--gff',
+            help='Output matches in gff format',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '--gff-type',
+            help='Name of searched feature',
+            metavar='STR',
+            default='regex_match'
+        )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
-
+    def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             print('--count-matches argument is incompatible with --invert-matches',
@@ -1475,34 +1485,24 @@ class Grep(Subcommand):
                   "(-P option and -w are incompatible)", file=sys.stderr)
             raise SystemExit
 
-        # If the user wants color and a count, ignore
-        if args.count_matches and args.color:
+        if args.ambiguous_nucl:
+            args.perl_regexp = True
+
+        # Some things just don't make sense in header searches ...
+        if args.gff or args.ambiguous_nucl:
+            args.match_sequence = True
+
+        # Others don't make sense with color
+        if args.gff or args.count_matches and args.color:
             args.color = False
 
-        flags = re.IGNORECASE if args.ignore_case else 0
+        if args.gff:
+            args.count = False
+            args.count_matches = False
 
-        pat = set()
-        if args.file:
-            with open(args.file, 'r') as f:
-                pat.update([line.rstrip('\n') for line in f.readlines()])
-        if args.patterns:
-            pat.update(args.patterns)
+        return(args)
 
-        if not pat:
-            print('Please provide a pattern', file=sys.stderr)
-            raise SystemExit
-
-        # TODO searching for perfect matches would be faster without using
-        # regex (just <str>.find(pat))
-        if not args.perl_regexp and not args.wrap:
-            pat = [re.escape(p) for p in pat]
-
-        if args.wrap:
-            wrapper = re.compile(args.wrap, flags=flags)
-        else:
-            pat = set((re.compile(p, flags=flags) for p in pat))
-            wrapper = None
-
+    def _create_matcher(self, args, pat, wrapper):
         # Check existence for matches to wrapper captures
         def swrpmatcher(text):
             for m in re.finditer(wrapper, text):
@@ -1518,59 +1518,150 @@ class Grep(Subcommand):
             return(False)
 
         # Find locations of matches to wrappers
-        def gwrpmatcher(text):
+        def gwrpmatcher(text, strand='.'):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    pos.append((m.start(), m.end()))
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
             return(pos)
 
         # Find locations of matches
-        def gpatmatcher(text):
+        def gpatmatcher(text, strand='.'):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    pos.append((m.start(), m.end()))
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
             return(pos)
 
-        if args.count_matches or args.color:
-            # print('1')
+        if args.gff or args.count_matches or args.color:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
-            # print('2')
             matcher = swrpmatcher if wrapper else spatmatcher
 
-        count, matches = 0, 0
-        for seq in gen.next():
-            if(args.match_sequence):
-                text = seq.seq
-            else:
-                text = seq.header
+        if args.reverse:
+            def rmatcher(text):
+                fmatch = matcher(text, strand='+')
+                rmatch = []
+                for d in matcher(FSeq.getrevcomp(text), strand='-'):
+                    d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                    rmatch.append(d)
+                return(fmatch + rmatch)
+            return(rmatcher)
+        else:
+            return(matcher)
 
-            m = matcher(text)
+    def _get_pattern(self, args):
+        pat = set()
+        if args.file:
+            pat.update([l.rstrip('\n') for l in args.file])
+        if args.patterns:
+            pat.update(args.patterns)
 
-            if (m and not args.invert_match) or (not m and args.invert_match):
-                if args.count:
-                    count += 1
-                if args.count_matches:
-                    matches += len(m)
-                if not args.count and not args.count_matches:
-                    if args.color:
-                        coltext = ColorString(text)
-                        for region in m:
-                            coltext.colorpos(range(*region))
-                        if args.match_sequence:
-                            seq.colseq = coltext
-                        else:
-                            seq.colheader = coltext
-                    yield(seq)
+        if args.ambiguous_nucl:
+            apat = set()
+            for p in pat:
+                perlpat = p
+                for k,v in Maps.DNA_AMB.items():
+                    perlpat = re.sub(k, '[%s]' % v, perlpat)
+                apat.update([perlpat])
+            pat = apat
 
-        if args.count and args.count_matches:
-            yield("{}\t{}".format(count, matches))
-        elif args.count:
-            yield(count)
-        elif args.count_matches:
-            yield(matches)
+        if not pat:
+            print('Please provide a pattern', file=sys.stderr)
+            raise SystemExit
+
+        # TODO searching for perfect matches would be faster without using
+        # regex (just <str>.find(pat))
+        if not args.perl_regexp and not args.wrap:
+            pat = [re.escape(p) for p in pat]
+
+        return(pat)
+
+    def _makegen(self, args):
+        if args.match_sequence:
+            gettext = lambda x: x.seq
+        else:
+            gettext = lambda x: x.header
+
+        if args.gff:
+            def sgen(gen, matcher):
+                source = "smof-{}".format(__version__)
+                gfftype = args.gff_type
+                row = [None,    #1 seqid
+                       source,  #2 source
+                       gfftype, #3 type
+                       None,    #4 start
+                       None,    #5 end
+                       '.',     #6 score
+                       None,    #7 strand
+                       '.',     #8 phase
+                       '.'      #9 attributes
+                      ]
+                for seq in gen.next():
+                    row[0] = re.sub('^>(\S+)', '\1', seq.header)
+                    for m in matcher(seq.seq):
+                        row[3] = m['pos'][0] + 1
+                        row[4] = m['pos'][1]
+                        row[6] = m['strand']
+                        yield('\t'.join([str(s) for s in row]))
+
+        elif args.count or args.count_matches:
+            def sgen(gen, matcher):
+                count, matches = 0, 0
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    if (m and not args.invert_match) or (not m and args.invert_match):
+                        count += 1
+                        try:
+                            matches += len(m)
+                        except:
+                            pass
+                if args.count and args.count_matches:
+                    yield "{}\t{}".format(count, matches)
+                elif args.count:
+                    yield count
+                elif args.count_matches:
+                    yield matches
+        else:
+            def sgen(gen, matcher):
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    if (m and not args.invert_match) or (not m and args.invert_match):
+                        if args.color:
+                            coltext = ColorString(text)
+                            for d in m:
+                                coltext.colorpos(range(*d['pos']))
+                            if args.match_sequence:
+                                seq.colseq = coltext
+                            else:
+                                seq.colheader = coltext
+                        yield(seq)
+        return(sgen)
+
+    def generator(self, args, gen):
+
+        args = self._process_arguments(args)
+
+        pat = self._get_pattern(args)
+
+        flags = re.IGNORECASE if not args.case_sensitive else 0
+
+        if args.wrap:
+            wrapper = re.compile(args.wrap, flags=flags)
+        else:
+            pat = set((re.compile(p, flags=flags) for p in pat))
+            wrapper = None
+
+        matcher = self._create_matcher(args, pat, wrapper)
+
+        sgen = self._makegen(args)
+
+        for item in sgen(gen, matcher):
+            yield item
 
 class Uniq(Subcommand):
     def _parse(self):
@@ -1657,6 +1748,42 @@ class Wc(Subcommand):
             print(nseqs)
         else:
             print("{}\t{}".format(nseqs, nchars))
+
+class Rename(Subcommand):
+    def _parse(self):
+        cmd_name = 'rename'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Larry Wall's rename pythonized for headers"
+        )
+        parser.add_argument(
+            'pattern',
+            metavar='PATTERN',
+            help="Regex pattern"
+        )
+        parser.add_argument(
+            'replacement',
+            metavar='REPLACEMENT',
+            nargs='?',
+            default='',
+            help="Regex replacement (default='', i.e. delete PATTERN)"
+        )
+        parser.add_argument(
+            'headers',
+            metavar='HEADERS',
+            nargs='?',
+            default=None,
+            help="Regex to select headers (if not supplied, select all)"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        matcher = re.compile(args.headers) if args.headers else None
+        for seq in gen.next():
+            if not matcher or re.search(matcher, seq.header):
+                seq.header = re.sub(args.pattern, args.replacement, seq.header)
+            yield seq
 
 
 # =======
