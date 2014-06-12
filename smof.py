@@ -1439,7 +1439,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-m', '--count-matches',
-            help='Print total number of matches',
+            help='Print number of non-overlapping matches',
             action='store_true',
             default=False
         )
@@ -1572,6 +1572,7 @@ class Grep(Subcommand):
         # regex (just <str>.find(pat))
         if not args.perl_regexp and not args.wrap:
             pat = [re.escape(p) for p in pat]
+
         return(pat)
 
     def _makegen(self, args):
