@@ -1423,6 +1423,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-r', '--reverse',
+            help='Also search for negative strand matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '--color',
             help='Print in color',
             action='store_true',
@@ -1437,7 +1443,8 @@ class Grep(Subcommand):
         parser.add_argument(
             '--gff-type',
             help='Name of searched feature',
-            default='pattern'
+            metavar='STR',
+            default='regex_match'
         )
         parser.set_defaults(func=self.func)
 
@@ -1481,19 +1488,21 @@ class Grep(Subcommand):
             return(False)
 
         # Find locations of matches to wrappers
-        def gwrpmatcher(text):
+        def gwrpmatcher(text, strand='.'):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    pos.append((m.start(), m.end()))
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
             return(pos)
 
         # Find locations of matches
-        def gpatmatcher(text):
+        def gpatmatcher(text, strand='.'):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    pos.append((m.start(), m.end()))
+                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    pos.append(match)
             return(pos)
 
         if args.gff or args.count_matches or args.color:
@@ -1501,7 +1510,17 @@ class Grep(Subcommand):
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
 
-        return(matcher)
+        if args.reverse:
+            def rmatcher(text):
+                fmatch = matcher(text, strand='+')
+                rmatch = []
+                for d in matcher(FSeq.getrevcomp(text), strand='-'):
+                    d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                    rmatch.append(d)
+                return(fmatch + rmatch)
+            return(rmatcher)
+        else:
+            return(matcher)
 
     def _get_pattern(self, args):
         pat = set()
@@ -1528,16 +1547,24 @@ class Grep(Subcommand):
 
         if args.gff:
             def sgen(gen, matcher):
-                # TODO optionally search negative strands
-                row = [None,
-                       "smof-{}".format(__version__),
-                       args.gff_type,
-                       None, None, '.', '+', '.', '.']
+                source = "smof-{}".format(__version__)
+                gfftype = args.gff_type
+                row = [None,    #1 seqid
+                       source,  #2 source
+                       gfftype, #3 type
+                       None,    #4 start
+                       None,    #5 end
+                       '.',     #6 score
+                       None,    #7 strand
+                       '.',     #8 phase
+                       '.'      #9 attributes
+                      ]
                 for seq in gen.next():
                     row[0] = re.sub('^>(\S+)', '\1', seq.header)
-                    for pos in matcher(seq.seq):
-                        row[3] = pos[0] + 1
-                        row[4] = pos[1]
+                    for m in matcher(seq.seq):
+                        row[3] = m['pos'][0] + 1
+                        row[4] = m['pos'][1]
+                        row[6] = m['strand']
                         yield('\t'.join([str(s) for s in row]))
 
         elif args.count or args.count_matches:
@@ -1563,8 +1590,8 @@ class Grep(Subcommand):
                     if (m and not args.invert_match) or (not m and args.invert_match):
                         if args.color:
                             coltext = ColorString(text)
-                            for region in m:
-                                coltext.colorpos(range(*region))
+                            for d in m:
+                                coltext.colorpos(range(*d['pos']))
                             if args.match_sequence:
                                 seq.colseq = coltext
                             else:
@@ -1591,7 +1618,6 @@ class Grep(Subcommand):
 
         for item in sgen(gen, matcher):
             yield item
-
 
 class Uniq(Subcommand):
     def _parse(self):
