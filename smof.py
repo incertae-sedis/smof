@@ -11,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 # ================
 # Argument Parsing
@@ -513,6 +513,75 @@ class ParseHeader:
     def regex_group(h, regex):
         raise NotImplemented
 
+class StatFun:
+    @classmethod
+    def N50(cls, x, issorted=False):
+        x = sorted(x) if not issorted else x
+        N = sum(x)
+        total = 0
+        for i in range(len(x)-1, -1, -1):
+            total += x[i]
+            if total > N / 2:
+                return(x[i])
+
+    @classmethod
+    def mean(cls, x):
+        return(sum(x) / len(x))
+
+    @classmethod
+    def median(cls, x, issorted=False):
+        return(cls.quantile(x, 0.5, issorted=issorted))
+
+    @classmethod
+    def sd(cls, x):
+        if(len(x) < 2):
+            return('NA')
+        else:
+            mean = sum(x) / len(x)
+            stdev = (sum((y - mean) ** 2 for y in x) / (len(x) - 1)) ** 0.5
+            return(stdev)
+        return(sd)
+
+    @classmethod
+    def quantile(cls, x, q, issorted=False):
+        '''
+        Calculates quantile as the weighted average between indices
+        '''
+        # Die if out of bounds
+        if not (0 <= q <= 1):
+            print('quantile must be between 0 and 1', file=sys.stderr)
+            raise SystemExit
+
+        # Ensure the vector is sorted
+        x = sorted(x) if not issorted else x
+
+        # Return max or min for q = 1 or 0
+        if q == 1:
+            return(x[-1])
+        elif q == 0:
+            return(x[0])
+
+        v = (len(x) - 1) * q
+        r = v % 1
+        i = math.floor(v)
+        quantile = x[i] * (1-r) + x[i+1] * r
+        return(quantile)
+
+    @classmethod
+    def summary(cls, x):
+        x = sorted(x)
+        out = {
+            'min':x[0],
+            'max':x[-1],
+            '1st_qu':cls.quantile(x, 0.25, issorted=True),
+            'median':cls.quantile(x, 0.50, issorted=True),
+            '3rd_qu':cls.quantile(x, 0.75, issorted=True),
+            'mean':cls.mean(x),
+            'sd':cls.sd(x),
+            'N50':cls.N50(x, issorted=True)
+        }
+        return(out)
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -889,7 +958,7 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
-            '-m', '--count-lowercase',
+            '-m', '--count-lower',
             help='Count the number of lowercase characters',
             default=False,
             action='store_true'
@@ -914,24 +983,67 @@ class Stat(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
+    def _process_args(self, args):
+        # If no output options are specified, do length stats
+        if not any((args.counts, args.length, args.proportion, args.count_lower)):
+            args.length = True
+        return(args)
+
     def _byfile(self, args, gen):
         g = FileStat()
         for seq in gen.next():
             g.add_seq(SeqStat(seq))
 
-        lower = sum_lower(g.counts) if args.count_lowercase else None
+        lower = sum_lower(g.counts) if args.count_lower else None
 
         if not args.case_sensitive:
             g.counts = counter_caser(g.counts)
 
         N = sum(v for v in g.counts.values())
+        slen = str(len(str(max(g.counts.values()))) + 2)
+        count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
         if args.counts ^ args.proportion:
-            for k,v in g.counts.items():
+            for k,v in count_iter:
                 val = v/N if args.proportion else v
-                yield("{}\t{}".format(k,val))
-        else:
-            for k,v in g.counts.items():
-                yield("{}\t{}\t{}".format(k,v,v/N))
+                if args.counts:
+                    exp = "{}{:>%sd}" % slen
+                else:
+                    exp = "{}{:>11.5%}"
+                yield(exp.format(k,val))
+        elif args.counts and args.proportion:
+            for k,v in count_iter:
+                outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                yield(outstr.format(k,v,v/N))
+
+        if args.count_lower:
+            yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+
+        if args.length:
+            total = sum(g.lengths)
+            N = len(g.lengths)
+            if N > 1:
+                s = StatFun.summary(g.lengths)
+
+                # Yield total number of sequences
+                yield("{:10s} {}".format('nseq:', len(g.lengths)))
+
+                # Yield totla number of letters
+                yield("{:10s} {}".format('nchars:', sum(g.lengths)))
+
+                # Yield five number summary of sequence lengths
+                fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
+                fivesum_str = "{:10s} {} {} {} {} {}"
+                yield(fivesum_str.format('5sum:', *fivesum))
+
+                # Yield mean and standard deviation
+                meansd_str="{:10s} {:d} ({:d})"
+                yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
+
+                # Yield N50
+                yield("{:10s} {}".format('N50:', s['N50']))
+            else:
+                lstr = ', '.join([str(x) for x in sorted(g.lengths)])
+                yield("nchars: {}".format(lstr))
 
     def _byseq(self, args, gen):
         seqlist = []
@@ -944,7 +1056,7 @@ class Stat(Subcommand):
         joiner = lambda s: ','.join([str(x) for x in s])
 
         ignorecase = not args.case_sensitive
-        kwargs = {'masked':args.count_lowercase,
+        kwargs = {'masked':args.count_lower,
                   'length':args.length,
                   'ignorecase':ignorecase}
 
@@ -957,6 +1069,7 @@ class Stat(Subcommand):
             yield(joiner(line))
 
     def generator(self, args, gen):
+        args = self._process_args(args)
         if args.byseq:
             g = self._byseq(args, gen)
         else:
