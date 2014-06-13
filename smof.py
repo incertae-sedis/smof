@@ -938,7 +938,7 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
-            '-m', '--count-lowercase',
+            '-m', '--count-lower',
             help='Count the number of lowercase characters',
             default=False,
             action='store_true'
@@ -965,7 +965,7 @@ class Stat(Subcommand):
 
     def _process_args(self, args):
         # If no output options are specified, do length stats
-        if not args.counts and not args.length and not args.proportion:
+        if not any((args.counts, args.length, args.proportion, args.count_lower)):
             args.length = True
         return(args)
 
@@ -974,7 +974,7 @@ class Stat(Subcommand):
         for seq in gen.next():
             g.add_seq(SeqStat(seq))
 
-        lower = sum_lower(g.counts) if args.count_lowercase else None
+        lower = sum_lower(g.counts) if args.count_lower else None
 
         if not args.case_sensitive:
             g.counts = counter_caser(g.counts)
@@ -994,6 +994,9 @@ class Stat(Subcommand):
                 outstr = "{}{:>" + slen + "d}{:>11.5%}"
                 yield(outstr.format(k,v,v/N))
 
+        if args.count_lower:
+            yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+
         if args.length:
             total = sum(g.lengths)
             N = len(g.lengths)
@@ -1012,7 +1015,7 @@ class Stat(Subcommand):
                 yield(fivesum_str.format('5sum:', *fivesum))
 
                 # Yield mean and standard deviation
-                meansd_str="{:10s} {:d}({:d})"
+                meansd_str="{:10s} {:d} ({:d})"
                 yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
 
                 # Yield N50
@@ -1032,7 +1035,7 @@ class Stat(Subcommand):
         joiner = lambda s: ','.join([str(x) for x in s])
 
         ignorecase = not args.case_sensitive
-        kwargs = {'masked':args.count_lowercase,
+        kwargs = {'masked':args.count_lower,
                   'length':args.length,
                   'ignorecase':ignorecase}
 
