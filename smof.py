@@ -748,7 +748,7 @@ class Clean(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Cleans file (irregular to unknown, lower to upper)")
+            help="Masks things (optionally), pretty prints")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
@@ -767,6 +767,12 @@ class Clean(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-x', '--toseq',
+            help="Removes all nonletter characters (gaps, stops, etc.)",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-r', '--mask-irregular',
             help="Converts irregular letters to unknown",
             action='store_true',
@@ -775,12 +781,6 @@ class Clean(Subcommand):
         parser.add_argument(
             '-m', '--mask-lowercase',
             help='Convert lower-case to unknown',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-x', '--remove-nonletters',
-            help="Remove gaps and stops ('[^A-Za-z]')",
             action='store_true',
             default=False
         )
@@ -864,7 +864,7 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.lower()
 
             # Remove all nonletters or wanted, otherwise just remove space
-            if args.remove_nonletters:
+            if args.toseq:
                 seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
             else:
                 seq.seq = re.sub('[^\S]', '', seq.seq)
