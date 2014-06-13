@@ -11,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 
 # ================
 # Argument Parsing
@@ -50,27 +50,21 @@ def parse(argv=None):
     parser = Parser()
 
     Chksum(parser)
-
+    Clean(parser)
     Complexity(parser)
-    Fstat(parser)
-    Unmask(parser)
-    Hstat(parser)
-    Tounk(parser)
-    Prettyprint(parser)
-    Qstat(parser)
+    Fasta2csv(parser)
+    Grep(parser)
+    Perm(parser)
+    Rename(parser)
+    Reverse(parser)
     Sample(parser)
+    Sniff(parser)
     Sort(parser)
     Split(parser)
+    Stat(parser)
     Subseq(parser)
-    Sniff(parser)
-    Fsubseq(parser)
-    Fasta2csv(parser)
-    Perm(parser)
-    Reverse(parser)
-    Grep(parser)
     Uniq(parser)
     Wc(parser)
-    Rename(parser)
     Winnow(parser)
 
     if(len(sys.argv) == 1):
@@ -293,7 +287,7 @@ class ColorString:
             b = m.start() + len(m.group())
             self.colorpos(list(range(a,b)), col)
 
-class SeqSummary:
+class FileDescription:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
@@ -445,6 +439,80 @@ class SeqSummary:
         self.ntype[stype] += 1
         return(stype)
 
+class SeqStat:
+    def __init__(self, seq):
+        self.counts = Counter(seq.seq)
+        self.header = seq.header
+        self.length = len(seq.seq)
+
+    def aslist(self,
+               charset=None,
+               length=False,
+               masked=False,
+               header_fun=None,
+               ignorecase=False):
+
+        if not charset:
+            charset = set(self.counts)
+        line = []
+        if header_fun:
+            try:
+                line.append(header_fun(self.header))
+            except TypeError:
+                print ("Cannot process header: '{}'".format(self.header))
+                raise SystemExit
+        if length:
+            line.append(self.length)
+
+        if masked:
+            line.append(sum_lower(self.counts))
+
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+            self.counts = counter_caser(self.counts)
+
+        line += [self.counts[c] for c in sorted(charset)]
+
+        return(line)
+
+    @classmethod
+    def getheader(cls, charset, length=False, masked=False, ignorecase=False):
+        header = ['seqid']
+
+        if ignorecase:
+            charset = set(''.join(charset).upper())
+
+        if length:
+            header += ['length']
+
+        if masked:
+            header += ['masked']
+
+        header += list(sorted(charset))
+
+        return(header)
+
+class FileStat:
+    def __init__(self):
+        self.counts = Counter()
+        self.nseqs = 0
+        self.lengths = []
+
+    def add_seq(self, stat):
+        self.counts += stat.counts
+        self.nseqs += 1
+        self.lengths.append(stat.length)
+
+class ParseHeader:
+    def firstword(h):
+        return(re.sub('>(\S+).*', '\1', h))
+
+    def ncbi_format(h, fields):
+        raise NotImplemented
+
+    def regex_group(h, regex):
+        raise NotImplemented
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -473,6 +541,10 @@ def counter_caser(counter, lower=False):
         counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
                      Counter({k.upper():v for k,v in counter.items() if k.islower()})
     return(counts_obj)
+
+def sum_lower(counter):
+    lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
+    return(sum(lc))
 
 
 # ====================
@@ -577,7 +649,7 @@ class Complexity(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Calculates the complexity of the given sequences'
+            help='Calculates linguistic complexity'
         )
         parser.add_argument(
             '-k', '--alphabet-size',
@@ -668,118 +740,44 @@ class Complexity(Subcommand):
                     col1 = seq_id
                 yield "{},{},{}".format(col1, mean, var)
 
-class Fstat(Subcommand):
+class Clean(Subcommand):
     def _parse(self):
-        cmd_name = 'fstat'
+        cmd_name = 'clean'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Provides total counts for file sequence characters"
-        )
-        parser.add_argument(
-            '-i', '--ignorecase',
-            help="Ignores case when counting characters",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        counts = Counter()
-        nseqs = 0
-        for seq in gen.next():
-            nseqs += 1
-            counts.update(seq.seq)
-
-        if args.ignorecase:
-            counts = counter_caser(counts)
-
-        nchars = sum(counts.values())
-        for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True):
-            yield "{}: {} {}".format(k, v, round(v/nchars, 4))
-        yield "nseqs: {}".format(nseqs)
-        yield "nchars: {}".format(nchars)
-        yield "mean length: {}".format(round(nchars/nseqs, 4))
-
-class Hstat(Subcommand):
-    def _parse(self):
-        cmd_name = 'hstat'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Extract info from headers (also seq length)")
-        parser.add_argument(
-            'fields',
-            help="Header fields to write to csv",
-            nargs='+')
-        parser.add_argument(
-            '--length',
-            help="Report length of each sequence",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Writes chosen header and seq length data to csv '''
-        fieldnames = self._get_fieldnames(args)
-        for seq in gen.next():
-            row = {}
-            for field in args.fields:
-                row[field] = seq.getvalue(field)
-            if(args.length):
-                row['length'] = len(seq.seq)
-            yield row
-
-    def _get_fieldnames(self, args):
-        fieldnames = list(args.fields)
-        if(args.length):
-            fieldnames.append('length')
-        return(fieldnames)
-
-    def write(self, args, gen):
-        fieldnames = self._get_fieldnames(args)
-        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-        w.writeheader()
-        for row in self.generator(args, gen):
-            w.writerow(row)
-
-class Unmask(Subcommand):
-    def _parse(self):
-        cmd_name = 'unmask'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Converts all letters to uppercase")
-        parser.add_argument(
-            '-x', '--to-x',
-            help="Convert lower case letters to X",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Converts to upcase '''
-        for seq in gen.next():
-            if(args.to_x):
-                unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
-            else:
-                unmasked_seq = FSeq(seq.header, seq.seq.upper())
-            yield unmasked_seq
-
-class Tounk(Subcommand):
-    def _parse(self):
-        cmd_name = 'tounk'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Convert irregular characters to unknown character'
-        )
+            help="Masks things (optionally), pretty prints")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
             help='Sequence type'
         )
         parser.add_argument(
-            '-l', '--lc',
+            '-u', '--toupper',
+            help="Convert to uppercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--tolower',
+            help="Convert to lowercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-x', '--toseq',
+            help="Removes all nonletter characters (gaps, stops, etc.)",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--mask-irregular',
+            help="Converts irregular letters to unknown",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-m', '--mask-lowercase',
             help='Convert lower-case to unknown',
             action='store_true',
             default=False
@@ -810,127 +808,161 @@ class Tounk(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
+    def _process_args(self, args):
+        if (args.mask_lowercase or args.mask_irregular) and not args.type:
+            print('Please provide sequence type (--type)', file=sys.stderr)
+            raise SystemExit
+
+        if args.tolower and args.toupper:
+            print('Err, you want me to convert to lower AND upper?', file=sys.stderr)
+            raise SystemExit
+
     def generator(self, args, gen):
-        if(args.type.lower()[0] in ['a', 'p']):
-            irr = args.pir
-            unk = args.punk
-        elif(args.type.lower()[0] in ['n', 'd']):
-            irr = args.nir
-            unk = args.nunk
-        if(args.lc):
-            irr = ''.join(set(irr) | set(string.ascii_lowercase))
-        trans = str.maketrans(irr, unk * len(irr))
+
+        # Catches illegal combinations of arguments
+        self._process_args(args)
+
+        # Make translator, this is only possible if type is given
+        trans = None
+        if args.type:
+            if args.type.lower()[0] in ['a', 'p']:
+                irr = args.pir
+                unk = args.punk
+            elif args.type.lower()[0] in ['n', 'd']:
+                irr = args.nir
+                unk = args.nunk
+            else:
+                print('Type not recognized', file=sys.stderr)
+                raise SystemExit
+
+            a = ''
+            # Get irregular characters
+            if args.mask_irregular:
+                a += irr
+
+            # convert lowercase to unknown
+            if args.mask_lowercase:
+                a += string.ascii_lowercase
+
+            a = ''.join(set(a))
+
+            b = unk * len(a)
+            if irr:
+                trans = str.maketrans(a, b)
+
         for seq in gen.next():
-            seq.seq = seq.seq.translate(trans)
+            # Irregular or lowercase to unknown
+            if trans:
+                seq.seq = seq.seq.translate(trans)
+
+            # Change everything to desired case
+            if args.toupper:
+                seq.seq = seq.seq.upper()
+            elif args.tolower:
+                seq.seq = seq.seq.lower()
+
+            # Remove all nonletters or wanted, otherwise just remove space
+            if args.toseq:
+                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
+            else:
+                seq.seq = re.sub('[^\S]', '', seq.seq)
+
             yield seq
 
-class Prettyprint(Subcommand):
+class Stat(Subcommand):
     def _parse(self):
-        cmd_name = 'prettyprint'
+        cmd_name = 'stat'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Prints fasta file in neat columns')
+            help="Calculate sequence statistics")
         parser.add_argument(
-            'cwidth',
-            help='Output column width',
-            type=int,
-            default=60)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Print each sequence with even columns of length cwidth '''
-        for seq in gen.next():
-            yield seq
-
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print(args.cwidth)
-
-class Qstat(Subcommand):
-    def _parse(self):
-        cmd_name = 'qstat'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Gathers statistics on each sequence")
-        parser.add_argument(
-            '-f', '--fields',
-            help="Header fields by which each sequence is identified in output csv file",
-            nargs='+',
-            default=[])
-        parser.add_argument(
-            '-m', '--masked',
-            help="Count the number of masked (lowercase) characters",
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-i', '--ignorecase',
-            help="Ignores case when counting characters",
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-s', '--start-offset',
-            help='Number of letters to ignore at beginning (default=0)',
-            type=int,
-            metavar='INT',
-            default=0
+            '-q', '--byseq',
+            help='Write a line for each sequence',
+            default=False,
+            action='store_true'
         )
         parser.add_argument(
-            '-e', '--end-offset',
-            help='Number of letters to ignore at end (default=0)',
-            type=int,
-            metavar='INT',
-            default=0
+            '-I', '--case-sensitive',
+            help='Match case',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-m', '--count-lowercase',
+            help='Count the number of lowercase characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-c', '--counts',
+            help='Write counts of all characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-l', '--length',
+            help='Write sequence length',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-p', '--proportion',
+            help='Write proportion of each character',
+            default=False,
+            action='store_true'
         )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
+    def _byfile(self, args, gen):
+        g = FileStat()
         for seq in gen.next():
-            if args.fields:
-                fields = tuple(seq.getvalue(x, missing='NA') for x in args.fields)
-            else:
-                fields = []
+            g.add_seq(SeqStat(seq))
 
-            # Trim the beginning and end of the sequence, as specified
-            count = Counter(seq.seq[args.start_offset:len(seq.seq) - args.end_offset])
+        lower = sum_lower(g.counts) if args.count_lowercase else None
 
-            if args.masked:
-                nmasked = sum([v for c,v in count.items() if c in string.ascii_lower])
-            else:
-                nmasked = None
+        if not args.case_sensitive:
+            g.counts = counter_caser(g.counts)
 
-            if args.ignorecase:
-                count = counter_caser(count)
-
-            yield (fields, count, nmasked)
-
-    def write(self, args, gen):
-        results = list(self.generator(args, gen))
-        # Set of all unique characters seen in the fasta file
-        chars = set()
-        for f,c,m in results:
-            chars.update(c.keys())
-        if args.ignorecase:
-            chars = sorted(set(''.join(chars).upper()))
+        N = sum(v for v in g.counts.values())
+        if args.counts ^ args.proportion:
+            for k,v in g.counts.items():
+                val = v/N if args.proportion else v
+                yield("{}\t{}".format(k,val))
         else:
-            chars = sorted(chars)
+            for k,v in g.counts.items():
+                yield("{}\t{}\t{}".format(k,v,v/N))
 
-        headerfields = args.fields if args.fields else []
-        fieldnames = ['length'] + headerfields
-        fieldnames += ['masked'] if args.masked else []
-        fieldnames += chars
+    def _byseq(self, args, gen):
+        seqlist = []
+        charset = set()
+        for seq in gen.next():
+            seqstat = SeqStat(seq)
+            seqlist.append(seqstat)
+            charset.update(seqstat.counts)
 
-        w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-        w.writeheader()
-        for fields,counts,masked in results:
-            row = {'length':sum(counts.values())}
-            if headerfields:
-                for i in range(len(fields)):
-                    row[headerfields[i]] = str(fields[i])
-            for k,v in counts.items():
-                row[k] = str(v)
-            w.writerow(row)
+        joiner = lambda s: ','.join([str(x) for x in s])
+
+        ignorecase = not args.case_sensitive
+        kwargs = {'masked':args.count_lowercase,
+                  'length':args.length,
+                  'ignorecase':ignorecase}
+
+        yield joiner(SeqStat.getheader(charset, **kwargs))
+
+        for q in seqlist:
+            line = q.aslist(charset=charset,
+                            header_fun=ParseHeader.firstword,
+                            **kwargs)
+            yield(joiner(line))
+
+    def generator(self, args, gen):
+        if args.byseq:
+            g = self._byseq(args, gen)
+        else:
+            g = self._byfile(args, gen)
+        for item in g:
+            yield(item)
 
 class Subseq(Subcommand):
     def _parse(self):
@@ -969,72 +1001,6 @@ class Subseq(Subcommand):
             else:
                 newseq = seq.seq[a-1:b]
             yield FSeq(seq.header, newseq)
-
-class Fsubseq(Subcommand):
-    def _parse(self):
-        cmd_name = 'fsubseq'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Mass extraction of subsequences from first fasta entry")
-        parser.add_argument(
-            'file',
-            help="File containing bounds for subsequence extraction")
-        parser.add_argument(
-            '-r', '--revcomp',
-            help='Take the reverse complement if bounds[0] > bounds[1]',
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-p', '--pattern-index',
-            help='Index of regex pattern in each row',
-            type=int,
-            metavar='INT',
-            default=-1)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        '''
-        Extracts many subsequences. Positional argument file
-        '''
-        bounds = defaultdict(list)
-        for row in csvrowGenerator(args.file):
-            if(args.pattern_index >= 0):
-                try:
-                    pat = row[args.pattern_index]
-                    del row[args.pattern_index]
-                except IndexError:
-                    print("Given pattern index doesn't exist, fuck you!",
-                          file=sys.stderr)
-                    raise SystemExit
-            else:
-                pat = '.*'
-            try:
-                a,b = [int(x) for x in row]
-            except TypeError:
-                print("Bounds must be pair of integers", file=sys.stderr)
-                raise SystemExit
-            bounds[pat].append((a,b))
-
-        for seq in gen.next():
-            for pat in bounds.keys():
-                if(not re.search(pat, seq.header)):
-                    continue
-                for a,b in bounds[pat]:
-                    # If a > b, take reverse complement if that option is enabled,
-                    # if not die
-                    if(a > b):
-                        if(args.revcomp):
-                            newseq = FSeq.getrevcomp(seq.seq[(b-1):a])
-                        else:
-                            print('Lower bound cannot be greater than upper bound '
-                                  '(do you want reverse complement? See options)',
-                                  file=sys.stderr)
-                            raise SystemExit
-                    # If b >= a, this is a normal forward sequence
-                    else:
-                        newseq = seq.seq[(a-1):b]
-                    yield FSeq(seq.header, newseq)
 
 class Fasta2csv(Subcommand):
     def _parse(self):
@@ -1084,7 +1050,7 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly order sequence by words of length w"
+            help="Randomly order sequence"
         )
         parser.add_argument(
             '-w', '--word-size',
@@ -1146,7 +1112,7 @@ class Sniff(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqsum = SeqSummary()
+        seqsum = FileDescription()
         for seq in gen.next():
             seqsum.add_seq(seq)
         yield seqsum
@@ -1201,7 +1167,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Reverse each sequence")
+            help="Reverse each sequence (NOT reverse complement)")
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1327,7 +1293,7 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller filers'
+            help='Split a multifasta file into k smaller files'
         )
         parser.add_argument(
             '-n', '--nfiles',
