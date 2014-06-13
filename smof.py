@@ -52,8 +52,7 @@ def parse(argv=None):
     Chksum(parser)
 
     Complexity(parser)
-    Unmask(parser)
-    Tounk(parser)
+    Clean(parser)
     Prettyprint(parser)
     Sample(parser)
     Sort(parser)
@@ -744,45 +743,45 @@ class Complexity(Subcommand):
                     col1 = seq_id
                 yield "{},{},{}".format(col1, mean, var)
 
-class Unmask(Subcommand):
+class Clean(Subcommand):
     def _parse(self):
-        cmd_name = 'unmask'
+        cmd_name = 'clean'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Converts all letters to uppercase")
-        parser.add_argument(
-            '-x', '--to-x',
-            help="Convert lower case letters to X",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Converts to upcase '''
-        for seq in gen.next():
-            if(args.to_x):
-                unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
-            else:
-                unmasked_seq = FSeq(seq.header, seq.seq.upper())
-            yield unmasked_seq
-
-class Tounk(Subcommand):
-    def _parse(self):
-        cmd_name = 'tounk'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Convert irregular characters to unknown character'
-        )
+            help="Cleans file (irregular to unknown, lower to upper)")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
             help='Sequence type'
         )
         parser.add_argument(
-            '-l', '--lc',
+            '-u', '--toupper',
+            help="Convert to uppercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--tolower',
+            help="Convert to lowercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--mask-irregular',
+            help="Converts irregular letters to unknown",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-m', '--mask-lowercase',
             help='Convert lower-case to unknown',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-x', '--remove-nonletters',
+            help="Remove gaps and stops ('[^A-Za-z]')",
             action='store_true',
             default=False
         )
@@ -812,18 +811,65 @@ class Tounk(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
+    def _process_args(self, args):
+        if (args.mask_lowercase or args.mask_irregular) and not args.type:
+            print('Please provide sequence type (--type)', file=sys.stderr)
+            raise SystemExit
+
+        if args.tolower and args.toupper:
+            print('Err, you want me to convert to lower AND upper?', file=sys.stderr)
+            raise SystemExit
+
     def generator(self, args, gen):
-        if(args.type.lower()[0] in ['a', 'p']):
-            irr = args.pir
-            unk = args.punk
-        elif(args.type.lower()[0] in ['n', 'd']):
-            irr = args.nir
-            unk = args.nunk
-        if(args.lc):
-            irr = ''.join(set(irr) | set(string.ascii_lowercase))
-        trans = str.maketrans(irr, unk * len(irr))
+
+        # Catches illegal combinations of arguments
+        self._process_args(args)
+
+        # Make translator, this is only possible if type is given
+        trans = None
+        if args.type:
+            if args.type.lower()[0] in ['a', 'p']:
+                irr = args.pir
+                unk = args.punk
+            elif args.type.lower()[0] in ['n', 'd']:
+                irr = args.nir
+                unk = args.nunk
+            else:
+                print('Type not recognized', file=sys.stderr)
+                raise SystemExit
+
+            a = ''
+            # Get irregular characters
+            if args.mask_irregular:
+                a += irr
+
+            # convert lowercase to unknown
+            if args.mask_lowercase:
+                a += string.ascii_lowercase
+
+            a = ''.join(set(a))
+
+            b = unk * len(a)
+            if irr:
+                trans = str.maketrans(a, b)
+
         for seq in gen.next():
-            seq.seq = seq.seq.translate(trans)
+            # Irregular or lowercase to unknown
+            if trans:
+                seq.seq = seq.seq.translate(trans)
+
+            # Change everything to desired case
+            if args.toupper:
+                seq.seq = seq.seq.upper()
+            elif args.tolower:
+                seq.seq = seq.seq.lower()
+
+            # Remove all nonletters or wanted, otherwise just remove space
+            if args.remove_nonletters:
+                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
+            else:
+                seq.seq = re.sub('[^\S]', '', seq.seq)
+
             yield seq
 
 class Prettyprint(Subcommand):
