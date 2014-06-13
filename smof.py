@@ -50,23 +50,21 @@ def parse(argv=None):
     parser = Parser()
 
     Chksum(parser)
-
-    Complexity(parser)
     Clean(parser)
+    Complexity(parser)
+    Fasta2csv(parser)
+    Grep(parser)
+    Perm(parser)
+    Rename(parser)
+    Reverse(parser)
     Sample(parser)
+    Sniff(parser)
     Sort(parser)
     Split(parser)
-    Subseq(parser)
-    Sniff(parser)
     Stat(parser)
-    Fsubseq(parser)
-    Fasta2csv(parser)
-    Perm(parser)
-    Reverse(parser)
-    Grep(parser)
+    Subseq(parser)
     Uniq(parser)
     Wc(parser)
-    Rename(parser)
     Winnow(parser)
 
     if(len(sys.argv) == 1):
@@ -1003,72 +1001,6 @@ class Subseq(Subcommand):
             else:
                 newseq = seq.seq[a-1:b]
             yield FSeq(seq.header, newseq)
-
-class Fsubseq(Subcommand):
-    def _parse(self):
-        cmd_name = 'fsubseq'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Mass extraction of subsequences from first fasta entry")
-        parser.add_argument(
-            'file',
-            help="File containing bounds for subsequence extraction")
-        parser.add_argument(
-            '-r', '--revcomp',
-            help='Take the reverse complement if bounds[0] > bounds[1]',
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-p', '--pattern-index',
-            help='Index of regex pattern in each row',
-            type=int,
-            metavar='INT',
-            default=-1)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        '''
-        Extracts many subsequences. Positional argument file
-        '''
-        bounds = defaultdict(list)
-        for row in csvrowGenerator(args.file):
-            if(args.pattern_index >= 0):
-                try:
-                    pat = row[args.pattern_index]
-                    del row[args.pattern_index]
-                except IndexError:
-                    print("Given pattern index doesn't exist, fuck you!",
-                          file=sys.stderr)
-                    raise SystemExit
-            else:
-                pat = '.*'
-            try:
-                a,b = [int(x) for x in row]
-            except TypeError:
-                print("Bounds must be pair of integers", file=sys.stderr)
-                raise SystemExit
-            bounds[pat].append((a,b))
-
-        for seq in gen.next():
-            for pat in bounds.keys():
-                if(not re.search(pat, seq.header)):
-                    continue
-                for a,b in bounds[pat]:
-                    # If a > b, take reverse complement if that option is enabled,
-                    # if not die
-                    if(a > b):
-                        if(args.revcomp):
-                            newseq = FSeq.getrevcomp(seq.seq[(b-1):a])
-                        else:
-                            print('Lower bound cannot be greater than upper bound '
-                                  '(do you want reverse complement? See options)',
-                                  file=sys.stderr)
-                            raise SystemExit
-                    # If b >= a, this is a normal forward sequence
-                    else:
-                        newseq = seq.seq[(a-1):b]
-                    yield FSeq(seq.header, newseq)
 
 class Fasta2csv(Subcommand):
     def _parse(self):
