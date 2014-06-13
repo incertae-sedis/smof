@@ -517,6 +517,75 @@ class ParseHeader:
     def regex_group(h, regex):
         raise NotImplemented
 
+class StatFun:
+    @classmethod
+    def N50(cls, x, issorted=False):
+        x = sorted(x) if not issorted else x
+        N = sum(x)
+        total = 0
+        for i in range(len(x)-1, -1, -1):
+            total += x[i]
+            if total > N / 2:
+                return(x[i])
+
+    @classmethod
+    def mean(cls, x):
+        return(sum(x) / len(x))
+
+    @classmethod
+    def median(cls, x, issorted=False):
+        return(cls.quantile(x, 0.5, issorted=issorted))
+
+    @classmethod
+    def sd(cls, x):
+        if(len(x) < 2):
+            return('NA')
+        else:
+            mean = sum(x) / len(x)
+            stdev = (sum((y - mean) ** 2 for y in x) / (len(x) - 1)) ** 0.5
+            return(stdev)
+        return(sd)
+
+    @classmethod
+    def quantile(cls, x, q, issorted=False):
+        '''
+        Calculates quantile as the weighted average between indices
+        '''
+        # Die if out of bounds
+        if not (0 <= q <= 1):
+            print('quantile must be between 0 and 1', file=sys.stderr)
+            raise SystemExit
+
+        # Ensure the vector is sorted
+        x = sorted(x) if not issorted else x
+
+        # Return max or min for q = 1 or 0
+        if q == 1:
+            return(x[-1])
+        elif q == 0:
+            return(x[0])
+
+        v = (len(x) - 1) * q
+        r = v % 1
+        i = math.floor(v)
+        quantile = x[i] * (1-r) + x[i+1] * r
+        return(quantile)
+
+    @classmethod
+    def summary(cls, x):
+        x = sorted(x)
+        out = {
+            'min':x[0],
+            'max':x[-1],
+            '1st_qu':cls.quantile(x, 0.25, issorted=True),
+            'median':cls.quantile(x, 0.50, issorted=True),
+            '3rd_qu':cls.quantile(x, 0.75, issorted=True),
+            'mean':cls.mean(x),
+            'sd':cls.sd(x),
+            'N50':cls.N50(x, issorted=True)
+        }
+        return(out)
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -894,6 +963,12 @@ class Stat(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
+    def _process_args(self, args):
+        # If no output options are specified, do length stats
+        if not args.counts and not args.length and not args.proportion:
+            args.length = True
+        return(args)
+
     def _byfile(self, args, gen):
         g = FileStat()
         for seq in gen.next():
@@ -909,9 +984,22 @@ class Stat(Subcommand):
             for k,v in g.counts.items():
                 val = v/N if args.proportion else v
                 yield("{}\t{}".format(k,val))
-        else:
+        elif args.counts and args.proportion:
             for k,v in g.counts.items():
                 yield("{}\t{}\t{}".format(k,v,v/N))
+
+        if args.length:
+            total = sum(g.lengths)
+            N = len(g.lengths)
+            if N > 1:
+                s = StatFun.summary(g.lengths)
+                fivesum = [s[x] for x in ('min','1st_qu','median','3rd_qu','max')]
+                yield("nseq: {}".format(len(g.lengths)))
+                yield("5num: {} {} {} {} {}".format(*fivesum))
+                yield("mean: {} sd: {} ND50: {}".format(s['mean'],s['sd'],s['N50']))
+            else:
+                lstr = ', '.join([str(x) for x in sorted(g.lengths)])
+                yield("length: {}".format(lstr))
 
     def _byseq(self, args, gen):
         seqlist = []
@@ -937,6 +1025,7 @@ class Stat(Subcommand):
             yield(joiner(line))
 
     def generator(self, args, gen):
+        args = self._process_args(args)
         if args.byseq:
             g = self._byseq(args, gen)
         else:
