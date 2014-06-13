@@ -649,7 +649,7 @@ class Complexity(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Calculates the complexity of the given sequences'
+            help='Calculates linguistic complexity'
         )
         parser.add_argument(
             '-k', '--alphabet-size',
@@ -1050,7 +1050,7 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly order sequence by words of length w"
+            help="Randomly order sequence"
         )
         parser.add_argument(
             '-w', '--word-size',
@@ -1167,7 +1167,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Reverse each sequence")
+            help="Reverse each sequence (NOT reverse complement)")
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1293,7 +1293,7 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller filers'
+            help='Split a multifasta file into k smaller files'
         )
         parser.add_argument(
             '-n', '--nfiles',
