@@ -981,8 +981,9 @@ class Stat(Subcommand):
 
         N = sum(v for v in g.counts.values())
         slen = str(len(str(max(g.counts.values()))) + 2)
+        count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
         if args.counts ^ args.proportion:
-            for k,v in g.counts.items():
+            for k,v in count_iter:
                 val = v/N if args.proportion else v
                 if args.counts:
                     exp = "{}{:>%sd}" % slen
@@ -990,7 +991,7 @@ class Stat(Subcommand):
                     exp = "{}{:>11.5%}"
                 yield(exp.format(k,val))
         elif args.counts and args.proportion:
-            for k,v in g.counts.items():
+            for k,v in count_iter:
                 outstr = "{}{:>" + slen + "d}{:>11.5%}"
                 yield(outstr.format(k,v,v/N))
 
