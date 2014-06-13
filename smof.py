@@ -980,26 +980,46 @@ class Stat(Subcommand):
             g.counts = counter_caser(g.counts)
 
         N = sum(v for v in g.counts.values())
+        slen = str(len(str(max(g.counts.values()))) + 2)
         if args.counts ^ args.proportion:
             for k,v in g.counts.items():
                 val = v/N if args.proportion else v
-                yield("{}\t{}".format(k,val))
+                if args.counts:
+                    exp = "{}{:>%sd}" % slen
+                else:
+                    exp = "{}{:>11.5%}"
+                yield(exp.format(k,val))
         elif args.counts and args.proportion:
             for k,v in g.counts.items():
-                yield("{}\t{}\t{}".format(k,v,v/N))
+                outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                yield(outstr.format(k,v,v/N))
 
         if args.length:
             total = sum(g.lengths)
             N = len(g.lengths)
             if N > 1:
                 s = StatFun.summary(g.lengths)
-                fivesum = [s[x] for x in ('min','1st_qu','median','3rd_qu','max')]
-                yield("nseq: {}".format(len(g.lengths)))
-                yield("5num: {} {} {} {} {}".format(*fivesum))
-                yield("mean: {} sd: {} ND50: {}".format(s['mean'],s['sd'],s['N50']))
+
+                # Yield total number of sequences
+                yield("{:10s} {}".format('nseq:', len(g.lengths)))
+
+                # Yield totla number of letters
+                yield("{:10s} {}".format('nchars:', sum(g.lengths)))
+
+                # Yield five number summary of sequence lengths
+                fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
+                fivesum_str = "{:10s} {} {} {} {} {}"
+                yield(fivesum_str.format('5sum:', *fivesum))
+
+                # Yield mean and standard deviation
+                meansd_str="{:10s} {:d}({:d})"
+                yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
+
+                # Yield N50
+                yield("{:10s} {}".format('N50:', s['N50']))
             else:
                 lstr = ', '.join([str(x) for x in sorted(g.lengths)])
-                yield("length: {}".format(lstr))
+                yield("nchars: {}".format(lstr))
 
     def _byseq(self, args, gen):
         seqlist = []
