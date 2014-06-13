@@ -53,7 +53,6 @@ def parse(argv=None):
 
     Complexity(parser)
     Clean(parser)
-    Prettyprint(parser)
     Sample(parser)
     Sort(parser)
     Split(parser)
@@ -871,29 +870,6 @@ class Clean(Subcommand):
                 seq.seq = re.sub('[^\S]', '', seq.seq)
 
             yield seq
-
-class Prettyprint(Subcommand):
-    def _parse(self):
-        cmd_name = 'prettyprint'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Prints fasta file in neat columns')
-        parser.add_argument(
-            'cwidth',
-            help='Output column width',
-            type=int,
-            default=60)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Print each sequence with even columns of length cwidth '''
-        for seq in gen.next():
-            yield seq
-
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print(args.cwidth)
 
 class Stat(Subcommand):
     def _parse(self):
