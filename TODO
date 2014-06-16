@@ -12,3 +12,5 @@ Minor things
     * add a head subcommand
     * add a tail subcommand
     * add an nth subcommand (extract the nth sequence)
+    * make clean deal appropriately with color
+    * color printing adds an extra character to the first line in grep
