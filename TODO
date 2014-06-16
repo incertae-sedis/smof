@@ -1,0 +1,16 @@
+Major things
+============
+    * reimplement in C
+    * allow input from files not just STDIN
+    * make a comp function that compares two or more fasta files
+
+Minor things
+============
+    * add sequence length histogram option to stat
+    * add amino acid class (e.g. polar, aromatic, etc.) to stat
+    * add color subcommand (color sequence by letter, optionally amino acid class)
+    * add a head subcommand
+    * add a tail subcommand
+    * add an nth subcommand (extract the nth sequence)
+    * make clean deal appropriately with color
+    * color printing adds an extra character to the first line in grep
