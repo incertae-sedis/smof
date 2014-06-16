@@ -506,7 +506,7 @@ class FileStat:
 
 class ParseHeader:
     def firstword(h):
-        return(re.sub('>(\S+).*', '\1', h))
+        return(re.sub('^(\S+).*', '\\1', h))
 
     def ncbi_format(h, fields):
         raise NotImplemented
