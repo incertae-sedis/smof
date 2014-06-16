@@ -11,7 +11,7 @@ from collections import defaultdict
 from hashlib import md5
 from collections import Counter
 
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 
 # ================
 # Argument Parsing
@@ -506,7 +506,7 @@ class FileStat:
 
 class ParseHeader:
     def firstword(h):
-        return(re.sub('>(\S+).*', '\1', h))
+        return(re.sub('^(\S+).*', '\\1', h))
 
     def ncbi_format(h, fields):
         raise NotImplemented
