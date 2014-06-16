@@ -1028,25 +1028,30 @@ class Stat(Subcommand):
     def _byseq(self, args, gen):
         seqlist = []
         charset = set()
-        for seq in gen.next():
-            seqstat = SeqStat(seq)
-            seqlist.append(seqstat)
-            charset.update(seqstat.counts)
+        if args.length and not (args.counts or args.proportion):
+            for seq in gen.next():
+                seqid = ParseHeader.firstword(seq.header)
+                yield("{}\t{}".format(seqid, len(seq.seq)))
+        else:
+            for seq in gen.next():
+                seqstat = SeqStat(seq)
+                seqlist.append(seqstat)
+                charset.update(seqstat.counts)
 
-        joiner = lambda s: ','.join([str(x) for x in s])
+            joiner = lambda s: ','.join([str(x) for x in s])
 
-        ignorecase = not args.case_sensitive
-        kwargs = {'masked':args.count_lower,
-                  'length':args.length,
-                  'ignorecase':ignorecase}
+            ignorecase = not args.case_sensitive
+            kwargs = {'masked':args.count_lower,
+                    'length':args.length,
+                    'ignorecase':ignorecase}
 
-        yield joiner(SeqStat.getheader(charset, **kwargs))
+            yield joiner(SeqStat.getheader(charset, **kwargs))
 
-        for q in seqlist:
-            line = q.aslist(charset=charset,
-                            header_fun=ParseHeader.firstword,
-                            **kwargs)
-            yield(joiner(line))
+            for q in seqlist:
+                line = q.aslist(charset=charset,
+                                header_fun=ParseHeader.firstword,
+                                **kwargs)
+                yield(joiner(line))
 
     def generator(self, args, gen):
         args = self._process_args(args)
