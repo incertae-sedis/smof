@@ -947,6 +947,10 @@ class Stat(Subcommand):
             usage=self.usage.format(cmd_name),
             help="Calculate sequence statistics")
         parser.add_argument(
+            '-d', '--delimiter',
+            help='Output delimiter'
+        )
+        parser.add_argument(
             '-q', '--byseq',
             help='Write a line for each sequence',
             default=False,
@@ -1053,29 +1057,31 @@ class Stat(Subcommand):
         seqlist = []
         charset = set()
         if args.length and not (args.counts or args.proportion):
+            delimiter = args.delimiter if args.delimiter else '\t'
             for seq in gen.next():
                 seqid = ParseHeader.firstword(seq.header)
-                yield("{}\t{}".format(seqid, len(seq.seq)))
+                yield("{}{}{}".format(seqid, delimiter, len(seq.seq)))
         else:
             for seq in gen.next():
                 seqstat = SeqStat(seq)
                 seqlist.append(seqstat)
                 charset.update(seqstat.counts)
 
-            joiner = lambda s: ','.join([str(x) for x in s])
+            delimiter = args.delimiter if args.delimiter else ','
+            joiner = lambda s,d: '{}'.format(d).join([str(x) for x in s])
 
             ignorecase = not args.case_sensitive
             kwargs = {'masked':args.count_lower,
                     'length':args.length,
                     'ignorecase':ignorecase}
 
-            yield joiner(SeqStat.getheader(charset, **kwargs))
+            yield joiner(SeqStat.getheader(charset, **kwargs), delimiter)
 
             for q in seqlist:
                 line = q.aslist(charset=charset,
                                 header_fun=ParseHeader.firstword,
                                 **kwargs)
-                yield(joiner(line))
+                yield(joiner(line, delimiter))
 
     def generator(self, args, gen):
         args = self._process_args(args)
