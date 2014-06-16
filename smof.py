@@ -444,8 +444,8 @@ class FileDescription:
         return(stype)
 
 class SeqStat:
-    def __init__(self, seq):
-        self.counts = Counter(seq.seq)
+    def __init__(self, seq, count=True):
+        self.counts = Counter(seq.seq) if count else None
         self.header = seq.header
         self.length = len(seq.seq)
 
@@ -503,7 +503,8 @@ class FileStat:
         self.lengths = []
 
     def add_seq(self, stat):
-        self.counts += stat.counts
+        if stat.counts:
+            self.counts += stat.counts
         self.nseqs += 1
         self.lengths.append(stat.length)
 
@@ -971,32 +972,35 @@ class Stat(Subcommand):
 
     def _byfile(self, args, gen):
         g = FileStat()
+        # Do I need to count the characters? (much faster if I don't)
+        need_count = args.counts or args.proportion or args.count_lower
         for seq in gen.next():
-            g.add_seq(SeqStat(seq))
+            g.add_seq(SeqStat(seq, count=need_count))
 
-        lower = sum_lower(g.counts) if args.count_lower else None
+        if need_count:
+            lower = sum_lower(g.counts) if args.count_lower else None
 
-        if not args.case_sensitive:
-            g.counts = counter_caser(g.counts)
+            if not args.case_sensitive:
+                g.counts = counter_caser(g.counts)
 
-        N = sum(v for v in g.counts.values())
-        slen = str(len(str(max(g.counts.values()))) + 2)
-        count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
-        if args.counts ^ args.proportion:
-            for k,v in count_iter:
-                val = v/N if args.proportion else v
-                if args.counts:
-                    exp = "{}{:>%sd}" % slen
-                else:
-                    exp = "{}{:>11.5%}"
-                yield(exp.format(k,val))
-        elif args.counts and args.proportion:
-            for k,v in count_iter:
-                outstr = "{}{:>" + slen + "d}{:>11.5%}"
-                yield(outstr.format(k,v,v/N))
+            N = sum(g.lengths)
+            slen = str(len(str(max(g.counts.values()))) + 2)
+            count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
+            if args.counts ^ args.proportion:
+                for k,v in count_iter:
+                    val = v/N if args.proportion else v
+                    if args.counts:
+                        exp = "{}{:>%sd}" % slen
+                    else:
+                        exp = "{}{:>11.5%}"
+                    yield(exp.format(k,val))
+            elif args.counts and args.proportion:
+                for k,v in count_iter:
+                    outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                    yield(outstr.format(k,v,v/N))
 
-        if args.count_lower:
-            yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+            if args.count_lower:
+                yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
 
         if args.length:
             total = sum(g.lengths)
