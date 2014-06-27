@@ -416,30 +416,7 @@ class FileDescription:
         return(case)
 
     def _handle_type(self, counts):
-        # If all chars are in ACGT
-        if set(counts) <= Alphabet.DNA:
-            stype = 'dna'
-        # If all chars in ACGU
-        elif set(counts) <= Alphabet.RNA:
-            stype = 'rna'
-        # If has any chars unique to proteins (EFILQPXJZ*)
-        elif set(counts) & Alphabet.PROT_EXC:
-            if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
-                stype = 'prot'
-            else:
-                stype = 'illegal'
-        # If all the residues could be aa, DNA, or RNA
-        elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
-            # If more than 80% look like nucleic acids, set 'amb_nucl'
-            if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-                stype = 'rna' if 'U' in counts else 'dna'
-            # Otherwise set as ambibuous
-            else:
-                stype = 'ambiguous'
-        # If none of these match, something is horribly wrong with your
-        # sequence
-        else:
-            stype = 'illegal'
+        stype = guess_type(counts)
         self.ntype[stype] += 1
         return(stype)
 
@@ -619,6 +596,36 @@ def counter_caser(counter, lower=False):
 def sum_lower(counter):
     lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
     return(sum(lc))
+
+def guess_type(counts):
+    '''
+    Predict sequence type from character counts (dna|rna|prot|ambiguous|illegal)
+    '''
+    # If all chars are in ACGT
+    if set(counts) <= Alphabet.DNA:
+        stype = 'dna'
+    # If all chars in ACGU
+    elif set(counts) <= Alphabet.RNA:
+        stype = 'rna'
+    # If has any chars unique to proteins (EFILQPXJZ*)
+    elif set(counts) & Alphabet.PROT_EXC:
+        if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
+            stype = 'prot'
+        else:
+            stype = 'illegal'
+    # If all the residues could be aa, DNA, or RNA
+    elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
+        # If more than 80% look like nucleic acids, set 'amb_nucl'
+        if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
+            stype = 'rna' if 'U' in counts else 'dna'
+        # Otherwise set as ambibuous
+        else:
+            stype = 'ambiguous'
+    # If none of these match, something is horribly wrong with your
+    # sequence
+    else:
+        stype = 'illegal'
+    return(stype)
 
 
 # ====================
