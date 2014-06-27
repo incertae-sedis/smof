@@ -50,25 +50,21 @@ def parse(argv=None):
     parser = Parser()
 
     Chksum(parser)
-
+    Clean(parser)
     Complexity(parser)
-    Unmask(parser)
-    Tounk(parser)
-    Prettyprint(parser)
+    Fasta2csv(parser)
+    Grep(parser)
+    Perm(parser)
+    Rename(parser)
+    Reverse(parser)
     Sample(parser)
+    Sniff(parser)
     Sort(parser)
     Split(parser)
-    Subseq(parser)
-    Sniff(parser)
     Stat(parser)
-    Fsubseq(parser)
-    Fasta2csv(parser)
-    Perm(parser)
-    Reverse(parser)
-    Grep(parser)
+    Subseq(parser)
     Uniq(parser)
     Wc(parser)
-    Rename(parser)
     Winnow(parser)
 
     if(len(sys.argv) == 1):
@@ -487,7 +483,7 @@ class FileStat:
 
 class ParseHeader:
     def firstword(h):
-        return(re.sub('>(\S+).*', '\1', h))
+        return(re.sub('^(\S+).*', '\\1', h))
 
     def ncbi_format(h, fields):
         raise NotImplemented
@@ -730,7 +726,7 @@ class Complexity(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Calculates the complexity of the given sequences'
+            help='Calculates linguistic complexity'
         )
         parser.add_argument(
             '-k', '--alphabet-size',
@@ -821,44 +817,44 @@ class Complexity(Subcommand):
                     col1 = seq_id
                 yield "{},{},{}".format(col1, mean, var)
 
-class Unmask(Subcommand):
+class Clean(Subcommand):
     def _parse(self):
-        cmd_name = 'unmask'
+        cmd_name = 'clean'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Converts all letters to uppercase")
-        parser.add_argument(
-            '-x', '--to-x',
-            help="Convert lower case letters to X",
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Converts to upcase '''
-        for seq in gen.next():
-            if(args.to_x):
-                unmasked_seq = FSeq(seq.header, re.sub('[a-z]', 'X', seq.seq))
-            else:
-                unmasked_seq = FSeq(seq.header, seq.seq.upper())
-            yield unmasked_seq
-
-class Tounk(Subcommand):
-    def _parse(self):
-        cmd_name = 'tounk'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Convert irregular characters to unknown character'
-        )
+            help="Masks things (optionally), pretty prints")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
             help='Sequence type'
         )
         parser.add_argument(
-            '-l', '--lc',
+            '-u', '--toupper',
+            help="Convert to uppercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--tolower',
+            help="Convert to lowercase",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-x', '--toseq',
+            help="Removes all nonletter characters (gaps, stops, etc.)",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-r', '--mask-irregular',
+            help="Converts irregular letters to unknown",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-m', '--mask-lowercase',
             help='Convert lower-case to unknown',
             action='store_true',
             default=False
@@ -889,42 +885,66 @@ class Tounk(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
-        if(args.type.lower()[0] in ['a', 'p']):
-            irr = args.pir
-            unk = args.punk
-        elif(args.type.lower()[0] in ['n', 'd']):
-            irr = args.nir
-            unk = args.nunk
-        if(args.lc):
-            irr = ''.join(set(irr) | set(string.ascii_lowercase))
-        trans = str.maketrans(irr, unk * len(irr))
-        for seq in gen.next():
-            seq.seq = seq.seq.translate(trans)
-            yield seq
+    def _process_args(self, args):
+        if (args.mask_lowercase or args.mask_irregular) and not args.type:
+            print('Please provide sequence type (--type)', file=sys.stderr)
+            raise SystemExit
 
-class Prettyprint(Subcommand):
-    def _parse(self):
-        cmd_name = 'prettyprint'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Prints fasta file in neat columns')
-        parser.add_argument(
-            'cwidth',
-            help='Output column width',
-            type=int,
-            default=60)
-        parser.set_defaults(func=self.func)
+        if args.tolower and args.toupper:
+            print('Err, you want me to convert to lower AND upper?', file=sys.stderr)
+            raise SystemExit
 
     def generator(self, args, gen):
-        ''' Print each sequence with even columns of length cwidth '''
-        for seq in gen.next():
-            yield seq
 
-    def write(self, args, gen):
-        for seq in self.generator(args, gen):
-            seq.print(args.cwidth)
+        # Catches illegal combinations of arguments
+        self._process_args(args)
+
+        # Make translator, this is only possible if type is given
+        trans = None
+        if args.type:
+            if args.type.lower()[0] in ['a', 'p']:
+                irr = args.pir
+                unk = args.punk
+            elif args.type.lower()[0] in ['n', 'd']:
+                irr = args.nir
+                unk = args.nunk
+            else:
+                print('Type not recognized', file=sys.stderr)
+                raise SystemExit
+
+            a = ''
+            # Get irregular characters
+            if args.mask_irregular:
+                a += irr
+
+            # convert lowercase to unknown
+            if args.mask_lowercase:
+                a += string.ascii_lowercase
+
+            a = ''.join(set(a))
+
+            b = unk * len(a)
+            if irr:
+                trans = str.maketrans(a, b)
+
+        for seq in gen.next():
+            # Irregular or lowercase to unknown
+            if trans:
+                seq.seq = seq.seq.translate(trans)
+
+            # Change everything to desired case
+            if args.toupper:
+                seq.seq = seq.seq.upper()
+            elif args.tolower:
+                seq.seq = seq.seq.lower()
+
+            # Remove all nonletters or wanted, otherwise just remove space
+            if args.toseq:
+                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
+            else:
+                seq.seq = re.sub('[^\S]', '', seq.seq)
+
+            yield seq
 
 class Stat(Subcommand):
     def _parse(self):
@@ -933,6 +953,10 @@ class Stat(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="Calculate sequence statistics")
+        parser.add_argument(
+            '-d', '--delimiter',
+            help='Output delimiter'
+        )
         parser.add_argument(
             '-q', '--byseq',
             help='Write a line for each sequence',
@@ -1040,29 +1064,31 @@ class Stat(Subcommand):
         seqlist = []
         charset = set()
         if args.length and not (args.counts or args.proportion):
+            delimiter = args.delimiter if args.delimiter else '\t'
             for seq in gen.next():
                 seqid = ParseHeader.firstword(seq.header)
-                yield("{}\t{}".format(seqid, len(seq.seq)))
+                yield("{}{}{}".format(seqid, delimiter, len(seq.seq)))
         else:
             for seq in gen.next():
                 seqstat = SeqStat(seq)
                 seqlist.append(seqstat)
                 charset.update(seqstat.counts)
 
-            joiner = lambda s: ','.join([str(x) for x in s])
+            delimiter = args.delimiter if args.delimiter else ','
+            joiner = lambda s,d: '{}'.format(d).join([str(x) for x in s])
 
             ignorecase = not args.case_sensitive
             kwargs = {'masked':args.count_lower,
                     'length':args.length,
                     'ignorecase':ignorecase}
 
-            yield joiner(SeqStat.getheader(charset, **kwargs))
+            yield joiner(SeqStat.getheader(charset, **kwargs), delimiter)
 
             for q in seqlist:
                 line = q.aslist(charset=charset,
                                 header_fun=ParseHeader.firstword,
                                 **kwargs)
-                yield(joiner(line))
+                yield(joiner(line, delimiter))
 
     def generator(self, args, gen):
         args = self._process_args(args)
@@ -1110,72 +1136,6 @@ class Subseq(Subcommand):
             else:
                 newseq = seq.seq[a-1:b]
             yield FSeq(seq.header, newseq)
-
-class Fsubseq(Subcommand):
-    def _parse(self):
-        cmd_name = 'fsubseq'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Mass extraction of subsequences from first fasta entry")
-        parser.add_argument(
-            'file',
-            help="File containing bounds for subsequence extraction")
-        parser.add_argument(
-            '-r', '--revcomp',
-            help='Take the reverse complement if bounds[0] > bounds[1]',
-            action='store_true',
-            default=False)
-        parser.add_argument(
-            '-p', '--pattern-index',
-            help='Index of regex pattern in each row',
-            type=int,
-            metavar='INT',
-            default=-1)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        '''
-        Extracts many subsequences. Positional argument file
-        '''
-        bounds = defaultdict(list)
-        for row in csvrowGenerator(args.file):
-            if(args.pattern_index >= 0):
-                try:
-                    pat = row[args.pattern_index]
-                    del row[args.pattern_index]
-                except IndexError:
-                    print("Given pattern index doesn't exist, fuck you!",
-                          file=sys.stderr)
-                    raise SystemExit
-            else:
-                pat = '.*'
-            try:
-                a,b = [int(x) for x in row]
-            except TypeError:
-                print("Bounds must be pair of integers", file=sys.stderr)
-                raise SystemExit
-            bounds[pat].append((a,b))
-
-        for seq in gen.next():
-            for pat in bounds.keys():
-                if(not re.search(pat, seq.header)):
-                    continue
-                for a,b in bounds[pat]:
-                    # If a > b, take reverse complement if that option is enabled,
-                    # if not die
-                    if(a > b):
-                        if(args.revcomp):
-                            newseq = FSeq.getrevcomp(seq.seq[(b-1):a])
-                        else:
-                            print('Lower bound cannot be greater than upper bound '
-                                  '(do you want reverse complement? See options)',
-                                  file=sys.stderr)
-                            raise SystemExit
-                    # If b >= a, this is a normal forward sequence
-                    else:
-                        newseq = seq.seq[(a-1):b]
-                    yield FSeq(seq.header, newseq)
 
 class Fasta2csv(Subcommand):
     def _parse(self):
@@ -1225,7 +1185,7 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly order sequence by words of length w"
+            help="Randomly order sequence"
         )
         parser.add_argument(
             '-w', '--word-size',
@@ -1342,7 +1302,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Reverse each sequence")
+            help="Reverse each sequence (NOT reverse complement)")
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1396,13 +1356,13 @@ class Winnow(Subcommand):
     def generator(self, args, gen):
         tests = []
         if args.contain:
-            tests.append(lambda s: reject.append(bool(set(args.contain) & set(s))))
+            tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
         if args.not_contain:
-            tests.append(lambda s: reject.append(bool(set(args.not_contain) & set(s))))
+            tests.append(lambda s, v=args.not_contain: bool(set(v) & set(s)))
         if args.longer_than:
-            tests.append(lambda s: reject.append(len(s) > args.longer_than))
+            tests.append(lambda s, v=args.longer_than: len(s) > v)
         if args.shorter_than:
-            tests.append(lambda s: reject.append(len(s) < args.shorter_than))
+            tests.append(lambda s, v=args.shorter_than: len(s) < v)
         if args.composition:
             try:
                 ch,sign,per = args.composition.split()
@@ -1468,7 +1428,7 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller filers'
+            help='Split a multifasta file into k smaller files'
         )
         parser.add_argument(
             '-n', '--nfiles',
