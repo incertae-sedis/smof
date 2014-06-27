@@ -982,6 +982,12 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
+            '-t', '--type',
+            help='Guess sequence type',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
             '-l', '--length',
             help='Write sequence length',
             default=False,
@@ -997,14 +1003,14 @@ class Stat(Subcommand):
 
     def _process_args(self, args):
         # If no output options are specified, do length stats
-        if not any((args.counts, args.length, args.proportion, args.count_lower)):
+        if not any((args.counts, args.type, args.length, args.proportion, args.count_lower)):
             args.length = True
         return(args)
 
     def _byfile(self, args, gen):
         g = FileStat()
         # Do I need to count the characters? (much faster if I don't)
-        need_count = args.counts or args.proportion or args.count_lower
+        need_count = any((args.counts, args.proportion, args.count_lower, args.type))
         for seq in gen.next():
             g.add_seq(SeqStat(seq, count=need_count))
 
@@ -1013,6 +1019,9 @@ class Stat(Subcommand):
 
             if not args.case_sensitive:
                 g.counts = counter_caser(g.counts)
+
+            if args.type:
+                yield(guess_type(g.counts))
 
             N = sum(g.lengths)
             slen = str(len(str(max(g.counts.values()))) + 2)
