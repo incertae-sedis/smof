@@ -999,6 +999,24 @@ class Stat(Subcommand):
             default=False,
             action='store_true'
         )
+        parser.add_argument(
+            '-g', '--length-hist',
+            help='Write ascii histogram of sequence lengths',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-G', '--log-length-hist',
+            help='Write ascii histogram of sequence log2 lengths',
+            default=False,
+            action='store_true'
+        )
+        # parser.add_argument(
+        #     '-C', '--comp-hist',
+        #     help='Write composition histogram',
+        #     default=False,
+        #     action='store_true'
+        # )
         parser.set_defaults(func=self.func)
 
     def _process_args(self, args):
@@ -1068,6 +1086,42 @@ class Stat(Subcommand):
             else:
                 lstr = ', '.join([str(x) for x in sorted(g.lengths)])
                 yield("nchars: {}".format(lstr))
+
+        if args.length_hist or args.log_length_hist:
+            try:
+                import numpy
+            except ImportError:
+                print('Please install numpy (needed for histograms)', file=sys.stderr)
+                raise SystemExit
+
+            if args.log_length_hist:
+                lengths = [math.log(x, 2) for x in g.lengths]
+            else:
+                lengths = g.lengths
+            height = 10
+            width = 60
+            n = numpy.histogram(lengths, bins=width)[0]
+            n = [height * x / max(n) for x in n]
+            yield(' ' + '-' * width)
+            for h in reversed(range(height)):
+                out = ['|']
+                for w in range(width):
+                    dif = n[w] - h
+                    if dif <= 0:
+                        out.append(' ')
+                    elif dif < 0.25:
+                        out.append('.')
+                    elif dif < 0.5:
+                        out.append('~')
+                    elif dif < 0.75:
+                        out.append('*')
+                    else:
+                        out.append('O')
+                out.append('|')
+                yield(''.join(out))
+            yield(' ' + '-' * width)
+
+
 
     def _byseq(self, args, gen):
         seqlist = []
