@@ -1349,13 +1349,13 @@ class Winnow(Subcommand):
     def generator(self, args, gen):
         tests = []
         if args.contain:
-            tests.append(lambda s: reject.append(bool(set(args.contain) & set(s))))
+            tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
         if args.not_contain:
-            tests.append(lambda s: reject.append(bool(set(args.not_contain) & set(s))))
+            tests.append(lambda s, v=args.not_contain: bool(set(v) & set(s)))
         if args.longer_than:
-            tests.append(lambda s: reject.append(len(s) > args.longer_than))
+            tests.append(lambda s, v=args.longer_than: len(s) > v)
         if args.shorter_than:
-            tests.append(lambda s: reject.append(len(s) < args.shorter_than))
+            tests.append(lambda s, v=args.shorter_than: len(s) < v)
         if args.composition:
             try:
                 ch,sign,per = args.composition.split()
