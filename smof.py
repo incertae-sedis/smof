@@ -1000,23 +1000,17 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
-            '-g', '--length-hist',
+            '-g', '--hist',
             help='Write ascii histogram of sequence lengths',
             default=False,
             action='store_true'
         )
         parser.add_argument(
-            '-G', '--log-length-hist',
+            '-G', '--log-hist',
             help='Write ascii histogram of sequence log2 lengths',
             default=False,
             action='store_true'
         )
-        # parser.add_argument(
-        #     '-C', '--comp-hist',
-        #     help='Write composition histogram',
-        #     default=False,
-        #     action='store_true'
-        # )
         parser.set_defaults(func=self.func)
 
     def _process_args(self, args):
@@ -1087,14 +1081,14 @@ class Stat(Subcommand):
                 lstr = ', '.join([str(x) for x in sorted(g.lengths)])
                 yield("nchars: {}".format(lstr))
 
-        if args.length_hist or args.log_length_hist:
+        if args.hist or args.log_hist:
             try:
                 import numpy
             except ImportError:
                 print('Please install numpy (needed for histograms)', file=sys.stderr)
                 raise SystemExit
 
-            if args.log_length_hist:
+            if args.log_hist:
                 lengths = [math.log(x, 2) for x in g.lengths]
             else:
                 lengths = g.lengths
@@ -1120,8 +1114,6 @@ class Stat(Subcommand):
                 out.append('|')
                 yield(''.join(out))
             yield(' ' + '-' * width)
-
-
 
     def _byseq(self, args, gen):
         seqlist = []
