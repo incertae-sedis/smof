@@ -412,30 +412,7 @@ class FileDescription:
         return(case)
 
     def _handle_type(self, counts):
-        # If all chars are in ACGT
-        if set(counts) <= Alphabet.DNA:
-            stype = 'dna'
-        # If all chars in ACGU
-        elif set(counts) <= Alphabet.RNA:
-            stype = 'rna'
-        # If has any chars unique to proteins (EFILQPXJZ*)
-        elif set(counts) & Alphabet.PROT_EXC:
-            if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
-                stype = 'prot'
-            else:
-                stype = 'illegal'
-        # If all the residues could be aa, DNA, or RNA
-        elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
-            # If more than 80% look like nucleic acids, set 'amb_nucl'
-            if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-                stype = 'rna' if 'U' in counts else 'dna'
-            # Otherwise set as ambibuous
-            else:
-                stype = 'ambiguous'
-        # If none of these match, something is horribly wrong with your
-        # sequence
-        else:
-            stype = 'illegal'
+        stype = guess_type(counts)
         self.ntype[stype] += 1
         return(stype)
 
@@ -615,6 +592,36 @@ def counter_caser(counter, lower=False):
 def sum_lower(counter):
     lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
     return(sum(lc))
+
+def guess_type(counts):
+    '''
+    Predict sequence type from character counts (dna|rna|prot|ambiguous|illegal)
+    '''
+    # If all chars are in ACGT
+    if set(counts) <= Alphabet.DNA:
+        stype = 'dna'
+    # If all chars in ACGU
+    elif set(counts) <= Alphabet.RNA:
+        stype = 'rna'
+    # If has any chars unique to proteins (EFILQPXJZ*)
+    elif set(counts) & Alphabet.PROT_EXC:
+        if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
+            stype = 'prot'
+        else:
+            stype = 'illegal'
+    # If all the residues could be aa, DNA, or RNA
+    elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
+        # If more than 80% look like nucleic acids, set 'amb_nucl'
+        if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
+            stype = 'rna' if 'U' in counts else 'dna'
+        # Otherwise set as ambibuous
+        else:
+            stype = 'ambiguous'
+    # If none of these match, something is horribly wrong with your
+    # sequence
+    else:
+        stype = 'illegal'
+    return(stype)
 
 
 # ====================
@@ -975,6 +982,12 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
+            '-t', '--type',
+            help='Guess sequence type',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
             '-l', '--length',
             help='Write sequence length',
             default=False,
@@ -986,18 +999,36 @@ class Stat(Subcommand):
             default=False,
             action='store_true'
         )
+        parser.add_argument(
+            '-g', '--length-hist',
+            help='Write ascii histogram of sequence lengths',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-G', '--log-length-hist',
+            help='Write ascii histogram of sequence log2 lengths',
+            default=False,
+            action='store_true'
+        )
+        # parser.add_argument(
+        #     '-C', '--comp-hist',
+        #     help='Write composition histogram',
+        #     default=False,
+        #     action='store_true'
+        # )
         parser.set_defaults(func=self.func)
 
     def _process_args(self, args):
         # If no output options are specified, do length stats
-        if not any((args.counts, args.length, args.proportion, args.count_lower)):
+        if not any((args.counts, args.type, args.length, args.proportion, args.count_lower)):
             args.length = True
         return(args)
 
     def _byfile(self, args, gen):
         g = FileStat()
         # Do I need to count the characters? (much faster if I don't)
-        need_count = args.counts or args.proportion or args.count_lower
+        need_count = any((args.counts, args.proportion, args.count_lower, args.type))
         for seq in gen.next():
             g.add_seq(SeqStat(seq, count=need_count))
 
@@ -1006,6 +1037,9 @@ class Stat(Subcommand):
 
             if not args.case_sensitive:
                 g.counts = counter_caser(g.counts)
+
+            if args.type:
+                yield(guess_type(g.counts))
 
             N = sum(g.lengths)
             slen = str(len(str(max(g.counts.values()))) + 2)
@@ -1052,6 +1086,42 @@ class Stat(Subcommand):
             else:
                 lstr = ', '.join([str(x) for x in sorted(g.lengths)])
                 yield("nchars: {}".format(lstr))
+
+        if args.length_hist or args.log_length_hist:
+            try:
+                import numpy
+            except ImportError:
+                print('Please install numpy (needed for histograms)', file=sys.stderr)
+                raise SystemExit
+
+            if args.log_length_hist:
+                lengths = [math.log(x, 2) for x in g.lengths]
+            else:
+                lengths = g.lengths
+            height = 10
+            width = 60
+            n = numpy.histogram(lengths, bins=width)[0]
+            n = [height * x / max(n) for x in n]
+            yield(' ' + '-' * width)
+            for h in reversed(range(height)):
+                out = ['|']
+                for w in range(width):
+                    dif = n[w] - h
+                    if dif <= 0:
+                        out.append(' ')
+                    elif dif < 0.25:
+                        out.append('.')
+                    elif dif < 0.5:
+                        out.append('~')
+                    elif dif < 0.75:
+                        out.append('*')
+                    else:
+                        out.append('O')
+                out.append('|')
+                yield(''.join(out))
+            yield(' ' + '-' * width)
+
+
 
     def _byseq(self, args, gen):
         seqlist = []
