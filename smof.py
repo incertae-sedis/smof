@@ -54,6 +54,7 @@ def parse(argv=None):
     Complexity(parser)
     Fasta2csv(parser)
     Grep(parser)
+    Head(parser)
     Perm(parser)
     Rename(parser)
     Reverse(parser)
@@ -63,6 +64,7 @@ def parse(argv=None):
     Split(parser)
     Stat(parser)
     Subseq(parser)
+    Tail(parser)
     Uniq(parser)
     Wc(parser)
     Winnow(parser)
@@ -1560,6 +1562,63 @@ class Split(Subcommand):
 # UNIX EMULATORS
 # ==============
 
+def headtailtrunk(seq, first, last):
+    if first and last:
+        if first + last < len(seq.seq):
+            seq.header = ParseHeader.firstword(seq.header) + \
+                    '|TRUNCATED:first-{}_last-{}'.format(first, last)
+            seq.seq = '{}{}{}'.format(
+                seq.seq[0:first],
+                '...',
+                seq.seq[-last:]
+            )
+    elif first:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:first-{}'.format(first)
+        seq.seq = seq.seq[0:first]
+    elif last:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:last-{}'.format(last)
+        seq.seq = seq.seq[-last:]
+    return(seq)
+
+class Head(Subcommand):
+    def _parse(self):
+        cmd_name = 'head'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Write first N sequences (default=1)"
+        )
+        parser.add_argument(
+            '-n', '--nseqs',
+            help='print N sequences',
+            metavar='N',
+            type=int,
+            default=1
+        )
+        parser.add_argument(
+            '-f', '--first',
+            help='print first K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.add_argument(
+            '-l', '--last',
+            help='print last K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        i = 1
+        for seq in gen.next():
+            yield headtailtrunk(seq, args.first, args.last)
+            if i == args.nseqs:
+                break
+            i += 1
+
 class Grep(Subcommand):
     def _parse(self):
         cmd_name = 'grep'
@@ -1987,6 +2046,48 @@ class Wc(Subcommand):
             print(nseqs)
         else:
             print("{}\t{}".format(nseqs, nchars))
+
+class Tail(Subcommand):
+    def _parse(self):
+        cmd_name = 'tail'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Write last N sequences (default=1)"
+        )
+        parser.add_argument(
+            '-n', '--nseqs',
+            help='print N sequences',
+            metavar='N',
+            type=int,
+            default=1
+        )
+        parser.add_argument(
+            '-f', '--first',
+            help='print first K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.add_argument(
+            '-l', '--last',
+            help='print last K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        import collections
+        try:
+            lastseqs = collections.deque(maxlen=args.nseqs)
+        except ValueError:
+            print('--nseqs argument must be positive', file=sys.stderr)
+            raise SystemExit
+        for seq in gen.next():
+            lastseqs.append(seq)
+
+        for s in lastseqs:
+            yield headtailtrunk(s, args.first, args.last)
 
 
 # =======
