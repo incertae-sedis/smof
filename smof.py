@@ -952,38 +952,23 @@ class Fasta2csv(Subcommand):
             help="Converts a fasta file to 2-column csv")
         parser.add_argument(
             '-d', '--delimiter',
-            help="Set delimiter (',' by default)",
+            help="Set delimiter (TAB by default)",
             metavar='CHAR',
-            default=',')
+            default='\t')
         parser.add_argument(
             '-r', '--header',
             help='Write header (default=False)',
             action='store_true',
             default=False)
-        parser.add_argument(
-            '-f', '--fields',
-            help='Extract given fields from the header',
-            metavar='STR',
-            nargs='+')
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         if(args.header):
-            if(args.fields):
-                yield args.fields + ['seq']
-            else:
-                yield ['header', 'seq']
-        for seq in gen.next():
-            if(args.fields):
-                row = [seq.getvalue(field) for field in args.fields]
-            else:
-                row = [seq.header]
-            yield tuple(row + [seq.seq])
+            yield 'seqid{}seq'.format(args.delimiter)
 
-    def write(self, args, gen):
-        w = csv.writer(sys.stdout, delimiter=args.delimiter)
-        for row in self.generator(args, gen):
-            w.writerow(row)
+        for seq in gen.next():
+            seqid = ParseHeader.firstword(seq.header)
+            yield '{}{}{}'.format(seqid, args.delimiter, seq.seq)
 
 class Perm(Subcommand):
     def _parse(self):
