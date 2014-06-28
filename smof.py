@@ -654,36 +654,36 @@ class Chksum(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Calculate an md5 checksum for the input sequences"
+            help="calculate an md5 checksum for the input sequences"
         )
         parser.add_argument(
             '-i', '--ignore-case',
-            help='Convert all to uppercase, before hashing',
+            help='convert all to uppercase, before hashing',
             action='store_true',
             default=False
         )
         method = parser.add_mutually_exclusive_group(required=False)
         method.add_argument(
             '-w', '--whole-file',
-            help='Calculate single md5sum for all headers and sequences (default action)',
+            help='calculate single md5sum for all headers and sequences (default action)',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-q', '--each-sequence',
-            help='Calculate md5sum for each sequence, write as TAB delimited list',
+            help='calculate md5sum for each sequence, write as TAB delimited list',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-s', '--all-sequences',
-            help='Calculate single md5sum for all sequences',
+            help='calculate single md5sum for all sequences',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-d', '--all-headers',
-            help='Calculate single md5sum for all headers',
+            help='calculate single md5sum for all headers',
             action='store_true',
             default=False
         )
@@ -726,64 +726,64 @@ class Clean(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Masks things (optionally), pretty prints")
+            help="masks things (optionally), pretty prints")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
-            help='Sequence type'
+            help='sequence type'
         )
         parser.add_argument(
             '-u', '--toupper',
-            help="Convert to uppercase",
+            help="convert to uppercase",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-l', '--tolower',
-            help="Convert to lowercase",
+            help="convert to lowercase",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-x', '--toseq',
-            help="Removes all nonletter characters (gaps, stops, etc.)",
+            help="removes all nonletter characters (gaps, stops, etc.)",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-r', '--mask-irregular',
-            help="Converts irregular letters to unknown",
+            help="converts irregular letters to unknown",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-m', '--mask-lowercase',
-            help='Convert lower-case to unknown',
+            help='convert lower-case to unknown',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--nir',
-            help='Nucleotide irregulars [default=(not ACGT)]',
+            help='nucleotide irregulars [default=(not ACGT)]',
             metavar='STR',
             default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
         )
         parser.add_argument(
             '--pir',
             metavar='STR',
-            help='Protein irregulars [default=BJOUZbjouz]',
+            help='protein irregulars [default=BJOUZbjouz]',
             default='BJOUXZbjouxz'
         )
         parser.add_argument(
             '--nunk',
             metavar='CHAR',
-            help='Nucleotide unknown character (default=N)',
+            help='nucleotide unknown character (default=N)',
             default='N'
         )
         parser.add_argument(
             '--punk',
             metavar='CHAR',
-            help='Protein unknown character (default=X)',
+            help='protein unknown character (default=X)',
             default='X'
         )
         parser.set_defaults(func=self.func)
@@ -855,46 +855,46 @@ class Complexity(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Calculates linguistic complexity'
+            help='calculates linguistic complexity'
         )
         parser.add_argument(
             '-k', '--alphabet-size',
-            help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
+            help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
             type=int,
             metavar='INT',
             default=4
         )
         parser.add_argument(
             '-w', '--window-length',
-            help='Window length (if provided, output will average of window complexities)',
+            help='window length (if provided, output will average of window complexities)',
             type=int,
             metavar='INT',
             default=100
         )
         parser.add_argument(
             '-m', '--word-length',
-            help='Length of each word',
+            help='length of each word',
             type=int,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-j', '--jump',
-            help='Distance between adjacent windows',
+            help='distance between adjacent windows',
             type=int,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-o', '--offset',
-            help='Index of start point',
+            help='index of start point',
             type=int,
             metavar='INT',
             default=0
         )
         parser.add_argument(
             '-d', '--drop',
-            help="Drop sequence if contains this character (e.g. 'X' or 'N')",
+            help="drop sequence if contains this character (e.g. 'X' or 'N')",
             metavar='CHAR',
             default=None
         )
@@ -949,15 +949,15 @@ class Fasta2csv(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Converts a fasta file to 2-column csv")
+            help="converts a fasta file to 2-column csv")
         parser.add_argument(
             '-d', '--delimiter',
-            help="Set delimiter (TAB by default)",
+            help="set delimiter (TAB by default)",
             metavar='CHAR',
             default='\t')
         parser.add_argument(
             '-r', '--header',
-            help='Write header (default=False)',
+            help='write header (default=False)',
             action='store_true',
             default=False)
         parser.set_defaults(func=self.func)
@@ -976,25 +976,25 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly order sequence"
+            help="randomly order sequence"
         )
         parser.add_argument(
             '-w', '--word-size',
-            help='Size of each word (default=1)',
+            help='size of each word (default=1)',
             type=int,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-s', '--start-offset',
-            help='Number of letters to ignore at beginning (default=0)',
+            help='number of letters to ignore at beginning (default=0)',
             type=int,
             metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
-            help='Number of letters to ignore at end (default=0)',
+            help='number of letters to ignore at end (default=0)',
             type=int,
             metavar='INT',
             default=0
@@ -1026,7 +1026,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Reverse each sequence (NOT reverse complement)")
+            help="reverse each sequence (NOT reverse complement)")
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1041,7 +1041,7 @@ class Sniff(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Extract info about the sequence"
+            help="extract info about the sequence"
         )
         parser.set_defaults(func=self.func)
 
@@ -1101,62 +1101,62 @@ class Stat(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Calculate sequence statistics")
+            help="calculate sequence statistics")
         parser.add_argument(
             '-d', '--delimiter',
-            help='Output delimiter'
+            help='output delimiter'
         )
         parser.add_argument(
             '-q', '--byseq',
-            help='Write a line for each sequence',
+            help='write a line for each sequence',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-I', '--case-sensitive',
-            help='Match case',
+            help='match case',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-m', '--count-lower',
-            help='Count the number of lowercase characters',
+            help='count the number of lowercase characters',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-c', '--counts',
-            help='Write counts of all characters',
+            help='write counts of all characters',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-t', '--type',
-            help='Guess sequence type',
+            help='guess sequence type',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-l', '--length',
-            help='Write sequence length',
+            help='write sequence length',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-p', '--proportion',
-            help='Write proportion of each character',
+            help='write proportion of each character',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-g', '--hist',
-            help='Write ascii histogram of sequence lengths',
+            help='write ascii histogram of sequence lengths',
             default=False,
             action='store_true'
         )
         parser.add_argument(
             '-G', '--log-hist',
-            help='Write ascii histogram of sequence log2 lengths',
+            help='write ascii histogram of sequence log2 lengths',
             default=False,
             action='store_true'
         )
@@ -1309,7 +1309,7 @@ class Subseq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Extract subsequence from each entry")
+            help="extract subsequence from each entry")
         parser.add_argument(
             'bounds',
             help="from and to values (indexed from 1)",
@@ -1317,7 +1317,7 @@ class Subseq(Subcommand):
             type=int)
         parser.add_argument(
             '-r', '--revcomp',
-            help='Take the reverse complement if bounds[0] > bounds[1]',
+            help='take the reverse complement if bounds[0] > bounds[1]',
             action='store_true',
             default=False)
         parser.set_defaults(func=self.func)
@@ -1347,40 +1347,40 @@ class Winnow(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Remove sequences which meet given conditions"
+            help="remove sequences which meet given conditions"
         )
         parser.add_argument(
             '-c', '--contain',
             metavar='STR',
-            help="Remove if contains any of these characters"
+            help="remove if contains any of these characters"
         )
         parser.add_argument(
             '-C', '--not-contain',
             metavar='STR',
-            help="Remove if contains any of these characters"
+            help="remove if contains any of these characters"
         )
         parser.add_argument(
             '-s', '--shorter-than',
-            help="Remove if sequence is shorter than i",
+            help="remove if sequence is shorter than i",
             metavar='INT',
             type=int
         )
         parser.add_argument(
             '-S', '--longer-than',
-            help="Remove if sequence is longer than i",
+            help="remove if sequence is longer than i",
             metavar='INT',
             type=int
         )
         parser.add_argument(
             '-v', '--invert',
-            help="Invert selection",
+            help="invert selection",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-p', '--composition',
             metavar='EXPR',
-            help="Composition (e.g. -p 'GC < 0.5')"
+            help="composition (e.g. -p 'GC < 0.5')"
         )
         parser.set_defaults(func=self.func)
 
@@ -1438,10 +1438,10 @@ class Sample(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly select entries from fasta file")
+            help="randomly select entries from fasta file")
         parser.add_argument(
             'n',
-            help="Sample size",
+            help="sample size",
             type=int,
             default=1)
         parser.set_defaults(func=self.func)
@@ -1459,23 +1459,23 @@ class Sort(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Sort sequences")
+            help="sort sequences")
         parser.add_argument(
             '-x', '--regex',
-            help="Sort by single regex capture")
+            help="sort by single regex capture")
         parser.add_argument(
             '-r', '--reverse',
-            help="Reverse sort",
+            help="reverse sort",
             action='store_true',
             default=False)
         parser.add_argument(
             '-n', '--numeric',
-            help="Numeric sort",
+            help="numeric sort",
             action='store_true',
             default=False)
         parser.add_argument(
             '-l', '--length',
-            help='Sort by sequence length',
+            help='sort by sequence length',
             action='store_true',
             default=False)
         parser.set_defaults(func=self.func)
@@ -1526,15 +1526,15 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller files'
+            help='split a multifasta file into k smaller files'
         )
         parser.add_argument(
             '-n', '--nfiles',
-            help='Number of output files'
+            help='number of output files'
         )
         parser.add_argument(
             '-p', '--prefix',
-            help='Prefix for output files',
+            help='prefix for output files',
             default='xxx'
         )
         parser.set_defaults(func=self.func)
@@ -1566,17 +1566,17 @@ class Grep(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Roughly emulates the UNIX grep command"
+            help="roughly emulates the UNIX grep command"
         )
         parser.add_argument(
             'patterns',
             metavar='PATTERNS',
-            help='Patterns to match',
+            help='patterns to match',
             nargs='*'
         )
         parser.add_argument(
             '-q', '--match-sequence',
-            help='Match sequence rather than header',
+            help='match sequence rather than header',
             action='store_true',
             default=False
         )
@@ -1584,22 +1584,22 @@ class Grep(Subcommand):
             '-f', '--file',
             metavar='FILE',
             type=argparse.FileType('r'),
-            help='Obtain patterns from FILE, one per line'
+            help='obtain patterns from FILE, one per line'
         )
         parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
-            help='A regular expression to capture PATTERNS'
+            help='a regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
-            help='Treat PATTERNS as perl regular expressions',
+            help='treat PATTERNS as perl regular expressions',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-B', '--ambiguous-nucl',
-            help='Parse extended nucleotide alphabet',
+            help='parse extended nucleotide alphabet',
             action='store_true',
             default=False
         )
@@ -1611,49 +1611,49 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-v', '--invert-match',
-            help='Print non-matching entries',
+            help='print non-matching entries',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-c', '--count',
-            help='Print number of entries with matches',
+            help='print number of entries with matches',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-m', '--count-matches',
-            help='Print number of non-overlapping matches',
+            help='print number of non-overlapping matches',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-b', '--both-strands',
-            help='Search both strands',
+            help='search both strands',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-r', '--reverse-only',
-            help='Only search the reverse strand',
+            help='only search the reverse strand',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--color',
-            help='Print in color',
+            help='print in color',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--gff',
-            help='Output matches in gff format',
+            help='output matches in gff format',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--gff-type',
-            help='Name of searched feature',
+            help='name of searched feature',
             metavar='STR',
             default='regex_match'
         )
@@ -1877,21 +1877,21 @@ class Rename(Subcommand):
         parser.add_argument(
             'pattern',
             metavar='PATTERN',
-            help="Regex pattern"
+            help="regex pattern"
         )
         parser.add_argument(
             'replacement',
             metavar='REPLACEMENT',
             nargs='?',
             default='',
-            help="Regex replacement (default='', i.e. delete PATTERN)"
+            help="regex replacement (default='', i.e. delete PATTERN)"
         )
         parser.add_argument(
             'headers',
             metavar='HEADERS',
             nargs='?',
             default=None,
-            help="Regex to select headers (if not supplied, select all)"
+            help="regex to select headers (if not supplied, select all)"
         )
         parser.set_defaults(func=self.func)
 
@@ -1908,23 +1908,23 @@ class Uniq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Emulates UNIX uniq command (prior sorting needless)"
+            help="emulates UNIX uniq command (prior sorting needless)"
         )
         parser.add_argument(
             '-c', '--count',
-            help='Writes (count|header) in tab-delimited format',
+            help='writes (count|header) in tab-delimited format',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-d', '--repeated',
-            help='Print only repeated entries',
+            help='print only repeated entries',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-u', '--uniq',
-            help='Print only unique entries',
+            help='print only unique entries',
             action='store_true',
             default=False
         )
@@ -1955,17 +1955,17 @@ class Wc(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Roughly emulates the UNIX wc command"
+            help="roughly emulates the UNIX wc command"
         )
         parser.add_argument(
             '-m', '--chars',
-            help='Writes the summed length of all sequences',
+            help='writes the summed length of all sequences',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-l', '--lines',
-            help='Writes the total number of sequences',
+            help='writes the total number of sequences',
             action='store_true',
             default=False
         )
