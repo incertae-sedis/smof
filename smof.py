@@ -549,12 +549,12 @@ def counter_caser(counter, lower=False):
     Sums cases in Collections.Counter object
     '''
     if lower:
-        counts_obj = Counter({k:v for k,v in counter.items() if k.islower()}) + \
-                     Counter({k.lower():v for k,v in counter.items() if k.isupper()})
+        out = counter + Counter({k.lower():v for k,v in counter.items() if k.isupper()})
+        out = out - Counter({k:v for k,v in counter.items() if k.isupper()})
     else:
-        counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
-                     Counter({k.upper():v for k,v in counter.items() if k.islower()})
-    return(counts_obj)
+        out = counter + Counter({k.upper():v for k,v in counter.items() if k.islower()})
+        out = out - Counter({k:v for k,v in counter.items() if k.islower()})
+    return(out)
 
 def sum_lower(counter):
     lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
@@ -1683,7 +1683,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-Y', '--force-color',
-            help='print in color even to non-tty',
+            help='print in color even to non-tty (DANGEROUS)',
             action='store_true',
             default=False
         )
