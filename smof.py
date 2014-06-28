@@ -1,14 +1,10 @@
 #! /usr/bin/python3
 
 import argparse
-import csv
-import random
 import math
 import re
 import sys
 import string
-from collections import defaultdict
-from hashlib import md5
 from collections import Counter
 
 __version__ = "1.5.4"
@@ -54,6 +50,7 @@ def parse(argv=None):
     Complexity(parser)
     Fasta2csv(parser)
     Grep(parser)
+    Head(parser)
     Perm(parser)
     Rename(parser)
     Reverse(parser)
@@ -63,6 +60,7 @@ def parse(argv=None):
     Split(parser)
     Stat(parser)
     Subseq(parser)
+    Tail(parser)
     Uniq(parser)
     Wc(parser)
     Winnow(parser)
@@ -80,21 +78,6 @@ def parse(argv=None):
 # CLASS DEFINITIONS
 # =================
 
-class Maps:
-    DNA_AMB = {
-        'R':'AG',
-        'Y':'CT',
-        'S':'GC',
-        'W':'AT',
-        'K':'GT',
-        'M':'AC',
-        'B':'CGT',
-        'D':'AGT',
-        'H':'ACT',
-        'V':'ACG',
-        'N':'ACGT'
-    }
-
 class Alphabet:
     # Including U, for selenocysteine, and * for STOP
     PROT     = set('ACDEFGHIKLMNPQRSTUVWYX*')
@@ -110,125 +93,6 @@ class Alphabet:
     GAP      = set('.-_')
     STOP     = {'TAG', 'TAA', 'TGA', 'UAG', 'UAA', 'UGA'}
     START    = {'ATG', 'AUG'}
-
-class FSeqGenerator:
-    def __init__(self, fh=sys.stdin):
-        self.fh = fh
-
-    def next(self):
-        seq_list = []
-        header = ''
-        nseqs = 0
-        for line in self.fh:
-            line = line.strip()
-            if not line:
-                continue
-            if ">" == line[0]:
-                if(seq_list):
-                    nseqs += 1
-                    yield FSeq(header, ''.join(seq_list))
-                seq_list = []
-                header = line.split('>')[1]
-            elif header:
-                seq_list.append(line)
-            else:
-                print("First line must begin with '>'", file=sys.stderr)
-                raise SystemExit
-        if header:
-            nseqs += 1
-            yield FSeq(header, ''.join(seq_list))
-        if not nseqs:
-            print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
-            raise SystemExit
-
-class FSeq:
-    # The translator for taking reverse complements
-    revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
-    def __init__(self, header, seq):
-        self.seq = seq
-        self.header = header
-        self.headerfields = {}
-        self.colseq = ColorString()
-        self.colheader = ColorString()
-
-    def __hash__(self):
-        return(hash((self.header, self.seq)))
-
-    def __eq__(self, other):
-        return((self.header, self.seq) == (other.header, other.seq))
-
-    def parse_header(self):
-        '''
-        Parses headers of the format:
-           '>field_1|value_1|field_2|value_2|...|field_k|value_k| description (optional)
-        For example:
-            >locus|AT3G01015|taxon|3702|gi|186509637|gb|NP_186749.2| TPX2 targeting protein
-        '''
-        fields = self.header.split('|')
-        # If there is no delimitation with '|', set whatever there is to field
-        # 'header'
-        if(len(fields) == 1):
-            self.headerfields['header'] = fields[0]
-        else:
-            if(len(fields) % 2  == 1 and fields[-1]):
-                self.headerfields['desc'] = fields.pop().strip()
-            for i in range(0, len(fields), 2):
-                self.headerfields[fields[i].strip()] = fields[i+1].strip()
-
-    def getvalue(self, field, quiet=False, missing=''):
-        if not self.headerfields:
-            self.parse_header()
-        try:
-            return(self.headerfields[field])
-        except:
-            if missing:
-                return missing
-            if not quiet:
-                print("Header lacks field '{}'".format(field), file=sys.stderr)
-                print(self.header, file=sys.stderr)
-            raise SystemExit
-
-    def subseq(self, a, b):
-        try:
-            return(self.seq[a:b])
-        except IndexError as e:
-            print("Cannot extract subsequence ({}, {}) from".format(a,b))
-            print('>' + self.header)
-        except:
-            print("Unknown error in extraction of subsequence ({}, {}) from".format(a,b))
-            print('>' + self.header)
-
-    def ungap(self):
-        self.seq = re.sub('[._-]', '', self.seq)
-
-    def print(self, column_width=80):
-        if self.colheader.seq:
-            self.colheader.print(column_width)
-        else:
-            print('>' + self.header)
-        for i in range(0, len(self.seq), column_width):
-            if self.colseq.seq:
-                self.colseq.print(column_width)
-                break
-            else:
-                print(self.seq[i:i + column_width])
-
-    def get_pretty_string(self, column_width=80):
-        out = ['>' + self.header]
-        for i in range(0, len(self.seq), column_width):
-            out.append(self.seq[i:i + column_width])
-        outstr = '\n'.join(out)
-        return(outstr)
-
-    def seq_upper(self):
-        self.seq = self.seq.upper()
-
-    def header_upper(self):
-        self.header = self.header.upper()
-
-    @classmethod
-    def getrevcomp(cls, seq):
-        return(seq[::-1].translate(FSeq.revcomp_translator))
 
 class Colors:
     HIGHLIGHT = chr(27) + '[32m'
@@ -412,32 +276,133 @@ class FileDescription:
         return(case)
 
     def _handle_type(self, counts):
-        # If all chars are in ACGT
-        if set(counts) <= Alphabet.DNA:
-            stype = 'dna'
-        # If all chars in ACGU
-        elif set(counts) <= Alphabet.RNA:
-            stype = 'rna'
-        # If has any chars unique to proteins (EFILQPXJZ*)
-        elif set(counts) & Alphabet.PROT_EXC:
-            if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
-                stype = 'prot'
-            else:
-                stype = 'illegal'
-        # If all the residues could be aa, DNA, or RNA
-        elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
-            # If more than 80% look like nucleic acids, set 'amb_nucl'
-            if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-                stype = 'rna' if 'U' in counts else 'dna'
-            # Otherwise set as ambibuous
-            else:
-                stype = 'ambiguous'
-        # If none of these match, something is horribly wrong with your
-        # sequence
-        else:
-            stype = 'illegal'
+        stype = guess_type(counts)
         self.ntype[stype] += 1
         return(stype)
+
+class FileStat:
+    def __init__(self):
+        self.counts = Counter()
+        self.nseqs = 0
+        self.lengths = []
+
+    def add_seq(self, stat):
+        if stat.counts:
+            self.counts += stat.counts
+        self.nseqs += 1
+        self.lengths.append(stat.length)
+
+class FSeq:
+    # The translator for taking reverse complements
+    revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
+    def __init__(self, header, seq):
+        self.seq = seq
+        self.header = header
+        self.colseq = ColorString()
+        self.colheader = ColorString()
+
+    def __hash__(self):
+        return(hash((self.header, self.seq)))
+
+    def __eq__(self, other):
+        return((self.header, self.seq) == (other.header, other.seq))
+
+    def subseq(self, a, b):
+        try:
+            return(self.seq[a:b])
+        except IndexError as e:
+            print("Cannot extract subsequence ({}, {}) from".format(a,b))
+            print('>' + self.header)
+        except:
+            print("Unknown error in extraction of subsequence ({}, {}) from".format(a,b))
+            print('>' + self.header)
+
+    def ungap(self):
+        self.seq = re.sub('[._-]', '', self.seq)
+
+    def print(self, column_width=80):
+        if self.colheader.seq:
+            self.colheader.print(column_width)
+        else:
+            print('>' + self.header)
+        for i in range(0, len(self.seq), column_width):
+            if self.colseq.seq:
+                self.colseq.print(column_width)
+                break
+            else:
+                print(self.seq[i:i + column_width])
+
+    def get_pretty_string(self, column_width=80):
+        out = ['>' + self.header]
+        for i in range(0, len(self.seq), column_width):
+            out.append(self.seq[i:i + column_width])
+        outstr = '\n'.join(out)
+        return(outstr)
+
+    def seq_upper(self):
+        self.seq = self.seq.upper()
+
+    def header_upper(self):
+        self.header = self.header.upper()
+
+    @classmethod
+    def getrevcomp(cls, seq):
+        return(seq[::-1].translate(FSeq.revcomp_translator))
+
+class FSeqGenerator:
+    def __init__(self, fh=sys.stdin):
+        self.fh = fh
+
+    def next(self):
+        seq_list = []
+        header = ''
+        nseqs = 0
+        for line in self.fh:
+            line = line.strip()
+            if not line:
+                continue
+            if ">" == line[0]:
+                if(seq_list):
+                    nseqs += 1
+                    yield FSeq(header, ''.join(seq_list))
+                seq_list = []
+                header = line.split('>')[1]
+            elif header:
+                seq_list.append(line)
+            else:
+                print("First line must begin with '>'", file=sys.stderr)
+                raise SystemExit
+        if header:
+            nseqs += 1
+            yield FSeq(header, ''.join(seq_list))
+        if not nseqs:
+            print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
+            raise SystemExit
+
+class Maps:
+    DNA_AMB = {
+        'R':'AG',
+        'Y':'CT',
+        'S':'GC',
+        'W':'AT',
+        'K':'GT',
+        'M':'AC',
+        'B':'CGT',
+        'D':'AGT',
+        'H':'ACT',
+        'V':'ACG',
+        'N':'ACGT'
+    }
+
+class ParseHeader:
+    def firstword(h):
+        return(re.sub('^(\S+).*', '\\1', h))
+
+    def ncbi_format(h, fields):
+        raise NotImplemented
+
+    def regex_group(h, regex):
+        raise NotImplemented
 
 class SeqStat:
     def __init__(self, seq, count=True):
@@ -491,28 +456,6 @@ class SeqStat:
         header += list(sorted(charset))
 
         return(header)
-
-class FileStat:
-    def __init__(self):
-        self.counts = Counter()
-        self.nseqs = 0
-        self.lengths = []
-
-    def add_seq(self, stat):
-        if stat.counts:
-            self.counts += stat.counts
-        self.nseqs += 1
-        self.lengths.append(stat.length)
-
-class ParseHeader:
-    def firstword(h):
-        return(re.sub('^(\S+).*', '\\1', h))
-
-    def ncbi_format(h, fields):
-        raise NotImplemented
-
-    def regex_group(h, regex):
-        raise NotImplemented
 
 class StatFun:
     @classmethod
@@ -589,6 +532,7 @@ class StatFun:
 # =================
 
 def csvrowGenerator(filename):
+    import csv
     try:
         f = open(filename, 'r')
         dialect = csv.Sniffer().sniff(f.read(1024))
@@ -615,6 +559,60 @@ def counter_caser(counter, lower=False):
 def sum_lower(counter):
     lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
     return(sum(lc))
+
+def guess_type(counts):
+    '''
+    Predict sequence type from character counts (dna|rna|prot|ambiguous|illegal)
+    '''
+    # If all chars are in ACGT
+    if set(counts) <= Alphabet.DNA:
+        stype = 'dna'
+    # If all chars in ACGU
+    elif set(counts) <= Alphabet.RNA:
+        stype = 'rna'
+    # If has any chars unique to proteins (EFILQPXJZ*)
+    elif set(counts) & Alphabet.PROT_EXC:
+        if set(counts) <= Alphabet.PROT | Alphabet.PROT_AMB:
+            stype = 'prot'
+        else:
+            stype = 'illegal'
+    # If all the residues could be aa, DNA, or RNA
+    elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
+        # If more than 80% look like nucleic acids, set 'amb_nucl'
+        if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
+            stype = 'rna' if 'U' in counts else 'dna'
+        # Otherwise set as ambibuous
+        else:
+            stype = 'ambiguous'
+    # If none of these match, something is horribly wrong with your
+    # sequence
+    else:
+        stype = 'illegal'
+    return(stype)
+
+def headtailtrunk(seq, first, last):
+    '''
+    This function is used by the Head and Tail classes to portray partial
+    sections of sequences.
+    '''
+    if first and last:
+        if first + last < len(seq.seq):
+            seq.header = ParseHeader.firstword(seq.header) + \
+                    '|TRUNCATED:first-{}_last-{}'.format(first, last)
+            seq.seq = '{}{}{}'.format(
+                seq.seq[0:first],
+                '...',
+                seq.seq[-last:]
+            )
+    elif first:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:first-{}'.format(first)
+        seq.seq = seq.seq[0:first]
+    elif last:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:last-{}'.format(last)
+        seq.seq = seq.seq[-last:]
+    return(seq)
 
 
 # ====================
@@ -647,36 +645,36 @@ class Chksum(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Calculate an md5 checksum for the input sequences"
+            help="calculate an md5 checksum for the input sequences"
         )
         parser.add_argument(
             '-i', '--ignore-case',
-            help='Convert all to uppercase, before hashing',
+            help='convert all to uppercase, before hashing',
             action='store_true',
             default=False
         )
         method = parser.add_mutually_exclusive_group(required=False)
         method.add_argument(
             '-w', '--whole-file',
-            help='Calculate single md5sum for all headers and sequences (default action)',
+            help='calculate single md5sum for all headers and sequences (default action)',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-q', '--each-sequence',
-            help='Calculate md5sum for each sequence, write as TAB delimited list',
+            help='calculate md5sum for each sequence, write as TAB delimited list',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-s', '--all-sequences',
-            help='Calculate single md5sum for all sequences',
+            help='calculate single md5sum for all sequences',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-d', '--all-headers',
-            help='Calculate single md5sum for all headers',
+            help='calculate single md5sum for all headers',
             action='store_true',
             default=False
         )
@@ -713,167 +711,70 @@ class Chksum(Subcommand):
         if not args.each_sequence:
             yield md5hash.hexdigest()
 
-class Complexity(Subcommand):
-    def _parse(self):
-        cmd_name = 'complexity'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='Calculates linguistic complexity'
-        )
-        parser.add_argument(
-            '-k', '--alphabet-size',
-            help='Number of letters in the alphabet (4 for DNA, 20 for proteins)',
-            type=int,
-            metavar='INT',
-            default=4
-        )
-        parser.add_argument(
-            '-w', '--window-length',
-            help='Window length (if provided, output will average of window complexities)',
-            type=int,
-            metavar='INT',
-            default=100
-        )
-        parser.add_argument(
-            '-m', '--word-length',
-            help='Length of each word',
-            type=int,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-j', '--jump',
-            help='Distance between adjacent windows',
-            type=int,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-o', '--offset',
-            help='Index of start point',
-            type=int,
-            metavar='INT',
-            default=0
-        )
-        parser.add_argument(
-            '-d', '--drop',
-            help="Drop sequence if contains this character (e.g. 'X' or 'N')",
-            metavar='CHAR',
-            default=None
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        try:
-            w = int(args.window_length)
-            m = int(args.word_length)
-            k = pow(int(args.alphabet_size), m)
-            p = int(args.jump)
-            offset = int(args.offset)
-        except ValueError:
-            print('All values must be integers', file=sys.stderr)
-            raise SystemExit
-
-        # Calculates the variable component of a single window's score
-        def varscore_generator(seq, words):
-            for i in range(offset, len(seq) - w + 1, p):
-                counts = defaultdict(int)
-                for j in range(i, i+w):
-                    try:
-                        counts[words[j]] += 1
-                    except IndexError:
-                        break
-                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-        w_fact = math.log(math.factorial(w), k)
-
-        seq_id = 0
-        for seq in gen.next():
-            seq_id += 1
-            mean = 'NA'
-            var = 'NA'
-            if(len(seq.seq) < w + offset): pass
-            elif(args.drop and args.drop in seq.seq): pass
-            else:
-                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-                varscores = tuple(score for score in varscore_generator(seq.seq, words))
-                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-                mean = sum(winscores) / len(winscores)
-                try:
-                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-                except ZeroDivisionError:
-                    var = 'NA'
-                try:
-                    col1 = seq.getvalue('gb', quiet=True)
-                except:
-                    col1 = seq_id
-                yield "{},{},{}".format(col1, mean, var)
-
 class Clean(Subcommand):
     def _parse(self):
         cmd_name = 'clean'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Masks things (optionally), pretty prints")
+            help="masks things (optionally), pretty prints")
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
-            help='Sequence type'
+            help='sequence type'
         )
         parser.add_argument(
             '-u', '--toupper',
-            help="Convert to uppercase",
+            help="convert to uppercase",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-l', '--tolower',
-            help="Convert to lowercase",
+            help="convert to lowercase",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-x', '--toseq',
-            help="Removes all nonletter characters (gaps, stops, etc.)",
+            help="removes all nonletter characters (gaps, stops, etc.)",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-r', '--mask-irregular',
-            help="Converts irregular letters to unknown",
+            help="converts irregular letters to unknown",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-m', '--mask-lowercase',
-            help='Convert lower-case to unknown',
+            help='convert lower-case to unknown',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--nir',
-            help='Nucleotide irregulars [default=(not ACGT)]',
+            help='nucleotide irregulars [default=(not ACGT)]',
             metavar='STR',
             default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
         )
         parser.add_argument(
             '--pir',
             metavar='STR',
-            help='Protein irregulars [default=BJOUZbjouz]',
+            help='protein irregulars [default=BJOUZbjouz]',
             default='BJOUXZbjouxz'
         )
         parser.add_argument(
             '--nunk',
             metavar='CHAR',
-            help='Nucleotide unknown character (default=N)',
+            help='nucleotide unknown character (default=N)',
             default='N'
         )
         parser.add_argument(
             '--punk',
             metavar='CHAR',
-            help='Protein unknown character (default=X)',
+            help='protein unknown character (default=X)',
             default='X'
         )
         parser.set_defaults(func=self.func)
@@ -939,196 +840,100 @@ class Clean(Subcommand):
 
             yield seq
 
-class Stat(Subcommand):
+class Complexity(Subcommand):
     def _parse(self):
-        cmd_name = 'stat'
+        cmd_name = 'complexity'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Calculate sequence statistics")
-        parser.add_argument(
-            '-d', '--delimiter',
-            help='Output delimiter'
+            help='calculates linguistic complexity'
         )
         parser.add_argument(
-            '-q', '--byseq',
-            help='Write a line for each sequence',
-            default=False,
-            action='store_true'
+            '-k', '--alphabet-size',
+            help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
+            type=int,
+            metavar='INT',
+            default=4
         )
         parser.add_argument(
-            '-I', '--case-sensitive',
-            help='Match case',
-            default=False,
-            action='store_true'
+            '-w', '--window-length',
+            help='window length (if provided, output will average of window complexities)',
+            type=int,
+            metavar='INT',
+            default=100
         )
         parser.add_argument(
-            '-m', '--count-lower',
-            help='Count the number of lowercase characters',
-            default=False,
-            action='store_true'
+            '-m', '--word-length',
+            help='length of each word',
+            type=int,
+            metavar='INT',
+            default=1
         )
         parser.add_argument(
-            '-c', '--counts',
-            help='Write counts of all characters',
-            default=False,
-            action='store_true'
+            '-j', '--jump',
+            help='distance between adjacent windows',
+            type=int,
+            metavar='INT',
+            default=1
         )
         parser.add_argument(
-            '-l', '--length',
-            help='Write sequence length',
-            default=False,
-            action='store_true'
+            '-o', '--offset',
+            help='index of start point',
+            type=int,
+            metavar='INT',
+            default=0
         )
         parser.add_argument(
-            '-p', '--proportion',
-            help='Write proportion of each character',
-            default=False,
-            action='store_true'
+            '-d', '--drop',
+            help="drop sequence if contains this character (e.g. 'X' or 'N')",
+            metavar='CHAR',
+            default=None
         )
         parser.set_defaults(func=self.func)
 
-    def _process_args(self, args):
-        # If no output options are specified, do length stats
-        if not any((args.counts, args.length, args.proportion, args.count_lower)):
-            args.length = True
-        return(args)
+    def generator(self, args, gen):
+        from collection import defaultdict
+        try:
+            w = int(args.window_length)
+            m = int(args.word_length)
+            k = pow(int(args.alphabet_size), m)
+            p = int(args.jump)
+            offset = int(args.offset)
+        except ValueError:
+            print('All values must be integers', file=sys.stderr)
+            raise SystemExit
 
-    def _byfile(self, args, gen):
-        g = FileStat()
-        # Do I need to count the characters? (much faster if I don't)
-        need_count = args.counts or args.proportion or args.count_lower
+        # Calculates the variable component of a single window's score
+        def varscore_generator(seq, words):
+            for i in range(offset, len(seq) - w + 1, p):
+                counts = defaultdict(int)
+                for j in range(i, i+w):
+                    try:
+                        counts[words[j]] += 1
+                    except IndexError:
+                        break
+                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
+
+        w_fact = math.log(math.factorial(w), k)
+
         for seq in gen.next():
-            g.add_seq(SeqStat(seq, count=need_count))
-
-        if need_count:
-            lower = sum_lower(g.counts) if args.count_lower else None
-
-            if not args.case_sensitive:
-                g.counts = counter_caser(g.counts)
-
-            N = sum(g.lengths)
-            slen = str(len(str(max(g.counts.values()))) + 2)
-            count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
-            if args.counts ^ args.proportion:
-                for k,v in count_iter:
-                    val = v/N if args.proportion else v
-                    if args.counts:
-                        exp = "{}{:>%sd}" % slen
-                    else:
-                        exp = "{}{:>11.5%}"
-                    yield(exp.format(k,val))
-            elif args.counts and args.proportion:
-                for k,v in count_iter:
-                    outstr = "{}{:>" + slen + "d}{:>11.5%}"
-                    yield(outstr.format(k,v,v/N))
-
-            if args.count_lower:
-                yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
-
-        if args.length:
-            total = sum(g.lengths)
-            N = len(g.lengths)
-            if N > 1:
-                s = StatFun.summary(g.lengths)
-
-                # Yield total number of sequences
-                yield("{:10s} {}".format('nseq:', len(g.lengths)))
-
-                # Yield totla number of letters
-                yield("{:10s} {}".format('nchars:', sum(g.lengths)))
-
-                # Yield five number summary of sequence lengths
-                fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
-                fivesum_str = "{:10s} {} {} {} {} {}"
-                yield(fivesum_str.format('5sum:', *fivesum))
-
-                # Yield mean and standard deviation
-                meansd_str="{:10s} {:d} ({:d})"
-                yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
-
-                # Yield N50
-                yield("{:10s} {}".format('N50:', s['N50']))
+            mean = 'NA'
+            var = 'NA'
+            if(len(seq.seq) < w + offset): pass
+            elif(args.drop and args.drop in seq.seq): pass
             else:
-                lstr = ', '.join([str(x) for x in sorted(g.lengths)])
-                yield("nchars: {}".format(lstr))
+                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
+                varscores = tuple(score for score in varscore_generator(seq.seq, words))
+                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
+                mean = sum(winscores) / len(winscores)
+                try:
+                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
+                except ZeroDivisionError:
+                    var = 'NA'
 
-    def _byseq(self, args, gen):
-        seqlist = []
-        charset = set()
-        if args.length and not (args.counts or args.proportion):
-            delimiter = args.delimiter if args.delimiter else '\t'
-            for seq in gen.next():
                 seqid = ParseHeader.firstword(seq.header)
-                yield("{}{}{}".format(seqid, delimiter, len(seq.seq)))
-        else:
-            for seq in gen.next():
-                seqstat = SeqStat(seq)
-                seqlist.append(seqstat)
-                charset.update(seqstat.counts)
 
-            delimiter = args.delimiter if args.delimiter else ','
-            joiner = lambda s,d: '{}'.format(d).join([str(x) for x in s])
-
-            ignorecase = not args.case_sensitive
-            kwargs = {'masked':args.count_lower,
-                    'length':args.length,
-                    'ignorecase':ignorecase}
-
-            yield joiner(SeqStat.getheader(charset, **kwargs), delimiter)
-
-            for q in seqlist:
-                line = q.aslist(charset=charset,
-                                header_fun=ParseHeader.firstword,
-                                **kwargs)
-                yield(joiner(line, delimiter))
-
-    def generator(self, args, gen):
-        args = self._process_args(args)
-        if args.byseq:
-            g = self._byseq(args, gen)
-        else:
-            g = self._byfile(args, gen)
-        for item in g:
-            yield(item)
-
-class Subseq(Subcommand):
-    def _parse(self):
-        cmd_name = 'subseq'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Extract subsequence from each entry")
-        parser.add_argument(
-            'bounds',
-            help="from and to values (indexed from 1)",
-            nargs=2,
-            type=int)
-        parser.add_argument(
-            '-r', '--revcomp',
-            help='Take the reverse complement if bounds[0] > bounds[1]',
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        ''' Index starting from 1 (not 0) '''
-        for seq in gen.next():
-            a = args.bounds[0]
-            b = args.bounds[1]
-            # If a > b, take reverse complement if that option is enabled,
-            # if not die
-            if(a > b):
-                if(args.revcomp):
-                    newseq = FSeq.getrevcomp(seq.seq[b-1:a])
-                else:
-                    print('Lower bound cannot be greater than upper bound ' + \
-                        '(do you want reverse complement? See options)', file=sys.stderr)
-                    sys.exit()
-            # If b >= a, this is a normal forward sequence
-            else:
-                newseq = seq.seq[a-1:b]
-            yield FSeq(seq.header, newseq)
+                yield "{}\t{:.5f}\t{:.4e}".format(seqid, mean, var)
 
 class Fasta2csv(Subcommand):
     def _parse(self):
@@ -1136,41 +941,26 @@ class Fasta2csv(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Converts a fasta file to 2-column csv")
+            help="converts a fasta file to 2-column csv")
         parser.add_argument(
             '-d', '--delimiter',
-            help="Set delimiter (',' by default)",
+            help="set delimiter (TAB by default)",
             metavar='CHAR',
-            default=',')
+            default='\t')
         parser.add_argument(
             '-r', '--header',
-            help='Write header (default=False)',
+            help='write header (default=False)',
             action='store_true',
             default=False)
-        parser.add_argument(
-            '-f', '--fields',
-            help='Extract given fields from the header',
-            metavar='STR',
-            nargs='+')
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         if(args.header):
-            if(args.fields):
-                yield args.fields + ['seq']
-            else:
-                yield ['header', 'seq']
-        for seq in gen.next():
-            if(args.fields):
-                row = [seq.getvalue(field) for field in args.fields]
-            else:
-                row = [seq.header]
-            yield tuple(row + [seq.seq])
+            yield 'seqid{}seq'.format(args.delimiter)
 
-    def write(self, args, gen):
-        w = csv.writer(sys.stdout, delimiter=args.delimiter)
-        for row in self.generator(args, gen):
-            w.writerow(row)
+        for seq in gen.next():
+            seqid = ParseHeader.firstword(seq.header)
+            yield '{}{}{}'.format(seqid, args.delimiter, seq.seq)
 
 class Perm(Subcommand):
     def _parse(self):
@@ -1178,37 +968,33 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly order sequence"
+            help="randomly order sequence"
         )
         parser.add_argument(
             '-w', '--word-size',
-            help='Size of each word (default=1)',
+            help='size of each word (default=1)',
             type=int,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-s', '--start-offset',
-            help='Number of letters to ignore at beginning (default=0)',
+            help='number of letters to ignore at beginning (default=0)',
             type=int,
             metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
-            help='Number of letters to ignore at end (default=0)',
+            help='number of letters to ignore at end (default=0)',
             type=int,
             metavar='INT',
             default=0
         )
-        parser.add_argument(
-            '-f', '--field',
-            metavar='STR',
-            help="Header field (e.g. 'gi' or 'locus')"
-        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        import random
         w = args.word_size
         start = args.start_offset
         end = args.end_offset
@@ -1223,11 +1009,24 @@ class Perm(Subcommand):
             words.append(rseq[(M - M % w):M])
             random.shuffle(words)
             out = ''.join(prefix + ''.join(words) + suffix)
-            if(args.field):
-                header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
-            else:
-                header=seq.header
+            header='{}|PERMUTATION:start={};end={};word_size={}'.format(
+                ParseHeader.firstword(seq.header), start, end, w)
             yield FSeq(header, out)
+
+class Reverse(Subcommand):
+    def _parse(self):
+        cmd_name = 'reverse'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="reverse each sequence (NOT reverse complement)")
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        ''' Reverse each sequence '''
+        for seq in gen.next():
+            header='{}|REVERSED'.format(ParseHeader.firstword(seq.header))
+            yield FSeq(header, seq.seq[::-1])
 
 class Sniff(Subcommand):
     def _parse(self):
@@ -1235,7 +1034,7 @@ class Sniff(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Extract info about the sequence"
+            help="extract info about the sequence"
         )
         parser.set_defaults(func=self.func)
 
@@ -1289,19 +1088,251 @@ class Sniff(Subcommand):
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
         write_feat(seqsum.ufeat, "Universal Features:", nseqs)
 
-class Reverse(Subcommand):
+class Stat(Subcommand):
     def _parse(self):
-        cmd_name = 'reverse'
+        cmd_name = 'stat'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Reverse each sequence (NOT reverse complement)")
+            help="calculate sequence statistics")
+        parser.add_argument(
+            '-d', '--delimiter',
+            help='output delimiter'
+        )
+        parser.add_argument(
+            '-q', '--byseq',
+            help='write a line for each sequence',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-I', '--case-sensitive',
+            help='match case',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-m', '--count-lower',
+            help='count the number of lowercase characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-c', '--counts',
+            help='write counts of all characters',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-t', '--type',
+            help='guess sequence type',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-l', '--length',
+            help='write sequence length',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-p', '--proportion',
+            help='write proportion of each character',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-g', '--hist',
+            help='write ascii histogram of sequence lengths',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
+            '-G', '--log-hist',
+            help='write ascii histogram of sequence log2 lengths',
+            default=False,
+            action='store_true'
+        )
+        parser.set_defaults(func=self.func)
+
+    def _process_args(self, args):
+        # If no output options are specified, do length stats
+        if not any((args.counts, args.type, args.length, args.proportion, args.count_lower)):
+            args.length = True
+        return(args)
+
+    def _byfile(self, args, gen):
+        g = FileStat()
+        # Do I need to count the characters? (much faster if I don't)
+        need_count = any((args.counts, args.proportion, args.count_lower, args.type))
+        for seq in gen.next():
+            g.add_seq(SeqStat(seq, count=need_count))
+
+        if need_count:
+            lower = sum_lower(g.counts) if args.count_lower else None
+
+            if not args.case_sensitive:
+                g.counts = counter_caser(g.counts)
+
+            if args.type:
+                yield(guess_type(g.counts))
+
+            N = sum(g.lengths)
+            slen = str(len(str(max(g.counts.values()))) + 2)
+            count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
+            if args.counts ^ args.proportion:
+                for k,v in count_iter:
+                    val = v/N if args.proportion else v
+                    if args.counts:
+                        exp = "{}{:>%sd}" % slen
+                    else:
+                        exp = "{}{:>11.5%}"
+                    yield(exp.format(k,val))
+            elif args.counts and args.proportion:
+                for k,v in count_iter:
+                    outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                    yield(outstr.format(k,v,v/N))
+
+            if args.count_lower:
+                yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+
+        if args.length:
+            total = sum(g.lengths)
+            N = len(g.lengths)
+            if N > 1:
+                s = StatFun.summary(g.lengths)
+
+                # Yield total number of sequences
+                yield("{:10s} {}".format('nseq:', len(g.lengths)))
+
+                # Yield totla number of letters
+                yield("{:10s} {}".format('nchars:', sum(g.lengths)))
+
+                # Yield five number summary of sequence lengths
+                fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
+                fivesum_str = "{:10s} {} {} {} {} {}"
+                yield(fivesum_str.format('5sum:', *fivesum))
+
+                # Yield mean and standard deviation
+                meansd_str="{:10s} {:d} ({:d})"
+                yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
+
+                # Yield N50
+                yield("{:10s} {}".format('N50:', s['N50']))
+            else:
+                lstr = ', '.join([str(x) for x in sorted(g.lengths)])
+                yield("nchars: {}".format(lstr))
+
+        if args.hist or args.log_hist:
+            try:
+                import numpy
+            except ImportError:
+                print('Please install numpy (needed for histograms)', file=sys.stderr)
+                raise SystemExit
+
+            if args.log_hist:
+                lengths = [math.log(x, 2) for x in g.lengths]
+            else:
+                lengths = g.lengths
+            height = 10
+            width = 60
+            n = numpy.histogram(lengths, bins=width)[0]
+            n = [height * x / max(n) for x in n]
+            yield(' ' + '-' * width)
+            for h in reversed(range(height)):
+                out = ['|']
+                for w in range(width):
+                    dif = n[w] - h
+                    if dif <= 0:
+                        out.append(' ')
+                    elif dif < 0.25:
+                        out.append('.')
+                    elif dif < 0.5:
+                        out.append('~')
+                    elif dif < 0.75:
+                        out.append('*')
+                    else:
+                        out.append('O')
+                out.append('|')
+                yield(''.join(out))
+            yield(' ' + '-' * width)
+
+    def _byseq(self, args, gen):
+        seqlist = []
+        charset = set()
+        if args.length and not (args.counts or args.proportion):
+            delimiter = args.delimiter if args.delimiter else '\t'
+            for seq in gen.next():
+                seqid = ParseHeader.firstword(seq.header)
+                yield("{}{}{}".format(seqid, delimiter, len(seq.seq)))
+        else:
+            for seq in gen.next():
+                seqstat = SeqStat(seq)
+                seqlist.append(seqstat)
+                charset.update(seqstat.counts)
+
+            delimiter = args.delimiter if args.delimiter else ','
+            joiner = lambda s,d: '{}'.format(d).join([str(x) for x in s])
+
+            ignorecase = not args.case_sensitive
+            kwargs = {'masked':args.count_lower,
+                    'length':args.length,
+                    'ignorecase':ignorecase}
+
+            yield joiner(SeqStat.getheader(charset, **kwargs), delimiter)
+
+            for q in seqlist:
+                line = q.aslist(charset=charset,
+                                header_fun=ParseHeader.firstword,
+                                **kwargs)
+                yield(joiner(line, delimiter))
+
+    def generator(self, args, gen):
+        args = self._process_args(args)
+        if args.byseq:
+            g = self._byseq(args, gen)
+        else:
+            g = self._byfile(args, gen)
+        for item in g:
+            yield(item)
+
+class Subseq(Subcommand):
+    def _parse(self):
+        cmd_name = 'subseq'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="extract subsequence from each entry")
+        parser.add_argument(
+            'bounds',
+            help="from and to values (indexed from 1)",
+            nargs=2,
+            type=int)
+        parser.add_argument(
+            '-r', '--revcomp',
+            help='take the reverse complement if bounds[0] > bounds[1]',
+            action='store_true',
+            default=False)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        ''' Reverse each sequence '''
+        ''' Index starting from 1 (not 0) '''
         for seq in gen.next():
-            yield FSeq(seq.header, seq.seq[::-1])
+            a = args.bounds[0]
+            b = args.bounds[1]
+            # If a > b, take reverse complement if that option is enabled,
+            # if not die
+            if(a > b):
+                if(args.revcomp):
+                    newseq = FSeq.getrevcomp(seq.seq[b-1:a])
+                else:
+                    print('Lower bound cannot be greater than upper bound ' + \
+                        '(do you want reverse complement? See options)', file=sys.stderr)
+                    sys.exit()
+            # If b >= a, this is a normal forward sequence
+            else:
+                newseq = seq.seq[a-1:b]
+            yield FSeq(seq.header, newseq)
 
 class Winnow(Subcommand):
     def _parse(self):
@@ -1309,40 +1340,40 @@ class Winnow(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Remove sequences which meet given conditions"
+            help="remove sequences which meet given conditions"
         )
         parser.add_argument(
             '-c', '--contain',
             metavar='STR',
-            help="Remove if contains any of these characters"
+            help="remove if contains any of these characters"
         )
         parser.add_argument(
             '-C', '--not-contain',
             metavar='STR',
-            help="Remove if contains any of these characters"
+            help="remove if contains any of these characters"
         )
         parser.add_argument(
             '-s', '--shorter-than',
-            help="Remove if sequence is shorter than i",
+            help="remove if sequence is shorter than i",
             metavar='INT',
             type=int
         )
         parser.add_argument(
             '-S', '--longer-than',
-            help="Remove if sequence is longer than i",
+            help="remove if sequence is longer than i",
             metavar='INT',
             type=int
         )
         parser.add_argument(
             '-v', '--invert',
-            help="Invert selection",
+            help="invert selection",
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-p', '--composition',
             metavar='EXPR',
-            help="Composition (e.g. -p 'GC < 0.5')"
+            help="composition (e.g. -p 'GC < 0.5')"
         )
         parser.set_defaults(func=self.func)
 
@@ -1400,20 +1431,88 @@ class Sample(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Randomly select entries from fasta file")
+            help="randomly select entries from fasta file")
         parser.add_argument(
             'n',
-            help="Sample size",
+            help="sample size",
             type=int,
             default=1)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
+        import random
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
             yield seqs[i]
+
+class Sort(Subcommand):
+    def _parse(self):
+        cmd_name = 'sort'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="sort sequences")
+        parser.add_argument(
+            '-x', '--regex',
+            help="sort by single regex capture")
+        parser.add_argument(
+            '-r', '--reverse',
+            help="reverse sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-n', '--numeric',
+            help="numeric sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-l', '--length',
+            help='sort by sequence length',
+            action='store_true',
+            default=False)
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        seqs = [s for s in gen.next()]
+
+        # Set type of order determining variable
+        if args.numeric:
+            def typer(x):
+                try:
+                    return(float(x))
+                except ValueError:
+                    print("'{}' cannot be numerically sorted".format(x), file=sys.stderr)
+                    raise SystemExit
+        else:
+            def typer(x):
+                return(x)
+
+        # Set search term
+        if args.regex:
+            r = re.compile(args.regex)
+            def sortterm(x):
+                try:
+                    capture = re.search(r, x.header).groups()[0]
+                    return(typer(capture))
+                except AttributeError:
+                    print("No match for regex '{}'".format(args.regex), file=sys.stderr)
+                    raise SystemExit
+                except IndexError:
+                    print("Nothing was captured in regex '{}'".format(args.regex), file=sys.stderr)
+                    raise SystemExit
+        elif args.length:
+            def sortterm(x):
+                return(len(x.seq))
+        else:
+            def sortterm(x):
+                return(x.header)
+
+        seqs.sort(key=lambda x: sortterm(x), reverse=args.reverse)
+
+        for s in seqs:
+            yield s
 
 class Split(Subcommand):
     def _parse(self):
@@ -1421,15 +1520,15 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='Split a multifasta file into k smaller files'
+            help='split a multifasta file into k smaller files'
         )
         parser.add_argument(
             '-n', '--nfiles',
-            help='Number of output files'
+            help='number of output files'
         )
         parser.add_argument(
             '-p', '--prefix',
-            help='Prefix for output files',
+            help='prefix for output files',
             default='xxx'
         )
         parser.set_defaults(func=self.func)
@@ -1450,29 +1549,47 @@ class Split(Subcommand):
                 for seq in (seqs[x] for x in range(begin, end)):
                     fo.write(seq.get_pretty_string() + '\n')
 
-class Sort(Subcommand):
-    def _parse(self):
-        cmd_name = 'sort'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
-        parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        seqs = [s for s in gen.next()]
-        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
-        for s in seqs:
-            yield s
-
 
 # ==============
 # UNIX EMULATORS
 # ==============
+
+class Head(Subcommand):
+    def _parse(self):
+        cmd_name = 'head'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Write first N sequences (default=1)"
+        )
+        parser.add_argument(
+            '-n', '--nseqs',
+            help='print N sequences',
+            metavar='N',
+            type=int,
+            default=1
+        )
+        parser.add_argument(
+            '-f', '--first',
+            help='print first K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.add_argument(
+            '-l', '--last',
+            help='print last K letters of each sequence',
+            metavar='K',
+            type=int
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        i = 1
+        for seq in gen.next():
+            yield headtailtrunk(seq, args.first, args.last)
+            if i == args.nseqs:
+                break
+            i += 1
 
 class Grep(Subcommand):
     def _parse(self):
@@ -1480,17 +1597,17 @@ class Grep(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Roughly emulates the UNIX grep command"
+            help="roughly emulates the UNIX grep command"
         )
         parser.add_argument(
             'patterns',
             metavar='PATTERNS',
-            help='Patterns to match',
+            help='patterns to match',
             nargs='*'
         )
         parser.add_argument(
             '-q', '--match-sequence',
-            help='Match sequence rather than header',
+            help='match sequence rather than header',
             action='store_true',
             default=False
         )
@@ -1498,22 +1615,22 @@ class Grep(Subcommand):
             '-f', '--file',
             metavar='FILE',
             type=argparse.FileType('r'),
-            help='Obtain patterns from FILE, one per line'
+            help='obtain patterns from FILE, one per line'
         )
         parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
-            help='A regular expression to capture PATTERNS'
+            help='a regular expression to capture PATTERNS'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
-            help='Treat PATTERNS as perl regular expressions',
+            help='treat PATTERNS as perl regular expressions',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-B', '--ambiguous-nucl',
-            help='Parse extended nucleotide alphabet',
+            help='parse extended nucleotide alphabet',
             action='store_true',
             default=False
         )
@@ -1525,49 +1642,49 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-v', '--invert-match',
-            help='Print non-matching entries',
+            help='print non-matching entries',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-c', '--count',
-            help='Print number of entries with matches',
+            help='print number of entries with matches',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-m', '--count-matches',
-            help='Print number of non-overlapping matches',
+            help='print number of non-overlapping matches',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-b', '--both-strands',
-            help='Search both strands',
+            help='search both strands',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-r', '--reverse-only',
-            help='Only search the reverse strand',
+            help='only search the reverse strand',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--color',
-            help='Print in color',
+            help='print in color',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--gff',
-            help='Output matches in gff format',
+            help='output matches in gff format',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '--gff-type',
-            help='Name of searched feature',
+            help='name of searched feature',
             metavar='STR',
             default='regex_match'
         )
@@ -1780,35 +1897,72 @@ class Grep(Subcommand):
         for item in sgen(gen, matcher):
             yield item
 
+class Rename(Subcommand):
+    def _parse(self):
+        cmd_name = 'rename'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="Larry Wall's rename pythonized for headers"
+        )
+        parser.add_argument(
+            'pattern',
+            metavar='PATTERN',
+            help="regex pattern"
+        )
+        parser.add_argument(
+            'replacement',
+            metavar='REPLACEMENT',
+            nargs='?',
+            default='',
+            help="regex replacement (default='', i.e. delete PATTERN)"
+        )
+        parser.add_argument(
+            'headers',
+            metavar='HEADERS',
+            nargs='?',
+            default=None,
+            help="regex to select headers (if not supplied, select all)"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        matcher = re.compile(args.headers) if args.headers else None
+        for seq in gen.next():
+            if not matcher or re.search(matcher, seq.header):
+                seq.header = re.sub(args.pattern, args.replacement, seq.header)
+            yield seq
+
 class Uniq(Subcommand):
     def _parse(self):
         cmd_name = 'uniq'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Emulates UNIX uniq command (prior sorting needless)"
+            help="emulates UNIX uniq command (prior sorting needless)"
         )
         parser.add_argument(
             '-c', '--count',
-            help='Writes (count|header) in tab-delimited format',
+            help='writes (count|header) in tab-delimited format',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-d', '--repeated',
-            help='Print only repeated entries',
+            help='print only repeated entries',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-u', '--uniq',
-            help='Print only unique entries',
+            help='print only unique entries',
             action='store_true',
             default=False
         )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        from collections import defaultdict
         seqs = defaultdict(int)
         for seq in gen.next():
             seqs[seq] += 1
@@ -1833,17 +1987,17 @@ class Wc(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Roughly emulates the UNIX wc command"
+            help="roughly emulates the UNIX wc command"
         )
         parser.add_argument(
             '-m', '--chars',
-            help='Writes the summed length of all sequences',
+            help='writes the summed length of all sequences',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-l', '--lines',
-            help='Writes the total number of sequences',
+            help='writes the total number of sequences',
             action='store_true',
             default=False
         )
@@ -1866,41 +2020,47 @@ class Wc(Subcommand):
         else:
             print("{}\t{}".format(nseqs, nchars))
 
-class Rename(Subcommand):
+class Tail(Subcommand):
     def _parse(self):
-        cmd_name = 'rename'
+        cmd_name = 'tail'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Larry Wall's rename pythonized for headers"
+            help="Write last N sequences (default=1)"
         )
         parser.add_argument(
-            'pattern',
-            metavar='PATTERN',
-            help="Regex pattern"
+            '-n', '--nseqs',
+            help='print N sequences',
+            metavar='N',
+            type=int,
+            default=1
         )
         parser.add_argument(
-            'replacement',
-            metavar='REPLACEMENT',
-            nargs='?',
-            default='',
-            help="Regex replacement (default='', i.e. delete PATTERN)"
+            '-f', '--first',
+            help='print first K letters of each sequence',
+            metavar='K',
+            type=int
         )
         parser.add_argument(
-            'headers',
-            metavar='HEADERS',
-            nargs='?',
-            default=None,
-            help="Regex to select headers (if not supplied, select all)"
+            '-l', '--last',
+            help='print last K letters of each sequence',
+            metavar='K',
+            type=int
         )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        matcher = re.compile(args.headers) if args.headers else None
+        from collections import deque
+        try:
+            lastseqs = deque(maxlen=args.nseqs)
+        except ValueError:
+            print('--nseqs argument must be positive', file=sys.stderr)
+            raise SystemExit
         for seq in gen.next():
-            if not matcher or re.search(matcher, seq.header):
-                seq.header = re.sub(args.pattern, args.replacement, seq.header)
-            yield seq
+            lastseqs.append(seq)
+
+        for s in lastseqs:
+            yield headtailtrunk(s, args.first, args.last)
 
 
 # =======
