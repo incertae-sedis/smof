@@ -999,11 +999,6 @@ class Perm(Subcommand):
             metavar='INT',
             default=0
         )
-        parser.add_argument(
-            '-f', '--field',
-            metavar='STR',
-            help="Header field (e.g. 'gi' or 'locus')"
-        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1021,10 +1016,8 @@ class Perm(Subcommand):
             words.append(rseq[(M - M % w):M])
             random.shuffle(words)
             out = ''.join(prefix + ''.join(words) + suffix)
-            if(args.field):
-                header='|'.join((args.field, seq.getvalue(args.field), 'start', str(start), 'end', str(end), 'word_size', str(w)))
-            else:
-                header=seq.header
+            header='{}|PERMUTATION:start={};end={};word_size={}'.format(
+                ParseHeader.firstword(seq.header), start, end, w)
             yield FSeq(header, out)
 
 class Reverse(Subcommand):
