@@ -138,9 +138,9 @@ class ColorString:
             else:
                 lastcol = self.seq[i][0]
         for i in range(len(self.seq)):
-            print(''.join(self.seq[i]), end='')
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
+            print(''.join(self.seq[i]), end='')
         print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
