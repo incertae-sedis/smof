@@ -795,9 +795,7 @@ class Complexity(Subcommand):
 
         w_fact = math.log(math.factorial(w), k)
 
-        seq_id = 0
         for seq in gen.next():
-            seq_id += 1
             mean = 'NA'
             var = 'NA'
             if(len(seq.seq) < w + offset): pass
@@ -811,11 +809,10 @@ class Complexity(Subcommand):
                     var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
                 except ZeroDivisionError:
                     var = 'NA'
-                try:
-                    col1 = seq.getvalue('gb', quiet=True)
-                except:
-                    col1 = seq_id
-                yield "{},{},{}".format(col1, mean, var)
+
+                seqid = ParseHeader.firstword(seq.header)
+
+                yield "{}\t{:.5f}\t{:.4e}".format(seqid, mean, var)
 
 class Clean(Subcommand):
     def _parse(self):
