@@ -821,7 +821,12 @@ class Clean(Subcommand):
             if irr:
                 trans = str.maketrans(a, b)
 
+        colorpat = re.compile(chr(27) + '\[\d+m')
         for seq in gen.next():
+
+            # Remove color
+            seq.seq = re.sub(colorpat, '', seq.seq)
+
             # Irregular or lowercase to unknown
             if trans:
                 seq.seq = seq.seq.translate(trans)
