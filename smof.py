@@ -1459,16 +1459,64 @@ class Sort(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Sort sequences by given fields")
+            help="Sort sequences")
         parser.add_argument(
-            'fields',
-            help="Header fields by which to sort sequences",
-            nargs='+')
+            '-x', '--regex',
+            help="Sort by single regex capture")
+        parser.add_argument(
+            '-r', '--reverse',
+            help="Reverse sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-n', '--numeric',
+            help="Numeric sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-l', '--length',
+            help='Sort by sequence length',
+            action='store_true',
+            default=False)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         seqs = [s for s in gen.next()]
-        seqs.sort(key=lambda x: list(x.getvalue(y) for y in args.fields))
+
+        # Set type of order determining variable
+        if args.numeric:
+            def typer(x):
+                try:
+                    return(float(x))
+                except ValueError:
+                    print("'{}' cannot be numerically sorted".format(x), file=sys.stderr)
+                    raise SystemExit
+        else:
+            def typer(x):
+                return(x)
+
+        # Set search term
+        if args.regex:
+            r = re.compile(args.regex)
+            def sortterm(x):
+                try:
+                    capture = re.search(r, x.header).groups()[0]
+                    return(typer(capture))
+                except AttributeError:
+                    print("No match for regex '{}'".format(args.regex), file=sys.stderr)
+                    raise SystemExit
+                except IndexError:
+                    print("Nothing was captured in regex '{}'".format(args.regex), file=sys.stderr)
+                    raise SystemExit
+        elif args.length:
+            def sortterm(x):
+                return(len(x.seq))
+        else:
+            def sortterm(x):
+                return(x.header)
+
+        seqs.sort(key=lambda x: sortterm(x), reverse=args.reverse)
+
         for s in seqs:
             yield s
 
