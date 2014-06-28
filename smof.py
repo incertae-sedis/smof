@@ -1032,7 +1032,8 @@ class Reverse(Subcommand):
     def generator(self, args, gen):
         ''' Reverse each sequence '''
         for seq in gen.next():
-            yield FSeq(seq.header, seq.seq[::-1])
+            header='{}|REVERSED'.format(ParseHeader.firstword(seq.header))
+            yield FSeq(header, seq.seq[::-1])
 
 class Sniff(Subcommand):
     def _parse(self):
