@@ -1,14 +1,10 @@
 #! /usr/bin/python3
 
 import argparse
-import csv
-import random
 import math
 import re
 import sys
 import string
-from collections import defaultdict
-from hashlib import md5
 from collections import Counter
 
 __version__ = "1.4.1"
@@ -568,6 +564,7 @@ class StatFun:
 # =================
 
 def csvrowGenerator(filename):
+    import csv
     try:
         f = open(filename, 'r')
         dialect = csv.Sniffer().sniff(f.read(1024))
@@ -903,6 +900,7 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        from collection import defaultdict
         try:
             w = int(args.window_length)
             m = int(args.word_length)
@@ -1004,6 +1002,7 @@ class Perm(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        import random
         w = args.word_size
         start = args.start_offset
         end = args.end_offset
@@ -1450,6 +1449,7 @@ class Sample(Subcommand):
 
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
+        import random
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
@@ -1990,6 +1990,7 @@ class Uniq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
+        from collections import defaultdict
         seqs = defaultdict(int)
         for seq in gen.next():
             seqs[seq] += 1
@@ -2077,9 +2078,9 @@ class Tail(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        import collections
+        from collections import deque
         try:
-            lastseqs = collections.deque(maxlen=args.nseqs)
+            lastseqs = deque(maxlen=args.nseqs)
         except ValueError:
             print('--nseqs argument must be positive', file=sys.stderr)
             raise SystemExit
