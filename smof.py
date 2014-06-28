@@ -590,6 +590,30 @@ def guess_type(counts):
         stype = 'illegal'
     return(stype)
 
+def headtailtrunk(seq, first, last):
+    '''
+    This function is used by the Head and Tail classes to portray partial
+    sections of sequences.
+    '''
+    if first and last:
+        if first + last < len(seq.seq):
+            seq.header = ParseHeader.firstword(seq.header) + \
+                    '|TRUNCATED:first-{}_last-{}'.format(first, last)
+            seq.seq = '{}{}{}'.format(
+                seq.seq[0:first],
+                '...',
+                seq.seq[-last:]
+            )
+    elif first:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:first-{}'.format(first)
+        seq.seq = seq.seq[0:first]
+    elif last:
+        seq.header = ParseHeader.firstword(seq.header) + \
+                '|TRUNCATED:last-{}'.format(last)
+        seq.seq = seq.seq[-last:]
+    return(seq)
+
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -1529,26 +1553,6 @@ class Split(Subcommand):
 # ==============
 # UNIX EMULATORS
 # ==============
-
-def headtailtrunk(seq, first, last):
-    if first and last:
-        if first + last < len(seq.seq):
-            seq.header = ParseHeader.firstword(seq.header) + \
-                    '|TRUNCATED:first-{}_last-{}'.format(first, last)
-            seq.seq = '{}{}{}'.format(
-                seq.seq[0:first],
-                '...',
-                seq.seq[-last:]
-            )
-    elif first:
-        seq.header = ParseHeader.firstword(seq.header) + \
-                '|TRUNCATED:first-{}'.format(first)
-        seq.seq = seq.seq[0:first]
-    elif last:
-        seq.header = ParseHeader.firstword(seq.header) + \
-                '|TRUNCATED:last-{}'.format(last)
-        seq.seq = seq.seq[-last:]
-    return(seq)
 
 class Head(Subcommand):
     def _parse(self):
