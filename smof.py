@@ -1671,8 +1671,14 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '--color',
-            help='print in color',
+            '-y', '--no-color',
+            help='do not print in color',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty',
             action='store_true',
             default=False
         )
@@ -1708,6 +1714,12 @@ class Grep(Subcommand):
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
+
+        # Decide when to color
+        if args.force_color or (sys.stdout.isatty() and not args.no_color):
+            args.color = True
+        else:
+            args.color = False
 
         # Others don't make sense with color
         if args.gff or args.count_matches and args.color:
