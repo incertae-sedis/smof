@@ -8,6 +8,4 @@ Minor things
 ============
     * add amino acid class (e.g. polar, aromatic, etc.) to stat
     * add color subcommand (color sequence by letter, optionally amino acid class)
-    * add an nth subcommand (extract the nth sequence)
     * make clean deal appropriately with color
-    * color printing adds an extra character to the first line in grep
