@@ -298,7 +298,6 @@ class FSeq:
     def __init__(self, header, seq):
         self.seq = seq
         self.header = header
-        self.headerfields = {}
         self.colseq = ColorString()
         self.colheader = ColorString()
 
@@ -307,37 +306,6 @@ class FSeq:
 
     def __eq__(self, other):
         return((self.header, self.seq) == (other.header, other.seq))
-
-    def parse_header(self):
-        '''
-        Parses headers of the format:
-           '>field_1|value_1|field_2|value_2|...|field_k|value_k| description (optional)
-        For example:
-            >locus|AT3G01015|taxon|3702|gi|186509637|gb|NP_186749.2| TPX2 targeting protein
-        '''
-        fields = self.header.split('|')
-        # If there is no delimitation with '|', set whatever there is to field
-        # 'header'
-        if(len(fields) == 1):
-            self.headerfields['header'] = fields[0]
-        else:
-            if(len(fields) % 2  == 1 and fields[-1]):
-                self.headerfields['desc'] = fields.pop().strip()
-            for i in range(0, len(fields), 2):
-                self.headerfields[fields[i].strip()] = fields[i+1].strip()
-
-    def getvalue(self, field, quiet=False, missing=''):
-        if not self.headerfields:
-            self.parse_header()
-        try:
-            return(self.headerfields[field])
-        except:
-            if missing:
-                return missing
-            if not quiet:
-                print("Header lacks field '{}'".format(field), file=sys.stderr)
-                print(self.header, file=sys.stderr)
-            raise SystemExit
 
     def subseq(self, a, b):
         try:
