@@ -7,7 +7,7 @@ import sys
 import string
 from collections import Counter
 
-__version__ = "1.6.1"
+__version__ = "1.6.2"
 
 # ================
 # Argument Parsing
@@ -549,12 +549,12 @@ def counter_caser(counter, lower=False):
     Sums cases in Collections.Counter object
     '''
     if lower:
-        counts_obj = Counter({k:v for k,v in counter.items() if k.islower()}) + \
-                     Counter({k.lower():v for k,v in counter.items() if k.isupper()})
+        out = counter + Counter({k.lower():v for k,v in counter.items() if k.isupper()})
+        out = out - Counter({k:v for k,v in counter.items() if k.isupper()})
     else:
-        counts_obj = Counter({k:v for k,v in counter.items() if k.isupper()}) + \
-                     Counter({k.upper():v for k,v in counter.items() if k.islower()})
-    return(counts_obj)
+        out = counter + Counter({k.upper():v for k,v in counter.items() if k.islower()})
+        out = out - Counter({k:v for k,v in counter.items() if k.islower()})
+    return(out)
 
 def sum_lower(counter):
     lc = [v for k,v in counter.items() if k in string.ascii_lowercase]
@@ -821,7 +821,12 @@ class Clean(Subcommand):
             if irr:
                 trans = str.maketrans(a, b)
 
+        colorpat = re.compile(chr(27) + '\[\d+m')
         for seq in gen.next():
+
+            # Remove color
+            seq.seq = re.sub(colorpat, '', seq.seq)
+
             # Irregular or lowercase to unknown
             if trans:
                 seq.seq = seq.seq.translate(trans)
@@ -1671,8 +1676,14 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '--color',
-            help='print in color',
+            '-y', '--no-color',
+            help='do not print in color',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty (DANGEROUS)',
             action='store_true',
             default=False
         )
@@ -1708,6 +1719,12 @@ class Grep(Subcommand):
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
+
+        # Decide when to color
+        if args.force_color or (sys.stdout.isatty() and not args.no_color):
+            args.color = True
+        else:
+            args.color = False
 
         # Others don't make sense with color
         if args.gff or args.count_matches and args.color:
