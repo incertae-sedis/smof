@@ -7,7 +7,7 @@ import sys
 import string
 from collections import Counter
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 
 # ================
 # Argument Parsing
@@ -138,9 +138,9 @@ class ColorString:
             else:
                 lastcol = self.seq[i][0]
         for i in range(len(self.seq)):
-            print(''.join(self.seq[i]), end='')
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
+            print(''.join(self.seq[i]), end='')
         print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
