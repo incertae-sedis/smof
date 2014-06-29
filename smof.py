@@ -7,7 +7,7 @@ import sys
 import string
 from collections import Counter
 
-__version__ = "1.6.2"
+__version__ = "1.7.0"
 
 # ================
 # Argument Parsing
@@ -95,14 +95,44 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    HIGHLIGHT = chr(27) + '[32m'
-    BACKGROUND = chr(27) + '[0m'
+    OFF = chr(27) + '[0m'
+    RED = chr(27) + '[31m'
+    GREEN = chr(27) + '[32m'
+    YELLOW = chr(27) + '[33m'
+    MAGENTA = chr(27) + '[35m'
+    CYAN = chr(27) + '[36m'
+    WHITE = chr(27) + '[37m'
+    BLUE = chr(27) + '[34m'
+    BOLD_RED = chr(27) + '[1;31m'
+    BOLD_GREEN = chr(27) + '[1;32m'
+    BOLD_YELLOW = chr(27) + '[1;33m'
+    BOLD_MAGENTA = chr(27) + '[1;35m'
+    BOLD_CYAN = chr(27) + '[1;36m'
+    BOLD_WHITE = chr(27) + '[1;37m'
+    BOLD_BLUE = chr(27) + '[1;34m'
+
+class ColorAA:
+    def __init__(self):
+        self.group = [
+            ['LVGAIP',    'aliphatic', Colors.BOLD_BLUE],
+            ['FYW',       'aromatic',  Colors.BOLD_RED],
+            ['SEKDRTNQH', 'polar',     Colors.BOLD_GREEN],
+            ['MCU',       'thiol',     Colors.BOLD_YELLOW]
+        ]
+        # add lower cases
+        self.group = [[l + l.lower(),g,c] for l,g,c in self.group]
+
+    def color(a):
+        for chars, group, color in self.group:
+            if a in chars:
+                return(Colors.OFF + a + color)
+        return(a)
 
 class ColorString:
     def __init__(self,
                  seq=None,
-                 bgcolor=Colors.BACKGROUND,
-                 default=Colors.HIGHLIGHT):
+                 bgcolor=Colors.OFF,
+                 default=Colors.BOLD_RED):
         self.bgcolor = bgcolor
         self.default = default
         self.seq = []
@@ -614,6 +644,17 @@ def headtailtrunk(seq, first, last):
         seq.seq = seq.seq[-last:]
     return(seq)
 
+def ascii_histchar(dif, chars=' .~*O'):
+    if dif <= 0:
+        return(chars[0])
+    elif dif < 0.25:
+        return(chars[1])
+    elif dif < 0.5:
+        return(chars[2])
+    elif dif < 0.75:
+        return(chars[3])
+    else:
+        return(chars[4])
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -1147,6 +1188,12 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
+            '-C', '--aa-profile',
+            help='display protein profile',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
             '-g', '--hist',
             help='write ascii histogram of sequence lengths',
             default=False,
@@ -1169,7 +1216,7 @@ class Stat(Subcommand):
     def _byfile(self, args, gen):
         g = FileStat()
         # Do I need to count the characters? (much faster if I don't)
-        need_count = any((args.counts, args.proportion, args.count_lower, args.type))
+        need_count = any((args.counts, args.proportion, args.count_lower, args.type, args.aa_profile))
         for seq in gen.next():
             g.add_seq(SeqStat(seq, count=need_count))
 
@@ -1235,32 +1282,47 @@ class Stat(Subcommand):
                 print('Please install numpy (needed for histograms)', file=sys.stderr)
                 raise SystemExit
 
-            if args.log_hist:
-                lengths = [math.log(x, 2) for x in g.lengths]
-            else:
+            def _hist(lengths, height=10, width=60):
+                y = numpy.histogram(lengths, bins=width)[0]
+                y = [height * x / max(y) for x in y]
+                allrows = []
+                for row in reversed(range(height)):
+                    out = ''.join([ascii_histchar(h - row) for h in y])
+                    allrows.append('|{}|'.format(out))
+                return(allrows)
+
+            if args.hist:
+                if args.log_hist:
+                    yield '\nFlat Histogram'
                 lengths = g.lengths
+                yield '\n'.join(_hist(lengths))
+
+            if args.log_hist:
+                if args.hist:
+                    yield '\nLog2 Histogram'
+                lengths = [math.log(x, 2) for x in g.lengths]
+                yield '\n'.join(_hist(lengths))
+
+
+        if args.aa_profile:
+            if args.hist or args.log_hist:
+                yield '\nProtein profile'
+            colorAA = ColorAA()
+            aacols = []
             height = 10
-            width = 60
-            n = numpy.histogram(lengths, bins=width)[0]
-            n = [height * x / max(n) for x in n]
-            yield(' ' + '-' * width)
-            for h in reversed(range(height)):
-                out = ['|']
-                for w in range(width):
-                    dif = n[w] - h
-                    if dif <= 0:
-                        out.append(' ')
-                    elif dif < 0.25:
-                        out.append('.')
-                    elif dif < 0.5:
-                        out.append('~')
-                    elif dif < 0.75:
-                        out.append('*')
-                    else:
-                        out.append('O')
-                out.append('|')
-                yield(''.join(out))
-            yield(' ' + '-' * width)
+            for chars, group, color in colorAA.group:
+                for c in chars:
+                    if not args.case_sensitive and c.islower():
+                        continue
+                    cheight = height * g.counts[c] / max(g.counts.values())
+                    aacols.append([c, cheight, color])
+            # Draw histogram
+            for row in reversed(range(height)):
+                out = ''.join([c + ascii_histchar(y - row, chars=" .:'|") for l,y,c in aacols])
+                out = '{}{}'.format(out, Colors.OFF)
+                yield out
+            names = ''.join([l for l,y,c in aacols])
+            yield names + Colors.OFF
 
     def _byseq(self, args, gen):
         seqlist = []
