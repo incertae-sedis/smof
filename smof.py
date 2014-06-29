@@ -1213,6 +1213,112 @@ class Stat(Subcommand):
             args.length = True
         return(args)
 
+    def _get_length_lines(self, args, g):
+        lines = []
+        total = sum(g.lengths)
+        N = len(g.lengths)
+        if N > 1:
+            s = StatFun.summary(g.lengths)
+
+            # Yield total number of sequences
+            lines.append("{:10s} {}".format('nseq:', len(g.lengths)))
+
+            # lines.append totla number of letters
+            lines.append("{:10s} {}".format('nchars:', sum(g.lengths)))
+
+            # lines.append five number summary of sequence lengths
+            fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
+            fivesum_str = "{:10s} {} {} {} {} {}"
+            lines.append(fivesum_str.format('5sum:', *fivesum))
+
+            # lines.append mean and standard deviation
+            meansd_str="{:10s} {:d} ({:d})"
+            lines.append(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
+
+            # lines.append N50
+            lines.append("{:10s} {}".format('N50:', s['N50']))
+        else:
+            lstr = ', '.join([str(x) for x in sorted(g.lengths)])
+            lines.append("nchars: {}".format(lstr))
+        return(lines)
+
+    def _get_hist_lines(self, args, g, title=None, height=10, width=60, log=False):
+        lines = []
+        try:
+            import numpy
+        except ImportError:
+            print('Please install numpy (needed for histograms)', file=sys.stderr)
+            raise SystemExit
+
+        if title:
+            lines.append('')
+            lines.append(title)
+
+        if log:
+            lengths = [math.log(x, 2) for x in g.lengths]
+        else:
+            lengths = g.lengths
+
+        y = numpy.histogram(lengths, bins=width)[0]
+        y = [height * x / max(y) for x in y]
+
+        for row in reversed(range(height)):
+            out = ''.join([ascii_histchar(h - row) for h in y])
+            lines.append('|{}|'.format(out))
+        return(lines)
+
+    def _get_aaprofile_lines(self, args, g, title=None, height=10):
+        lines = []
+        if title:
+            lines.append('')
+            lines.append(title)
+
+        colorAA = ColorAA()
+        aacols = []
+        for chars, group, color in colorAA.group:
+            for c in chars:
+                if not args.case_sensitive and c.islower():
+                    continue
+                cheight = height * g.counts[c] / max(g.counts.values())
+                aacols.append([c, cheight, color])
+        # Draw histogram
+        for row in reversed(range(height)):
+            out = ''.join([c + ascii_histchar(y - row, chars=" .:'|") for l,y,c in aacols])
+            out = '{}{}'.format(out, Colors.OFF)
+            lines.append(out)
+        names = ''.join([l for l,y,c in aacols])
+        lines.append(names + Colors.OFF)
+        return(lines)
+
+    def _get_count_lines(self, args, g):
+        lines = []
+        lower = sum_lower(g.counts) if args.count_lower else None
+        if not args.case_sensitive:
+            g.counts = counter_caser(g.counts)
+
+        if args.type:
+            lines.append(guess_type(g.counts))
+
+        N = sum(g.lengths)
+        slen = str(len(str(max(g.counts.values()))) + 2)
+        count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
+        if args.counts ^ args.proportion:
+            for k,v in count_iter:
+                val = v/N if args.proportion else v
+                if args.counts:
+                    exp = "{}{:>%sd}" % slen
+                else:
+                    exp = "{}{:>11.5%}"
+                lines.append(exp.format(k,val))
+        elif args.counts and args.proportion:
+            for k,v in count_iter:
+                outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                lines.append(outstr.format(k,v,v/N))
+
+        if args.count_lower:
+            lines.append("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+        return(lines)
+
     def _byfile(self, args, gen):
         g = FileStat()
         # Do I need to count the characters? (much faster if I don't)
@@ -1221,108 +1327,33 @@ class Stat(Subcommand):
             g.add_seq(SeqStat(seq, count=need_count))
 
         if need_count:
-            lower = sum_lower(g.counts) if args.count_lower else None
-
-            if not args.case_sensitive:
-                g.counts = counter_caser(g.counts)
-
-            if args.type:
-                yield(guess_type(g.counts))
-
-            N = sum(g.lengths)
-            slen = str(len(str(max(g.counts.values()))) + 2)
-            count_iter = sorted(g.counts.items(), key=lambda x: -x[1])
-            if args.counts ^ args.proportion:
-                for k,v in count_iter:
-                    val = v/N if args.proportion else v
-                    if args.counts:
-                        exp = "{}{:>%sd}" % slen
-                    else:
-                        exp = "{}{:>11.5%}"
-                    yield(exp.format(k,val))
-            elif args.counts and args.proportion:
-                for k,v in count_iter:
-                    outstr = "{}{:>" + slen + "d}{:>11.5%}"
-                    yield(outstr.format(k,v,v/N))
-
-            if args.count_lower:
-                yield("{:10s} {} ({:.1%})".format('lower:', lower, lower/N))
+            lines = self._get_count_lines(args, g)
+            yield '\n'.join(lines)
 
         if args.length:
-            total = sum(g.lengths)
-            N = len(g.lengths)
-            if N > 1:
-                s = StatFun.summary(g.lengths)
+            lines = self._get_length_lines(args, g)
+            yield '\n'.join(lines)
 
-                # Yield total number of sequences
-                yield("{:10s} {}".format('nseq:', len(g.lengths)))
-
-                # Yield totla number of letters
-                yield("{:10s} {}".format('nchars:', sum(g.lengths)))
-
-                # Yield five number summary of sequence lengths
-                fivesum = [round(s[x]) for x in ('min','1st_qu','median','3rd_qu','max')]
-                fivesum_str = "{:10s} {} {} {} {} {}"
-                yield(fivesum_str.format('5sum:', *fivesum))
-
-                # Yield mean and standard deviation
-                meansd_str="{:10s} {:d} ({:d})"
-                yield(meansd_str.format('mean(sd):', round(s['mean']), round(s['sd'])))
-
-                # Yield N50
-                yield("{:10s} {}".format('N50:', s['N50']))
-            else:
-                lstr = ', '.join([str(x) for x in sorted(g.lengths)])
-                yield("nchars: {}".format(lstr))
-
-        if args.hist or args.log_hist:
-            try:
-                import numpy
-            except ImportError:
-                print('Please install numpy (needed for histograms)', file=sys.stderr)
-                raise SystemExit
-
-            def _hist(lengths, height=10, width=60):
-                y = numpy.histogram(lengths, bins=width)[0]
-                y = [height * x / max(y) for x in y]
-                allrows = []
-                for row in reversed(range(height)):
-                    out = ''.join([ascii_histchar(h - row) for h in y])
-                    allrows.append('|{}|'.format(out))
-                return(allrows)
-
-            if args.hist:
-                if args.log_hist:
-                    yield '\nFlat Histogram'
-                lengths = g.lengths
-                yield '\n'.join(_hist(lengths))
-
+        if args.hist:
             if args.log_hist:
-                if args.hist:
-                    yield '\nLog2 Histogram'
-                lengths = [math.log(x, 2) for x in g.lengths]
-                yield '\n'.join(_hist(lengths))
+                lines = self._get_hist_lines(args, g, title='Flat histogram')
+            else:
+                lines = self._get_hist_lines(args, g)
+            yield '\n'.join(lines)
 
+        if args.log_hist:
+            if args.hist:
+                lines = self._get_hist_lines(args, g, title='Log2 histogram', log=True)
+            else:
+                lines = self._get_hist_lines(args, g, log=True)
+            yield '\n'.join(lines)
 
         if args.aa_profile:
             if args.hist or args.log_hist:
-                yield '\nProtein profile'
-            colorAA = ColorAA()
-            aacols = []
-            height = 10
-            for chars, group, color in colorAA.group:
-                for c in chars:
-                    if not args.case_sensitive and c.islower():
-                        continue
-                    cheight = height * g.counts[c] / max(g.counts.values())
-                    aacols.append([c, cheight, color])
-            # Draw histogram
-            for row in reversed(range(height)):
-                out = ''.join([c + ascii_histchar(y - row, chars=" .:'|") for l,y,c in aacols])
-                out = '{}{}'.format(out, Colors.OFF)
-                yield out
-            names = ''.join([l for l,y,c in aacols])
-            yield names + Colors.OFF
+                lines = self._get_aaprofile_lines(args, g, title='AA profile')
+            else:
+                lines = self._get_aaprofile_lines(args, g)
+            yield '\n'.join(lines)
 
     def _byseq(self, args, gen):
         seqlist = []
