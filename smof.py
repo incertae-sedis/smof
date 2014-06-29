@@ -95,7 +95,6 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    # borrowed from pyp
     OFF = chr(27) + '[0m'
     RED = chr(27) + '[31m'
     GREEN = chr(27) + '[32m'
@@ -104,35 +103,36 @@ class Colors:
     CYAN = chr(27) + '[36m'
     WHITE = chr(27) + '[37m'
     BLUE = chr(27) + '[34m'
-    BOLD = chr(27) + '[1m'
-
-    # Set default coloring for grep
-    HIGHLIGHT = RED
-    BACKGROUND = OFF
-
+    BOLD_RED = chr(27) + '[1;31m'
+    BOLD_GREEN = chr(27) + '[1;32m'
+    BOLD_YELLOW = chr(27) + '[1;33m'
+    BOLD_MAGENTA = chr(27) + '[1;35m'
+    BOLD_CYAN = chr(27) + '[1;36m'
+    BOLD_WHITE = chr(27) + '[1;37m'
+    BOLD_BLUE = chr(27) + '[1;34m'
 
 class ColorAA:
-    def __init__(self, group=None):
-        if group:
-            self.group = group
-        else:
-            self.group = {
-                'AGILPVagilpv':('aliphatic', Colors.BLUE),
-                'FYWfyw':('aromatic', Colors.RED),
-                'DENQRHSTKdenqrhstk':('polar', Colors.GREEN),
-                'MCmc':('thiol', Colors.Yellor)
-            }
+    def __init__(self):
+        self.group = [
+            ['AGILPV',    'aliphatic', Colors.BOLD_BLUE],
+            ['FYW',       'aromatic',  Colors.BOLD_RED],
+            ['DENQRHSTK', 'polar',     Colors.BOLD_GREEN],
+            ['MCU',       'thiol',     Colors.BOLD_YELLOW]
+        ]
+        # add lower cases
+        self.group = [[l + l.lower(),g,c] for l,g,c in self.group]
 
     def color(a):
-        for k,v in self.group:
-            if a in k:
-                return(Colors.OFF + a + v)
+        for chars, group, color in self.group:
+            if a in chars:
+                return(Colors.OFF + a + color)
+        return(a)
 
 class ColorString:
     def __init__(self,
                  seq=None,
-                 bgcolor=Colors.BACKGROUND,
-                 default=Colors.HIGHLIGHT):
+                 bgcolor=Colors.OFF,
+                 default=Colors.BOLD_RED):
         self.bgcolor = bgcolor
         self.default = default
         self.seq = []
@@ -644,6 +644,17 @@ def headtailtrunk(seq, first, last):
         seq.seq = seq.seq[-last:]
     return(seq)
 
+def ascii_histchar(dif):
+    if dif <= 0:
+        return(' ')
+    elif dif < 0.25:
+        return('.')
+    elif dif < 0.5:
+        return('~')
+    elif dif < 0.75:
+        return('*')
+    else:
+        return('O')
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -1277,29 +1288,31 @@ class Stat(Subcommand):
                 lengths = g.lengths
             height = 10
             width = 60
-            n = numpy.histogram(lengths, bins=width)[0]
-            n = [height * x / max(n) for x in n]
-            yield(' ' + '-' * width)
-            for h in reversed(range(height)):
-                out = ['|']
-                for w in range(width):
-                    dif = n[w] - h
-                    if dif <= 0:
-                        out.append(' ')
-                    elif dif < 0.25:
-                        out.append('.')
-                    elif dif < 0.5:
-                        out.append('~')
-                    elif dif < 0.75:
-                        out.append('*')
-                    else:
-                        out.append('O')
-                out.append('|')
-                yield(''.join(out))
-            yield(' ' + '-' * width)
+            y = numpy.histogram(lengths, bins=width)[0]
+            y = [height * x / max(y) for x in y]
+            # Draw histogram
+            for row in reversed(range(height)):
+                out = ''.join([ascii_histchar(h - row) for h in y])
+                out = '|{}|'.format(out)
+                yield out
 
         if args.aa_profile:
-            pass
+            colorAA = ColorAA()
+            aacols = []
+            height = 10
+            for chars, group, color in colorAA.group:
+                for c in chars:
+                    if not g.counts[c]:
+                        continue
+                    cheight = height * g.counts[c] / max(g.counts.values())
+                    aacols.append([c, cheight, color])
+            # Draw histogram
+            for row in reversed(range(height)):
+                out = ''.join([c + ascii_histchar(y - row) for l,y,c in aacols])
+                out = '{}{}'.format(out, Colors.OFF)
+                yield out
+            names = ''.join([l for l,y,c in aacols])
+            yield names + Colors.OFF
 
 
     def _byseq(self, args, gen):
