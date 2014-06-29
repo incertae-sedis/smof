@@ -1282,19 +1282,27 @@ class Stat(Subcommand):
                 print('Please install numpy (needed for histograms)', file=sys.stderr)
                 raise SystemExit
 
-            if args.log_hist:
-                lengths = [math.log(x, 2) for x in g.lengths]
-            else:
+            def _hist(lengths, height=10, width=60):
+                y = numpy.histogram(lengths, bins=width)[0]
+                y = [height * x / max(y) for x in y]
+                allrows = []
+                for row in reversed(range(height)):
+                    out = ''.join([ascii_histchar(h - row) for h in y])
+                    allrows.append('|{}|'.format(out))
+                return(allrows)
+
+            if args.hist:
+                if args.log_hist:
+                    yield '\nFlat Histogram'
                 lengths = g.lengths
-            height = 10
-            width = 60
-            y = numpy.histogram(lengths, bins=width)[0]
-            y = [height * x / max(y) for x in y]
-            # Draw histogram
-            for row in reversed(range(height)):
-                out = ''.join([ascii_histchar(h - row) for h in y])
-                out = '|{}|'.format(out)
-                yield out
+                yield '\n'.join(_hist(lengths))
+
+            if args.log_hist:
+                if args.hist:
+                    yield '\nLog2 Histogram'
+                lengths = [math.log(x, 2) for x in g.lengths]
+                yield '\n'.join(_hist(lengths))
+
 
         if args.aa_profile:
             colorAA = ColorAA()
@@ -1313,7 +1321,6 @@ class Stat(Subcommand):
                 yield out
             names = ''.join([l for l,y,c in aacols])
             yield names + Colors.OFF
-
 
     def _byseq(self, args, gen):
         seqlist = []
