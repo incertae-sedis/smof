@@ -1242,7 +1242,7 @@ class Stat(Subcommand):
             lines.append("nchars: {}".format(lstr))
         return(lines)
 
-    def _get_hist_lines(self, args, g):
+    def _get_hist_lines(self, args, g, title=None, height=10, width=60, log=False):
         lines = []
         try:
             import numpy
@@ -1250,26 +1250,31 @@ class Stat(Subcommand):
             print('Please install numpy (needed for histograms)', file=sys.stderr)
             raise SystemExit
 
-        if args.log_hist:
+        if title:
+            lines.append('')
+            lines.append(title)
+
+        if log:
             lengths = [math.log(x, 2) for x in g.lengths]
         else:
             lengths = g.lengths
-        height = 10
-        width = 60
+
         y = numpy.histogram(lengths, bins=width)[0]
         y = [height * x / max(y) for x in y]
-        # Draw histogram
+
         for row in reversed(range(height)):
             out = ''.join([ascii_histchar(h - row) for h in y])
-            out = '|{}|'.format(out)
-            lines.append(out)
+            lines.append('|{}|'.format(out))
         return(lines)
 
-    def _get_aaprofile_lines(self, args, g):
+    def _get_aaprofile_lines(self, args, g, title=None, height=10):
         lines = []
+        if title:
+            lines.append('')
+            lines.append(title)
+
         colorAA = ColorAA()
         aacols = []
-        height = 10
         for chars, group, color in colorAA.group:
             for c in chars:
                 if not args.case_sensitive and c.islower():
@@ -1329,12 +1334,25 @@ class Stat(Subcommand):
             lines = self._get_length_lines(args, g)
             yield '\n'.join(lines)
 
-        if args.hist or args.log_hist:
-            lines = self._get_hist_lines(args, g)
+        if args.hist:
+            if args.log_hist:
+                lines = self._get_hist_lines(args, g, title='Flat histogram')
+            else:
+                lines = self._get_hist_lines(args, g)
+            yield '\n'.join(lines)
+
+        if args.log_hist:
+            if args.hist:
+                lines = self._get_hist_lines(args, g, title='Log2 histogram', log=True)
+            else:
+                lines = self._get_hist_lines(args, g, log=True)
             yield '\n'.join(lines)
 
         if args.aa_profile:
-            lines = self._get_aaprofile_lines(args, g)
+            if args.hist or args.log_hist:
+                lines = self._get_aaprofile_lines(args, g, title='AA profile')
+            else:
+                lines = self._get_aaprofile_lines(args, g)
             yield '\n'.join(lines)
 
     def _byseq(self, args, gen):
