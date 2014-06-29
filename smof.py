@@ -325,6 +325,8 @@ class FileStat:
 class FSeq:
     # The translator for taking reverse complements
     revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
+    # Translator of ungapping
+    ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
     def __init__(self, header, seq):
         self.seq = seq
         self.header = header
@@ -338,7 +340,7 @@ class FSeq:
         return((self.header, self.seq) == (other.header, other.seq))
 
     def ungap(self):
-        self.seq = re.sub('[._-]', '', self.seq)
+        self.seq = self.seq.translate(ungapper)
 
     def print(self, column_width=80):
         if self.colheader.seq:
@@ -645,6 +647,7 @@ def ascii_histchar(dif, chars=' .~*O'):
         return(chars[3])
     else:
         return(chars[4])
+
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
