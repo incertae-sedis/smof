@@ -95,8 +95,38 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    HIGHLIGHT = chr(27) + '[32m'
-    BACKGROUND = chr(27) + '[0m'
+    # borrowed from pyp
+    OFF = chr(27) + '[0m'
+    RED = chr(27) + '[31m'
+    GREEN = chr(27) + '[32m'
+    YELLOW = chr(27) + '[33m'
+    MAGENTA = chr(27) + '[35m'
+    CYAN = chr(27) + '[36m'
+    WHITE = chr(27) + '[37m'
+    BLUE = chr(27) + '[34m'
+    BOLD = chr(27) + '[1m'
+
+    # Set default coloring for grep
+    HIGHLIGHT = RED
+    BACKGROUND = OFF
+
+
+class ColorAA:
+    def __init__(self, group=None):
+        if group:
+            self.group = group
+        else:
+            self.group = {
+                'AGILPVagilpv':('aliphatic', Colors.BLUE),
+                'FYWfyw':('aromatic', Colors.RED),
+                'DENQRHSTKdenqrhstk':('polar', Colors.GREEN),
+                'MCmc':('thiol', Colors.Yellor)
+            }
+
+    def color(a):
+        for k,v in self.group:
+            if a in k:
+                return(Colors.OFF + a + v)
 
 class ColorString:
     def __init__(self,
@@ -1147,6 +1177,12 @@ class Stat(Subcommand):
             action='store_true'
         )
         parser.add_argument(
+            '-C', '--aa-profile',
+            help='display protein profile',
+            default=False,
+            action='store_true'
+        )
+        parser.add_argument(
             '-g', '--hist',
             help='write ascii histogram of sequence lengths',
             default=False,
@@ -1169,7 +1205,7 @@ class Stat(Subcommand):
     def _byfile(self, args, gen):
         g = FileStat()
         # Do I need to count the characters? (much faster if I don't)
-        need_count = any((args.counts, args.proportion, args.count_lower, args.type))
+        need_count = any((args.counts, args.proportion, args.count_lower, args.type, args.aa_profile))
         for seq in gen.next():
             g.add_seq(SeqStat(seq, count=need_count))
 
@@ -1261,6 +1297,10 @@ class Stat(Subcommand):
                 out.append('|')
                 yield(''.join(out))
             yield(' ' + '-' * width)
+
+        if args.aa_profile:
+            pass
+
 
     def _byseq(self, args, gen):
         seqlist = []
