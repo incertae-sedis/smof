@@ -1305,6 +1305,8 @@ class Stat(Subcommand):
 
 
         if args.aa_profile:
+            if args.hist or args.log_hist:
+                yield '\nProtein profile'
             colorAA = ColorAA()
             aacols = []
             height = 10
