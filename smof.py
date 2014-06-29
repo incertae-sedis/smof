@@ -337,16 +337,6 @@ class FSeq:
     def __eq__(self, other):
         return((self.header, self.seq) == (other.header, other.seq))
 
-    def subseq(self, a, b):
-        try:
-            return(self.seq[a:b])
-        except IndexError as e:
-            print("Cannot extract subsequence ({}, {}) from".format(a,b))
-            print('>' + self.header)
-        except:
-            print("Unknown error in extraction of subsequence ({}, {}) from".format(a,b))
-            print('>' + self.header)
-
     def ungap(self):
         self.seq = re.sub('[._-]', '', self.seq)
 
