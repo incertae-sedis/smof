@@ -114,9 +114,9 @@ class Colors:
 class ColorAA:
     def __init__(self):
         self.group = [
-            ['AGILPV',    'aliphatic', Colors.BOLD_BLUE],
+            ['LVGAIP',    'aliphatic', Colors.BOLD_BLUE],
             ['FYW',       'aromatic',  Colors.BOLD_RED],
-            ['DENQRHSTK', 'polar',     Colors.BOLD_GREEN],
+            ['SEKDRTNQH', 'polar',     Colors.BOLD_GREEN],
             ['MCU',       'thiol',     Colors.BOLD_YELLOW]
         ]
         # add lower cases
@@ -644,17 +644,17 @@ def headtailtrunk(seq, first, last):
         seq.seq = seq.seq[-last:]
     return(seq)
 
-def ascii_histchar(dif):
+def ascii_histchar(dif, chars=' .~*O'):
     if dif <= 0:
-        return(' ')
+        return(chars[0])
     elif dif < 0.25:
-        return('.')
+        return(chars[1])
     elif dif < 0.5:
-        return('~')
+        return(chars[2])
     elif dif < 0.75:
-        return('*')
+        return(chars[3])
     else:
-        return('O')
+        return(chars[4])
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -1302,13 +1302,13 @@ class Stat(Subcommand):
             height = 10
             for chars, group, color in colorAA.group:
                 for c in chars:
-                    if not g.counts[c]:
+                    if not args.case_sensitive and c.islower():
                         continue
                     cheight = height * g.counts[c] / max(g.counts.values())
                     aacols.append([c, cheight, color])
             # Draw histogram
             for row in reversed(range(height)):
-                out = ''.join([c + ascii_histchar(y - row) for l,y,c in aacols])
+                out = ''.join([c + ascii_histchar(y - row, chars=" .:'|") for l,y,c in aacols])
                 out = '{}{}'.format(out, Colors.OFF)
                 yield out
             names = ''.join([l for l,y,c in aacols])
