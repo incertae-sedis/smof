@@ -6,6 +6,7 @@ import re
 import sys
 import string
 from collections import Counter
+from hashlib import md5
 
 __version__ = "1.4.1"
 
@@ -221,7 +222,6 @@ class FileDescription:
         Calculates properties for one sequence
         @type seq: FSeq object
         '''
-
         # Add md5 hashes of sequences and headers to respective sets
         self.seqs.update([md5(bytes(seq.seq, 'ascii')).digest()])
         self.headers.update([md5(bytes(seq.header, 'ascii')).digest()])
@@ -289,7 +289,7 @@ class FileDescription:
     def _handle_gaps(self, seq, counts):
         # Handle gaps
         if Alphabet.GAP & set(counts):
-            self.ufeat['ngapped'] += 1
+            self.ufeat['gapped'] += 1
             return(True)
         return(False)
 
@@ -712,7 +712,6 @@ class Chksum(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from hashlib import md5
         md5hash = md5()
         # Hash the sequences only (in input order)
         if(args.all_sequences):
