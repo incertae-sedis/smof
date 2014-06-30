@@ -1392,17 +1392,12 @@ class Subseq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="extract subsequence from each entry")
+            help="extract subsequence from each entry (revcomp if a<b)")
         parser.add_argument(
             'bounds',
             help="from and to values (indexed from 1)",
             nargs=2,
             type=int)
-        parser.add_argument(
-            '-r', '--revcomp',
-            help='take the reverse complement if bounds[0] > bounds[1]',
-            action='store_true',
-            default=False)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1410,19 +1405,16 @@ class Subseq(Subcommand):
         for seq in gen.next():
             a = args.bounds[0]
             b = args.bounds[1]
-            # If a > b, take reverse complement if that option is enabled,
-            # if not die
-            if(a > b):
-                if(args.revcomp):
-                    newseq = FSeq.getrevcomp(seq.seq[b-1:a])
-                else:
-                    print('Lower bound cannot be greater than upper bound ' + \
-                        '(do you want reverse complement? See options)', file=sys.stderr)
-                    sys.exit()
-            # If b >= a, this is a normal forward sequence
             else:
-                newseq = seq.seq[a-1:b]
-            yield FSeq(seq.header, newseq)
+                rev = (a > b) and guess_type(seq.seq) == 'dna'
+                seqid = ParseHeader.firstword(seq.header)
+                seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
+
+                start,end = sorted([a,b])
+                seq.seq = seq.seq[start-1:end]
+                if rev:
+                    seq.seq = FSeq.getrevcomp(seq.seq)
+                yield seq
 
 class Winnow(Subcommand):
     def _parse(self):
