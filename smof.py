@@ -1466,10 +1466,17 @@ class Subseq(Subcommand):
         for seq in gen.next(handle_color=True):
             a = args.bounds[0]
             b = args.bounds[1]
+            start,end = sorted([a,b])
+            end = min(end, len(seq.seq))
+
+            # Check boundaries
             if a < 1 or b < 1:
                 print('Bounds must be >= 0', file=sys.stderr)
                 raise SystemExit
-            start,end = sorted([a,b])
+            if start > len(seq.seq):
+                print('Start position must be less than seq length', file=sys.stderr)
+                raise SystemExit
+
             if args.color:
                 color = Colors.COLORS[args.color]
                 if not seq.colseq.seq:
