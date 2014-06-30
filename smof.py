@@ -112,7 +112,8 @@ class Colors:
     BOLD_WHITE   = chr(27) + '[1;37m'
     BOLD_BLUE    = chr(27) + '[1;34m'
 
-    pat = re.compile(chr(27) + '\[[0-9;]+m')
+    patstr = chr(27) + '\[[0-9;]+m'
+    pat = re.compile(patstr)
 
     COLORS = {
         'red'          : RED,
@@ -168,31 +169,15 @@ class ColorString:
         '''
         if not self.seq:
             if is_colored:
-                # Get positions of every coloring string
-                colpos = []
-                for segment in re.split(Colors.pat, seq):
-                    last = 1 if not colpos else colpos[-1]
-                    colpos.append(len(segment) + last - 1)
-
-                if colpos[-1] == colpos[-2]:
-                    colpos.pop()
-
-                # Make colorless list
-                self.seq = [[None, s] for s in re.sub(Colors.pat, '', seq)]
-
-                # Add coloring elements
-                colors = re.findall(Colors.pat, seq)
-                for p,c in zip(colpos, colors):
-                    self.seq[p][0] = c
-
-                # If there is no initial color, add
-                if colpos[0] != 0:
-                    self.seq[0][0] = Colors.OFF
-
-                # Extend coloring inbetween elements
-                for i in range(1, len(self.seq)):
-                    if not self.seq[i][0]:
-                        self.seq[i][0] = self.seq[i-1][0]
+                color = Colors.OFF
+                for item in re.split('(' + Colors.patstr + ')', seq):
+                    if not item:
+                        continue
+                    if item[0] == chr(27):
+                        color = item
+                        continue
+                    for char in item:
+                        self.seq.append([color, char])
             else:
                 self.seq = [[self.bgcolor, s] for s in seq]
 
