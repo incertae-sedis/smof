@@ -399,6 +399,16 @@ class FSeq:
     def __eq__(self, other):
         return((self.header, self.seq) == (other.header, other.seq))
 
+    def color_seq(self, *args, **kwargs):
+        if not self.colseq.seq:
+            self.colseq = ColorString(self.seq)
+        self.colseq.colorpos(*args, **kwargs)
+
+    def color_header(self, *args, **kwargs):
+        if not self.colseq.header:
+            self.colheader = ColorString(self.header)
+        self.colheader.colorpos(*args, **kwargs)
+
     def ungap(self):
         self.seq = self.seq.translate(ungapper)
 
@@ -1840,6 +1850,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-S', '--preserve-color',
+            help='Preserve incoming color',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '--gff',
             help='output matches in gff format',
             action='store_true',
@@ -2030,18 +2046,16 @@ class Grep(Subcommand):
                     yield matches
         else:
             def sgen(gen, matcher):
-                for seq in gen.next():
+                for seq in gen.next(handle_color=args.preserve_color):
                     text = gettext(seq)
                     m = matcher(text)
                     if (m and not args.invert_match) or (not m and args.invert_match):
                         if args.color:
-                            coltext = ColorString(text)
-                            for d in m:
-                                coltext.colorpos(range(*d['pos']))
-                            if args.match_sequence:
-                                seq.colseq = coltext
-                            else:
-                                seq.colheader = coltext
+                            for pos in [range(*d['pos']) for d in m]:
+                                if args.match_sequence:
+                                    seq.color_seq(pos=pos)
+                                else:
+                                    seq.color_header(pos=pos)
                         yield(seq)
         return(sgen)
 
