@@ -112,6 +112,8 @@ class Colors:
     BOLD_WHITE   = chr(27) + '[1;37m'
     BOLD_BLUE    = chr(27) + '[1;34m'
 
+    pat = re.compile(chr(27) + '\[\d+m')
+
     COLORS = {
         'red'          : RED,
         'green'        : GREEN,
@@ -149,22 +151,50 @@ class ColorAA:
 class ColorString:
     def __init__(self,
                  seq=None,
+                 is_colored=False,
                  bgcolor=Colors.OFF,
                  default=Colors.BOLD_RED):
         self.bgcolor = bgcolor
         self.default = default
         self.seq = []
         if seq:
-            self.setseq(seq)
+            self.setseq(seq, is_colored)
 
-    def setseq(self, seq):
+    def setseq(self, seq, is_colored):
         '''
         Pair every character in the input string with a color
         @param seq: string that will ultimately be colored
         @type seq: string
         '''
         if not self.seq:
-            self.seq = [[self.bgcolor, s] for s in seq]
+            if is_colored:
+                # Get positions of every coloring string
+                colpos = []
+                for segment in re.split(Colors.pat, seq):
+                    last = 1 if not colpos else colpos[-1]
+                    colpos.append(len(segment) + last - 1)
+
+                if colpos[-1] == colpos[-2]:
+                    colpos.pop()
+
+                # Make colorless list
+                self.seq = [[None, s] for s in re.sub(Colors.pat, '', seq)]
+
+                # Add coloring elements
+                colors = re.findall(Colors.pat, seq)
+                for p,c in zip(colpos, colors):
+                    self.seq[p][0] = c
+
+                # If there is no initial color, add
+                if colpos[0] != 0:
+                    self.seq[0][0] = Colors.OFF
+
+                # Extend coloring inbetween elements
+                for i in range(1, len(self.seq)):
+                    if not self.seq[i][0]:
+                        self.seq[i][0] = self.seq[i-1][0]
+            else:
+                self.seq = [[self.bgcolor, s] for s in seq]
 
     def colorpos(self, pos, col=None):
         '''
@@ -344,11 +374,24 @@ class FSeq:
     revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
-    def __init__(self, header, seq):
+
+    def __init__(self, header, seq, handle_color=False, purge_color=False):
         self.seq = seq
         self.header = header
         self.colseq = ColorString()
         self.colheader = ColorString()
+        if purge_color or handle_color:
+            if bool(re.search(Colors.pat, seq)):
+                self.seq = self._clear_color(seq)
+                if handle_color:
+                    self.colseq = ColorString(seq, is_colored=True)
+            if bool(re.search(Colors.pat, header)):
+                self.header = self._clear_color(header)
+                if handle_color:
+                    self.colheader = ColorString(header, is_colored=True)
+
+    def _clear_color(self, text):
+        return(re.sub(Colors.pat, '', text))
 
     def __hash__(self):
         return(hash((self.header, self.seq)))
@@ -392,7 +435,7 @@ class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
         self.fh = fh
 
-    def next(self):
+    def next(self, *args, **kwargs):
         seq_list = []
         header = ''
         nseqs = 0
@@ -403,7 +446,7 @@ class FSeqGenerator:
             if ">" == line[0]:
                 if(seq_list):
                     nseqs += 1
-                    yield FSeq(header, ''.join(seq_list))
+                    yield FSeq(header, ''.join(seq_list), *args, **kwargs)
                 seq_list = []
                 header = line.split('>')[1]
             elif header:
@@ -413,7 +456,7 @@ class FSeqGenerator:
                 raise SystemExit
         if header:
             nseqs += 1
-            yield FSeq(header, ''.join(seq_list))
+            yield FSeq(header, ''.join(seq_list), *args, **kwargs)
         if not nseqs:
             print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
             raise SystemExit
@@ -872,10 +915,7 @@ class Clean(Subcommand):
                 trans = str.maketrans(a, b)
 
         colorpat = re.compile(chr(27) + '\[\d+m')
-        for seq in gen.next():
-
-            # Remove color
-            seq.seq = re.sub(colorpat, '', seq.seq)
+        for seq in gen.next(purge_color=True):
 
             # Irregular or lowercase to unknown
             if trans:
@@ -1413,7 +1453,7 @@ class Subseq(Subcommand):
         )
         parser.add_argument(
             'color',
-            help='set the highlighting color',
+            help='color subsequence (do not extract)',
             choices=Colors.COLORS.keys(),
             nargs='?',
             default=None
@@ -1428,7 +1468,7 @@ class Subseq(Subcommand):
 
     def generator(self, args, gen):
         ''' Index starting from 1 (not 0) '''
-        for seq in gen.next():
+        for seq in gen.next(handle_color=True):
             a = args.bounds[0]
             b = args.bounds[1]
             if a < 1 or b < 1:
@@ -1437,9 +1477,9 @@ class Subseq(Subcommand):
             start,end = sorted([a,b])
             if args.color:
                 color = Colors.COLORS[args.color]
-                colortext = ColorString(seq=seq.seq)
-                colortext.colorpos(range(start-1, end), color)
-                seq.colseq = colortext
+                if not seq.colseq.seq:
+                    seq.colseq = ColorString(seq.seq)
+                seq.colseq.colorpos(range(start-1, end), color)
                 yield seq
             else:
                 rev = (a > b) and guess_type(seq.seq) == 'dna'
