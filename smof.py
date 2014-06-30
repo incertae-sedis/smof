@@ -112,7 +112,7 @@ class Colors:
     BOLD_WHITE   = chr(27) + '[1;37m'
     BOLD_BLUE    = chr(27) + '[1;34m'
 
-    pat = re.compile(chr(27) + '\[\d+m')
+    pat = re.compile(chr(27) + '\[[0-9;]+m')
 
     COLORS = {
         'red'          : RED,
