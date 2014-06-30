@@ -96,14 +96,14 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    OFF          = chr(27) + '[0m'
-    RED          = chr(27) + '[31m'
-    GREEN        = chr(27) + '[32m'
-    YELLOW       = chr(27) + '[33m'
-    MAGENTA      = chr(27) + '[35m'
-    CYAN         = chr(27) + '[36m'
-    WHITE        = chr(27) + '[37m'
-    BLUE         = chr(27) + '[34m'
+    OFF          = chr(27) + '[0;0m'
+    RED          = chr(27) + '[0;31m'
+    GREEN        = chr(27) + '[0;32m'
+    YELLOW       = chr(27) + '[0;33m'
+    MAGENTA      = chr(27) + '[0;35m'
+    CYAN         = chr(27) + '[0;36m'
+    WHITE        = chr(27) + '[0;37m'
+    BLUE         = chr(27) + '[0;34m'
     BOLD_RED     = chr(27) + '[1;31m'
     BOLD_GREEN   = chr(27) + '[1;32m'
     BOLD_YELLOW  = chr(27) + '[1;33m'
