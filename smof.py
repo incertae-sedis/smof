@@ -96,21 +96,38 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    OFF = chr(27) + '[0m'
-    RED = chr(27) + '[31m'
-    GREEN = chr(27) + '[32m'
-    YELLOW = chr(27) + '[33m'
-    MAGENTA = chr(27) + '[35m'
-    CYAN = chr(27) + '[36m'
-    WHITE = chr(27) + '[37m'
-    BLUE = chr(27) + '[34m'
-    BOLD_RED = chr(27) + '[1;31m'
-    BOLD_GREEN = chr(27) + '[1;32m'
-    BOLD_YELLOW = chr(27) + '[1;33m'
+    OFF          = chr(27) + '[0m'
+    RED          = chr(27) + '[31m'
+    GREEN        = chr(27) + '[32m'
+    YELLOW       = chr(27) + '[33m'
+    MAGENTA      = chr(27) + '[35m'
+    CYAN         = chr(27) + '[36m'
+    WHITE        = chr(27) + '[37m'
+    BLUE         = chr(27) + '[34m'
+    BOLD_RED     = chr(27) + '[1;31m'
+    BOLD_GREEN   = chr(27) + '[1;32m'
+    BOLD_YELLOW  = chr(27) + '[1;33m'
     BOLD_MAGENTA = chr(27) + '[1;35m'
-    BOLD_CYAN = chr(27) + '[1;36m'
-    BOLD_WHITE = chr(27) + '[1;37m'
-    BOLD_BLUE = chr(27) + '[1;34m'
+    BOLD_CYAN    = chr(27) + '[1;36m'
+    BOLD_WHITE   = chr(27) + '[1;37m'
+    BOLD_BLUE    = chr(27) + '[1;34m'
+
+    COLORS = {
+        'red'          : RED,
+        'green'        : GREEN,
+        'yellow'       : YELLOW,
+        'magenta'      : MAGENTA,
+        'cyan'         : CYAN,
+        'white'        : WHITE,
+        'blue'         : BLUE,
+        'bold_red'     : BOLD_RED,
+        'bold_green'   : BOLD_GREEN,
+        'bold_yellow'  : BOLD_YELLOW,
+        'bold_magenta' : BOLD_MAGENTA,
+        'bold_cyan'    : BOLD_CYAN,
+        'bold_white'   : BOLD_WHITE,
+        'bold_blue'    : BOLD_BLUE
+    }
 
 class ColorAA:
     def __init__(self):
@@ -1392,12 +1409,21 @@ class Subseq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="extract subsequence from each entry (revcomp if a<b)")
+            help="extract subsequence from each entry (revcomp if a<b)"
+        )
+        parser.add_argument(
+            'color',
+            help='set the highlighting color',
+            choices=Colors.COLORS.keys(),
+            nargs='?',
+            default=None
+        )
         parser.add_argument(
             'bounds',
             help="from and to values (indexed from 1)",
             nargs=2,
-            type=int)
+            type=int
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1405,12 +1431,21 @@ class Subseq(Subcommand):
         for seq in gen.next():
             a = args.bounds[0]
             b = args.bounds[1]
+            if a < 1 or b < 1:
+                print('Bounds must be >= 0', file=sys.stderr)
+                raise SystemExit
+            start,end = sorted([a,b])
+            if args.color:
+                color = Colors.COLORS[args.color]
+                colortext = ColorString(seq=seq.seq)
+                colortext.colorpos(range(start-1, end), color)
+                seq.colseq = colortext
+                yield seq
             else:
                 rev = (a > b) and guess_type(seq.seq) == 'dna'
                 seqid = ParseHeader.firstword(seq.header)
                 seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
 
-                start,end = sorted([a,b])
                 seq.seq = seq.seq[start-1:end]
                 if rev:
                     seq.seq = FSeq.getrevcomp(seq.seq)
