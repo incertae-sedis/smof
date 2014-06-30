@@ -8,7 +8,7 @@ import string
 from collections import Counter
 from hashlib import md5
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 # ================
 # Argument Parsing
@@ -96,14 +96,14 @@ class Alphabet:
     START    = {'ATG', 'AUG'}
 
 class Colors:
-    OFF          = chr(27) + '[0m'
-    RED          = chr(27) + '[31m'
-    GREEN        = chr(27) + '[32m'
-    YELLOW       = chr(27) + '[33m'
-    MAGENTA      = chr(27) + '[35m'
-    CYAN         = chr(27) + '[36m'
-    WHITE        = chr(27) + '[37m'
-    BLUE         = chr(27) + '[34m'
+    OFF          = chr(27) + '[0;0m'
+    RED          = chr(27) + '[0;31m'
+    GREEN        = chr(27) + '[0;32m'
+    YELLOW       = chr(27) + '[0;33m'
+    MAGENTA      = chr(27) + '[0;35m'
+    CYAN         = chr(27) + '[0;36m'
+    WHITE        = chr(27) + '[0;37m'
+    BLUE         = chr(27) + '[0;34m'
     BOLD_RED     = chr(27) + '[1;31m'
     BOLD_GREEN   = chr(27) + '[1;32m'
     BOLD_YELLOW  = chr(27) + '[1;33m'
@@ -390,7 +390,7 @@ class FSeq:
         self.colseq.colorpos(*args, **kwargs)
 
     def color_header(self, *args, **kwargs):
-        if not self.colseq.header:
+        if not self.colseq.seq:
             self.colheader = ColorString(self.header)
         self.colheader.colorpos(*args, **kwargs)
 
@@ -2045,9 +2045,9 @@ class Grep(Subcommand):
                         if args.color:
                             for pos in [range(*d['pos']) for d in m]:
                                 if args.match_sequence:
-                                    seq.color_seq(pos=pos)
+                                    seq.color_seq(pos=pos, col=Colors.BOLD_RED)
                                 else:
-                                    seq.color_header(pos=pos)
+                                    seq.color_header(pos=pos, col=Colors.BOLD_RED)
                         yield(seq)
         return(sgen)
 
