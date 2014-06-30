@@ -390,7 +390,7 @@ class FSeq:
         self.colseq.colorpos(*args, **kwargs)
 
     def color_header(self, *args, **kwargs):
-        if not self.colseq.header:
+        if not self.colseq.seq:
             self.colheader = ColorString(self.header)
         self.colheader.colorpos(*args, **kwargs)
 
@@ -2045,9 +2045,9 @@ class Grep(Subcommand):
                         if args.color:
                             for pos in [range(*d['pos']) for d in m]:
                                 if args.match_sequence:
-                                    seq.color_seq(pos=pos)
+                                    seq.color_seq(pos=pos, col=Colors.BOLD_RED)
                                 else:
-                                    seq.color_header(pos=pos)
+                                    seq.color_header(pos=pos, col=Colors.BOLD_RED)
                         yield(seq)
         return(sgen)
 
