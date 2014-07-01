@@ -1489,7 +1489,7 @@ class Subseq(Subcommand):
 
     def _gff_generator(self, args, gen):
         subseqs = defaultdict(list)
-        for line in args.gff_file:
+        for line in args.gff:
             row = line.split('\t')
             try:
                 subseqs[row[0]].append({'start':int(row[3]),
@@ -1520,7 +1520,7 @@ class Subseq(Subcommand):
             yield self._subseq(seq, *args.bounds, color=args.color)
 
     def generator(self, args, gen):
-        if args.gff_file:
+        if args.gff:
             sgen = self._gff_generator
         else:
             sgen = self._bound_generator
