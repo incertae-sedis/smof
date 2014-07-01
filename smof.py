@@ -9,7 +9,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 
 # ================
 # Argument Parsing
@@ -1455,6 +1455,12 @@ class Subseq(Subcommand):
             type=argparse.FileType('r')
         )
         parser.add_argument(
+            '-k', '--keep',
+            help='With --gff, keep sequences with no matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-b', '--bounds',
             metavar='N',
             help="from and to values (indexed from 1)",
@@ -1503,12 +1509,15 @@ class Subseq(Subcommand):
         for seq in gen.next(handle_color=True):
             seqid = ParseHeader.firstword(seq.header)
             try:
-                d = subseqs[seqid]
+                if seqid not in subseqs.keys():
+                    raise KeyError
             except KeyError:
-                yield seq
+                if args.keep:
+                    yield seq
+                continue
 
             if args.color:
-                for s in d:
+                for s in subseqs[seqid]:
                     seq = self._subseq(seq, s['start'], s['end'], args.color)
                 yield seq
             else:
@@ -1527,7 +1536,6 @@ class Subseq(Subcommand):
 
         for item in sgen(args, gen):
             yield item
-
 
 class Winnow(Subcommand):
     def _parse(self):
