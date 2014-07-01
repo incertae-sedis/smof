@@ -1741,14 +1741,12 @@ class Head(Subcommand):
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
-            default=-1,
             type=int
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
-            default=-1,
             type=int
         )
         parser.set_defaults(func=self.func)
@@ -1757,7 +1755,7 @@ class Head(Subcommand):
         if args.nseqs < 1:
             print('--nseqs must be >= 1', file=sys.stderr)
             raise SystemExit
-        if args.first < 1 or args.last < 1:
+        if (args.first and args.first < 1) or (args.last and args.last < 1):
             print('--first and --last must be > 0, if provided', file=sys.stderr)
             raise SystemExit
 
@@ -2248,7 +2246,7 @@ class Tail(Subcommand):
         if args.nseqs < 1:
             print('--nseqs must be >= 1', file=sys.stderr)
             raise SystemExit
-        if args.first < 1 or args.last < 1:
+        if (args.first and args.first < 1) or (args.last and args.last < 1):
             print('--first and --last must be > 0, if provided', file=sys.stderr)
             raise SystemExit
 
