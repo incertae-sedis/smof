@@ -6,6 +6,7 @@ import re
 import sys
 import string
 from collections import Counter
+from collections import defaultdict
 from hashlib import md5
 
 __version__ = "1.4.1"
@@ -977,7 +978,6 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collections import defaultdict
         try:
             w = int(args.window_length)
             m = int(args.word_length)
@@ -1442,47 +1442,92 @@ class Subseq(Subcommand):
             help="extract subsequence from each entry (revcomp if a<b)"
         )
         parser.add_argument(
-            'color',
+            '-c', '--color',
             help='color subsequence (do not extract)',
             choices=Colors.COLORS.keys(),
-            nargs='?',
+            metavar='STR',
             default=None
         )
         parser.add_argument(
-            'bounds',
+            '-f', '--gff',
+            metavar='FILE',
+            help='get bounds from this gff3 file',
+            type=argparse.FileType('r')
+        )
+        parser.add_argument(
+            '-b', '--bounds',
+            metavar='N',
             help="from and to values (indexed from 1)",
             nargs=2,
             type=counting_number
         )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
-        ''' Index starting from 1 (not 0) '''
-        for seq in gen.next(handle_color=True):
-            a = args.bounds[0]
-            b = args.bounds[1]
-            start,end = sorted([a,b])
-            end = min(end, len(seq.seq))
+    def _subseq(self, seq, a, b, color):
+        start,end = sorted([a,b])
+        end = min(end, len(seq.seq))
 
-            # Check boundaries
-            if start > len(seq.seq):
-                err('Start position must be less than seq length')
+        # Check boundaries
+        if start > len(seq.seq):
+            err('Start position must be less than seq length')
+
+        if color:
+            c = Colors.COLORS[color]
+            if not seq.colseq.seq:
+                seq.colseq = ColorString(seq.seq)
+            seq.colseq.colorpos(range(start-1, end), c)
+            return(seq)
+        else:
+            rev = (a > b) and guess_type(seq.seq) == 'dna'
+            seqid = ParseHeader.firstword(seq.header)
+            seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
+
+            seq.seq = seq.seq[start-1:end]
+            if rev:
+                seq.seq = FSeq.getrevcomp(seq.seq)
+            return(seq)
+
+    def _gff_generator(self, args, gen):
+        subseqs = defaultdict(list)
+        for line in args.gff_file:
+            row = line.split('\t')
+            try:
+                subseqs[row[0]].append({'start':int(row[3]),
+                                        'end':int(row[4]),
+                                        'strand':row[6]})
+            except IndexError:
+                err('Improper gff3 file')
+            except ValueError:
+                err('gff bounds must be integers')
+
+        for seq in gen.next(handle_color=True):
+            seqid = ParseHeader.firstword(seq.header)
+            try:
+                d = subseqs[seqid]
+            except KeyError:
+                yield seq
 
             if args.color:
-                color = Colors.COLORS[args.color]
-                if not seq.colseq.seq:
-                    seq.colseq = ColorString(seq.seq)
-                seq.colseq.colorpos(range(start-1, end), color)
+                for s in d:
+                    seq = self._subseq(seq, s['start'], s['end'], args.color)
                 yield seq
             else:
-                rev = (a > b) and guess_type(seq.seq) == 'dna'
-                seqid = ParseHeader.firstword(seq.header)
-                seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
+                for s in d:
+                    yield self._subseq(seq, s['start'], s['end'], args.color)
 
-                seq.seq = seq.seq[start-1:end]
-                if rev:
-                    seq.seq = FSeq.getrevcomp(seq.seq)
-                yield seq
+    def _bound_generator(self, args, gen):
+        for seq in gen.next(handle_color=True):
+            yield self._subseq(seq, *args.bounds, color=args.color)
+
+    def generator(self, args, gen):
+        if args.gff_file:
+            sgen = self._gff_generator
+        else:
+            sgen = self._bound_generator
+
+        for item in sgen(args, gen):
+            yield item
+
 
 class Winnow(Subcommand):
     def _parse(self):
@@ -2120,7 +2165,6 @@ class Uniq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collections import defaultdict
         seqs = defaultdict(int)
         for seq in gen.next():
             seqs[seq] += 1
