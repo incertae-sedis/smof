@@ -2235,7 +2235,16 @@ class Tail(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
+    def _process_arguments(self, args):
+        if args.nseqs < 1:
+            print('--nseqs must be >= 1', file=sys.stderr)
+            raise SystemExit
+        if args.first < 1 or args.last < 1:
+            print('--first and --last must be > 0, if provided', file=sys.stderr)
+            raise SystemExit
+
     def generator(self, args, gen):
+        self._process_arguments(args)
         from collections import deque
         try:
             lastseqs = deque(maxlen=args.nseqs)
