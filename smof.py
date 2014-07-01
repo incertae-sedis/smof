@@ -1639,6 +1639,10 @@ class Sort(Subcommand):
     def generator(self, args, gen):
         seqs = [s for s in gen.next()]
 
+        if args.numeric and not args.regex:
+            print('--numeric does nothing unless with --regex', file=sys.stderr)
+            raise SystemExit
+
         # Set type of order determining variable
         if args.numeric:
             def typer(x):
