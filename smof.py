@@ -1486,12 +1486,13 @@ class Subseq(Subcommand):
         else:
             rev = (a > b) and guess_type(seq.seq) == 'dna'
             seqid = ParseHeader.firstword(seq.header)
-            seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
+            header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
 
-            seq.seq = seq.seq[start-1:end]
+            seq = seq.seq[start-1:end]
+            newseq = FSeq(header, seq)
             if rev:
-                seq.seq = FSeq.getrevcomp(seq.seq)
-            return(seq)
+                newseq = FSeq.getrevcomp(seq.seq)
+            return(newseq)
 
     def _gff_generator(self, args, gen):
         subseqs = defaultdict(list)
@@ -1521,7 +1522,7 @@ class Subseq(Subcommand):
                     seq = self._subseq(seq, s['start'], s['end'], args.color)
                 yield seq
             else:
-                for s in d:
+                for s in subseqs[seqid]:
                     yield self._subseq(seq, s['start'], s['end'], args.color)
 
     def _bound_generator(self, args, gen):
