@@ -9,7 +9,6 @@ Minor things
     * add amino acid class (e.g. polar, aromatic, etc.) to stat
     * add color subcommand (color sequence by letter, optionally amino acid class)
     * goto help when no arguments given
-    * sample -1 etc handling
     * fix numeric sorting (die if not numeric)
     * rewrite split so it doesn't read everything into memory
     * better help for subseq (and everything else)

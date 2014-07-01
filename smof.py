@@ -1595,12 +1595,15 @@ class Sample(Subcommand):
             'n',
             help="sample size",
             type=int,
+            nargs='?',
             default=1)
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
         import random
+        if args.n < 1:
+            raise SystemExit
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
