@@ -447,14 +447,12 @@ class FSeqGenerator:
             elif header:
                 seq_list.append(line)
             else:
-                print("First line must begin with '>'", file=sys.stderr)
-                raise SystemExit
+                err("First fasta line must begin with '>'")
         if header:
             nseqs += 1
             yield FSeq(header, ''.join(seq_list), *args, **kwargs)
         if not nseqs:
-            print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
-            raise SystemExit
+            err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
     DNA_AMB = {
@@ -501,8 +499,7 @@ class SeqStat:
             try:
                 line.append(header_fun(self.header))
             except TypeError:
-                print ("Cannot process header: '{}'".format(self.header))
-                raise SystemExit
+                err("Cannot process header: '{}'".format(self.header))
         if length:
             line.append(self.length)
 
@@ -570,8 +567,7 @@ class StatFun:
         '''
         # Die if out of bounds
         if not (0 <= q <= 1):
-            print('quantile must be between 0 and 1', file=sys.stderr)
-            raise SystemExit
+            err('quantile must be between 0 and 1')
 
         # Ensure the vector is sorted
         x = sorted(x) if not issorted else x
@@ -714,6 +710,10 @@ def positive_int(i):
     if i < 0:
          raise argparse.ArgumentTypeError("%s is an invalid positive number" % i)
     return i
+
+def err(msg):
+    print(msg, file=sys.stderr)
+    raise SystemExit
 
 
 # ====================
@@ -881,12 +881,10 @@ class Clean(Subcommand):
 
     def _process_args(self, args):
         if (args.mask_lowercase or args.mask_irregular) and not args.type:
-            print('Please provide sequence type (--type)', file=sys.stderr)
-            raise SystemExit
+            err('Please provide sequence type (--type)')
 
         if args.tolower and args.toupper:
-            print('Err, you want me to convert to lower AND upper?', file=sys.stderr)
-            raise SystemExit
+            err('Err, you want me to convert to lower AND upper?')
 
     def generator(self, args, gen):
 
@@ -903,8 +901,7 @@ class Clean(Subcommand):
                 irr = args.nir
                 unk = args.nunk
             else:
-                print('Type not recognized', file=sys.stderr)
-                raise SystemExit
+                err('Type not recognized')
 
             a = ''
             # Get irregular characters
@@ -1002,8 +999,7 @@ class Complexity(Subcommand):
             p = int(args.jump)
             offset = int(args.offset)
         except ValueError:
-            print('All values must be integers', file=sys.stderr)
-            raise SystemExit
+            err('All values must be integers')
 
         # Calculates the variable component of a single window's score
         def varscore_generator(seq, words):
@@ -1305,8 +1301,7 @@ class Stat(Subcommand):
         try:
             import numpy
         except ImportError:
-            print('Please install numpy (needed for histograms)', file=sys.stderr)
-            raise SystemExit
+            err('Please install numpy (needed for histograms)')
 
         if title:
             lines.append('')
@@ -1485,8 +1480,7 @@ class Subseq(Subcommand):
 
             # Check boundaries
             if start > len(seq.seq):
-                print('Start position must be less than seq length', file=sys.stderr)
-                raise SystemExit
+                err('Start position must be less than seq length')
 
             if args.color:
                 color = Colors.COLORS[args.color]
@@ -1561,20 +1555,16 @@ class Winnow(Subcommand):
             try:
                 ch,sign,per = args.composition.split()
             except ValueError:
-                print('Composition argument have 3 values', file=sys.stderr)
-                raise SystemExit
+                err('Composition argument have 3 values')
             legal_signs = ('<', '<=', '>=', '>', '==')
             if not sign in legal_signs:
-                print("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')", file=sys.stderr)
-                raise SystemExit
+                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')")
             try:
                 per = float(per)
             except ValueError:
-                print("Third value must be a float")
-                raise SystemExit
+                err("Third value must be a float")
             if not 0 <= per <= 1:
-                print("Third value must be between 0 and 1")
-                raise SystemExit
+                err("Third value must be between 0 and 1")
             ch = set(str(ch))
 
             def evaluate(s):
@@ -1649,8 +1639,7 @@ class Sort(Subcommand):
         seqs = [s for s in gen.next()]
 
         if args.numeric and not args.regex:
-            print('--numeric does nothing unless with --regex', file=sys.stderr)
-            raise SystemExit
+            err('--numeric does nothing unless with --regex')
 
         # Set type of order determining variable
         if args.numeric:
@@ -1658,8 +1647,7 @@ class Sort(Subcommand):
                 try:
                     return(float(x))
                 except ValueError:
-                    print("'{}' cannot be numerically sorted".format(x), file=sys.stderr)
-                    raise SystemExit
+                    err("'{}' cannot be numerically sorted".format(x))
         else:
             def typer(x):
                 return(x)
@@ -1672,11 +1660,9 @@ class Sort(Subcommand):
                     capture = re.search(r, x.header).groups()[0]
                     return(typer(capture))
                 except AttributeError:
-                    print("No match for regex '{}'".format(args.regex), file=sys.stderr)
-                    raise SystemExit
+                    err("No match for regex '{}'".format(args.regex))
                 except IndexError:
-                    print("Nothing was captured in regex '{}'".format(args.regex), file=sys.stderr)
-                    raise SystemExit
+                    err("Nothing was captured in regex '{}'".format(args.regex))
         elif args.length:
             def sortterm(x):
                 return(len(x.seq))
@@ -1880,14 +1866,10 @@ class Grep(Subcommand):
     def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
-            print('--count-matches argument is incompatible with --invert-matches',
-                    file=sys.stderr)
-            raise SystemExit
+            err('--count-matches argument is incompatible with --invert-matches')
 
         if args.wrap and args.perl_regexp:
-            print("PATTERNS found in --wrap captures must be literal ",
-                  "(-P option and -w are incompatible)", file=sys.stderr)
-            raise SystemExit
+            err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
 
         if args.ambiguous_nucl:
             args.perl_regexp = True
@@ -1996,8 +1978,7 @@ class Grep(Subcommand):
             pat = apat
 
         if not pat:
-            print('Please provide a pattern', file=sys.stderr)
-            raise SystemExit
+            err('Please provide a pattern')
 
         # TODO searching for perfect matches would be faster without using
         # regex (just <str>.find(pat))
@@ -2245,8 +2226,7 @@ class Tail(Subcommand):
         try:
             lastseqs = deque(maxlen=args.nseqs)
         except ValueError:
-            print('--nseqs argument must be positive', file=sys.stderr)
-            raise SystemExit
+            err('--nseqs argument must be positive')
         for seq in gen.next():
             lastseqs.append(seq)
 
