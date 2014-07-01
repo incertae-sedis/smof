@@ -148,6 +148,8 @@ class ColorString:
         if seq:
             self.setseq(seq, is_colored)
 
+    def append(self, colstr):
+        self.seq += colstr.seq
     def setseq(self, seq, is_colored):
         '''
         Pair every character in the input string with a color
@@ -343,7 +345,7 @@ class FileStat:
 
 class FSeq:
     # The translator for taking reverse complements
-    revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
+    revtrans = str.maketrans('acgtACGT', 'tgcaTGCA')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
 
@@ -362,14 +364,25 @@ class FSeq:
                 if handle_color:
                     self.colheader = ColorString(header, is_colored=True)
 
-    def _clear_color(self, text):
-        return(re.sub(Colors.pat, '', text))
-
     def __hash__(self):
         return(hash((self.header, self.seq)))
 
     def __eq__(self, other):
         return((self.header, self.seq) == (other.header, other.seq))
+
+    def _clear_color(self, text):
+        return(re.sub(Colors.pat, '', text))
+
+    def subseq(self, a, b):
+        header_suffix = '|SUBSEQ({}..{})'.format(a + 1, b)
+        header = ParseHeader.firstword(self.header) + header_suffix
+        sub = FSeq(header, self.seq[a:b])
+        if self.colheader:
+            # TODO implement header color preservation
+            pass
+        if self.colseq:
+            sub.colseq.seq = self.colseq.seq[a:b]
+        return(sub)
 
     def color_seq(self, *args, **kwargs):
         if not self.colseq.seq:
@@ -411,7 +424,18 @@ class FSeq:
 
     @classmethod
     def getrevcomp(cls, seq):
-        return(seq[::-1].translate(FSeq.revcomp_translator))
+        trans = lambda s: s.translate(FSeq.revtrans)
+        if isinstance(seq, str):
+            return(trans(seq[::-1]))
+        elif isinstance(seq, FSeq):
+            newheader = ParseHeader.firstword(seq.header) + '|REVCOM'
+            newseq = FSeq(newheader, trans(seq.seq[::-1]))
+            if seq.colseq:
+                newseq.colseq.seq = [[c, trans(s)] for c,s in seq.colseq.seq[::-1]]
+            if seq.colheader:
+                # TODO implement this
+                pass
+            return(newseq)
 
 class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
@@ -1485,13 +1509,10 @@ class Subseq(Subcommand):
             return(seq)
         else:
             rev = (a > b) and guess_type(seq.seq) == 'dna'
-            seqid = ParseHeader.firstword(seq.header)
-            header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
 
-            seq = seq.seq[start-1:end]
-            newseq = FSeq(header, seq)
+            newseq = seq.subseq(start-1, end)
             if rev:
-                newseq = FSeq.getrevcomp(seq.seq)
+                newseq = FSeq.getrevcomp(newseq)
             return(newseq)
 
     def _gff_generator(self, args, gen):
