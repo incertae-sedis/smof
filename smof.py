@@ -982,7 +982,7 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collection import defaultdict
+        from collections import defaultdict
         try:
             w = int(args.window_length)
             m = int(args.word_length)
