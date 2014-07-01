@@ -42,31 +42,17 @@ def parse(argv=None):
 
     parser = Parser()
 
-    Chksum(parser)
-    Clean(parser)
-    Complexity(parser)
-    Fasta2csv(parser)
-    Grep(parser)
-    Head(parser)
-    Perm(parser)
-    Rename(parser)
-    Reverse(parser)
-    Sample(parser)
-    Sniff(parser)
-    Sort(parser)
-    Split(parser)
-    Stat(parser)
-    Subseq(parser)
-    Tail(parser)
-    Uniq(parser)
-    Wc(parser)
-    Winnow(parser)
+    subcommands = [Chksum, Clean, Complexity, Fasta2csv, Grep,
+                   Head, Perm, Rename, Reverse, Sample, Sniff,
+                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
+    for cmd in subcommands:
+        cmd(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
         raise SystemExit
 
-    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
+    if sys.argv[1] in ['idsearch', 'retrieve', 'search', 'rmfields']:
         print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
         raise SystemExit
 
