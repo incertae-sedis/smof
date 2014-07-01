@@ -703,6 +703,18 @@ def ascii_histchar(dif, chars=' .~*O'):
     else:
         return(chars[4])
 
+def counting_number(i):
+    i = int(i)
+    if i < 1:
+         raise argparse.ArgumentTypeError("%s is an invalid counting number" % i)
+    return i
+
+def positive_int(i):
+    i = int(i)
+    if i < 0:
+         raise argparse.ArgumentTypeError("%s is an invalid positive number" % i)
+    return i
+
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -941,35 +953,35 @@ class Complexity(Subcommand):
         parser.add_argument(
             '-k', '--alphabet-size',
             help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=4
         )
         parser.add_argument(
             '-w', '--window-length',
             help='window length (if provided, output will average of window complexities)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=100
         )
         parser.add_argument(
             '-m', '--word-length',
             help='length of each word',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-j', '--jump',
             help='distance between adjacent windows',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-o', '--offset',
-            help='index of start point',
-            type=int,
+            help='index of start pocounting_number',
+            type=positive_int,
             metavar='INT',
             default=0
         )
@@ -1065,21 +1077,21 @@ class Perm(Subcommand):
         parser.add_argument(
             '-w', '--word-size',
             help='size of each word (default=1)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-s', '--start-offset',
             help='number of letters to ignore at beginning (default=0)',
-            type=int,
+            type=positive_int,
             metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
             help='number of letters to ignore at end (default=0)',
-            type=int,
+            type=positive_int,
             metavar='INT',
             default=0
         )
@@ -1459,7 +1471,7 @@ class Subseq(Subcommand):
             'bounds',
             help="from and to values (indexed from 1)",
             nargs=2,
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
@@ -1472,9 +1484,6 @@ class Subseq(Subcommand):
             end = min(end, len(seq.seq))
 
             # Check boundaries
-            if a < 1 or b < 1:
-                print('Bounds must be >= 0', file=sys.stderr)
-                raise SystemExit
             if start > len(seq.seq):
                 print('Start position must be less than seq length', file=sys.stderr)
                 raise SystemExit
@@ -1516,14 +1525,14 @@ class Winnow(Subcommand):
         parser.add_argument(
             '-s', '--shorter-than',
             help="remove if sequence is shorter than i",
-            metavar='INT',
-            type=int
+            type=counting_number,
+            metavar='INT'
         )
         parser.add_argument(
             '-S', '--longer-than',
             help="remove if sequence is longer than i",
-            metavar='INT',
-            type=int
+            type=counting_number,
+            metavar='INT'
         )
         parser.add_argument(
             '-v', '--invert',
@@ -1596,7 +1605,7 @@ class Sample(Subcommand):
         parser.add_argument(
             'n',
             help="sample size",
-            type=int,
+            type=counting_number,
             nargs='?',
             default=1)
         parser.set_defaults(func=self.func)
@@ -1604,8 +1613,6 @@ class Sample(Subcommand):
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
         import random
-        if args.n < 1:
-            raise SystemExit
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
@@ -1734,33 +1741,24 @@ class Head(Subcommand):
             '-n', '--nseqs',
             help='print N sequences',
             metavar='N',
-            type=int,
+            type=counting_number,
             default=1
         )
         parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
-    def _process_arguments(self, args):
-        if args.nseqs < 1:
-            print('--nseqs must be >= 1', file=sys.stderr)
-            raise SystemExit
-        if (args.first and args.first < 1) or (args.last and args.last < 1):
-            print('--first and --last must be > 0, if provided', file=sys.stderr)
-            raise SystemExit
-
     def generator(self, args, gen):
-        self._process_arguments(args)
         i = 1
         for seq in gen.next():
             yield headtailtrunk(seq, args.first, args.last)
@@ -2225,33 +2223,24 @@ class Tail(Subcommand):
             '-n', '--nseqs',
             help='print N sequences',
             metavar='N',
-            type=int,
+            type=counting_number,
             default=1
         )
         parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
-    def _process_arguments(self, args):
-        if args.nseqs < 1:
-            print('--nseqs must be >= 1', file=sys.stderr)
-            raise SystemExit
-        if (args.first and args.first < 1) or (args.last and args.last < 1):
-            print('--first and --last must be > 0, if provided', file=sys.stderr)
-            raise SystemExit
-
     def generator(self, args, gen):
-        self._process_arguments(args)
         from collections import deque
         try:
             lastseqs = deque(maxlen=args.nseqs)
