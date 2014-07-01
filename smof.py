@@ -1009,9 +1009,8 @@ class Complexity(Subcommand):
         for seq in gen.next():
             mean = 'NA'
             var = 'NA'
-            if(len(seq.seq) < w + offset): pass
-            elif(args.drop and args.drop in seq.seq): pass
-            else:
+            seqid = ParseHeader.firstword(seq.header)
+            if len(seq.seq) >= w + offset:
                 words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
                 varscores = tuple(score for score in varscore_generator(seq.seq, words))
                 winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
@@ -1020,10 +1019,13 @@ class Complexity(Subcommand):
                     var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
                 except ZeroDivisionError:
                     var = 'NA'
+            elif args.drop and args.drop in seq.seq:
+                continue
 
-                seqid = ParseHeader.firstword(seq.header)
+            mean = mean if mean == 'NA' else '{:.5f}'.format(mean)
+            var = var if var == 'NA' else '{:.5e}'.format(var)
 
-                yield "{}\t{:.5f}\t{:.4e}".format(seqid, mean, var)
+            yield '\t'.join((seqid, mean, var))
 
 class Fasta2csv(Subcommand):
     def _parse(self):
