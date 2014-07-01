@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#!/usr/bin/env python3
 
 import argparse
 import math
@@ -8,7 +8,7 @@ import string
 from collections import Counter
 from hashlib import md5
 
-__version__ = "1.8.1"
+__version__ = "1.8.2"
 
 # ================
 # Argument Parsing
@@ -40,34 +40,20 @@ class Parser:
 
 def parse(argv=None):
 
-    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
-        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
-        raise SystemExit
-
     parser = Parser()
 
-    Chksum(parser)
-    Clean(parser)
-    Complexity(parser)
-    Fasta2csv(parser)
-    Grep(parser)
-    Head(parser)
-    Perm(parser)
-    Rename(parser)
-    Reverse(parser)
-    Sample(parser)
-    Sniff(parser)
-    Sort(parser)
-    Split(parser)
-    Stat(parser)
-    Subseq(parser)
-    Tail(parser)
-    Uniq(parser)
-    Wc(parser)
-    Winnow(parser)
+    subcommands = [Chksum, Clean, Complexity, Fasta2csv, Grep,
+                   Head, Perm, Rename, Reverse, Sample, Sniff,
+                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
+    for cmd in subcommands:
+        cmd(parser)
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
+        raise SystemExit
+
+    if sys.argv[1] in ['idsearch', 'retrieve', 'search', 'rmfields']:
+        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
         raise SystemExit
 
     args = parser.parser.parse_args(argv)
@@ -447,14 +433,12 @@ class FSeqGenerator:
             elif header:
                 seq_list.append(line)
             else:
-                print("First line must begin with '>'", file=sys.stderr)
-                raise SystemExit
+                err("First fasta line must begin with '>'")
         if header:
             nseqs += 1
             yield FSeq(header, ''.join(seq_list), *args, **kwargs)
         if not nseqs:
-            print("smof could not retrieve any sequence from this file, exiting", file=sys.stderr)
-            raise SystemExit
+            err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
     DNA_AMB = {
@@ -501,8 +485,7 @@ class SeqStat:
             try:
                 line.append(header_fun(self.header))
             except TypeError:
-                print ("Cannot process header: '{}'".format(self.header))
-                raise SystemExit
+                err("Cannot process header: '{}'".format(self.header))
         if length:
             line.append(self.length)
 
@@ -570,8 +553,7 @@ class StatFun:
         '''
         # Die if out of bounds
         if not (0 <= q <= 1):
-            print('quantile must be between 0 and 1', file=sys.stderr)
-            raise SystemExit
+            err('quantile must be between 0 and 1')
 
         # Ensure the vector is sorted
         x = sorted(x) if not issorted else x
@@ -702,6 +684,22 @@ def ascii_histchar(dif, chars=' .~*O'):
         return(chars[3])
     else:
         return(chars[4])
+
+def counting_number(i):
+    i = int(i)
+    if i < 1:
+         raise argparse.ArgumentTypeError("%s is an invalid counting number" % i)
+    return i
+
+def positive_int(i):
+    i = int(i)
+    if i < 0:
+         raise argparse.ArgumentTypeError("%s is an invalid positive number" % i)
+    return i
+
+def err(msg):
+    print(msg, file=sys.stderr)
+    raise SystemExit
 
 
 # ====================
@@ -869,12 +867,10 @@ class Clean(Subcommand):
 
     def _process_args(self, args):
         if (args.mask_lowercase or args.mask_irregular) and not args.type:
-            print('Please provide sequence type (--type)', file=sys.stderr)
-            raise SystemExit
+            err('Please provide sequence type (--type)')
 
         if args.tolower and args.toupper:
-            print('Err, you want me to convert to lower AND upper?', file=sys.stderr)
-            raise SystemExit
+            err('Err, you want me to convert to lower AND upper?')
 
     def generator(self, args, gen):
 
@@ -891,8 +887,7 @@ class Clean(Subcommand):
                 irr = args.nir
                 unk = args.nunk
             else:
-                print('Type not recognized', file=sys.stderr)
-                raise SystemExit
+                err('Type not recognized')
 
             a = ''
             # Get irregular characters
@@ -941,35 +936,35 @@ class Complexity(Subcommand):
         parser.add_argument(
             '-k', '--alphabet-size',
             help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=4
         )
         parser.add_argument(
             '-w', '--window-length',
             help='window length (if provided, output will average of window complexities)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=100
         )
         parser.add_argument(
             '-m', '--word-length',
             help='length of each word',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-j', '--jump',
             help='distance between adjacent windows',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-o', '--offset',
-            help='index of start point',
-            type=int,
+            help='index of start pocounting_number',
+            type=positive_int,
             metavar='INT',
             default=0
         )
@@ -982,7 +977,7 @@ class Complexity(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collection import defaultdict
+        from collections import defaultdict
         try:
             w = int(args.window_length)
             m = int(args.word_length)
@@ -990,8 +985,7 @@ class Complexity(Subcommand):
             p = int(args.jump)
             offset = int(args.offset)
         except ValueError:
-            print('All values must be integers', file=sys.stderr)
-            raise SystemExit
+            err('All values must be integers')
 
         # Calculates the variable component of a single window's score
         def varscore_generator(seq, words):
@@ -1009,9 +1003,8 @@ class Complexity(Subcommand):
         for seq in gen.next():
             mean = 'NA'
             var = 'NA'
-            if(len(seq.seq) < w + offset): pass
-            elif(args.drop and args.drop in seq.seq): pass
-            else:
+            seqid = ParseHeader.firstword(seq.header)
+            if len(seq.seq) >= w + offset:
                 words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
                 varscores = tuple(score for score in varscore_generator(seq.seq, words))
                 winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
@@ -1020,10 +1013,13 @@ class Complexity(Subcommand):
                     var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
                 except ZeroDivisionError:
                     var = 'NA'
+            elif args.drop and args.drop in seq.seq:
+                continue
 
-                seqid = ParseHeader.firstword(seq.header)
+            mean = mean if mean == 'NA' else '{:.5f}'.format(mean)
+            var = var if var == 'NA' else '{:.5e}'.format(var)
 
-                yield "{}\t{:.5f}\t{:.4e}".format(seqid, mean, var)
+            yield '\t'.join((seqid, mean, var))
 
 class Fasta2csv(Subcommand):
     def _parse(self):
@@ -1063,21 +1059,21 @@ class Perm(Subcommand):
         parser.add_argument(
             '-w', '--word-size',
             help='size of each word (default=1)',
-            type=int,
+            type=counting_number,
             metavar='INT',
             default=1
         )
         parser.add_argument(
             '-s', '--start-offset',
             help='number of letters to ignore at beginning (default=0)',
-            type=int,
+            type=positive_int,
             metavar='INT',
             default=0
         )
         parser.add_argument(
             '-e', '--end-offset',
             help='number of letters to ignore at end (default=0)',
-            type=int,
+            type=positive_int,
             metavar='INT',
             default=0
         )
@@ -1291,8 +1287,7 @@ class Stat(Subcommand):
         try:
             import numpy
         except ImportError:
-            print('Please install numpy (needed for histograms)', file=sys.stderr)
-            raise SystemExit
+            err('Please install numpy (needed for histograms)')
 
         if title:
             lines.append('')
@@ -1457,7 +1452,7 @@ class Subseq(Subcommand):
             'bounds',
             help="from and to values (indexed from 1)",
             nargs=2,
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
@@ -1470,12 +1465,8 @@ class Subseq(Subcommand):
             end = min(end, len(seq.seq))
 
             # Check boundaries
-            if a < 1 or b < 1:
-                print('Bounds must be >= 0', file=sys.stderr)
-                raise SystemExit
             if start > len(seq.seq):
-                print('Start position must be less than seq length', file=sys.stderr)
-                raise SystemExit
+                err('Start position must be less than seq length')
 
             if args.color:
                 color = Colors.COLORS[args.color]
@@ -1514,14 +1505,14 @@ class Winnow(Subcommand):
         parser.add_argument(
             '-s', '--shorter-than',
             help="remove if sequence is shorter than i",
-            metavar='INT',
-            type=int
+            type=counting_number,
+            metavar='INT'
         )
         parser.add_argument(
             '-S', '--longer-than',
             help="remove if sequence is longer than i",
-            metavar='INT',
-            type=int
+            type=counting_number,
+            metavar='INT'
         )
         parser.add_argument(
             '-v', '--invert',
@@ -1550,20 +1541,16 @@ class Winnow(Subcommand):
             try:
                 ch,sign,per = args.composition.split()
             except ValueError:
-                print('Composition argument have 3 values', file=sys.stderr)
-                raise SystemExit
+                err('Composition argument have 3 values')
             legal_signs = ('<', '<=', '>=', '>', '==')
             if not sign in legal_signs:
-                print("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')", file=sys.stderr)
-                raise SystemExit
+                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')")
             try:
                 per = float(per)
             except ValueError:
-                print("Third value must be a float")
-                raise SystemExit
+                err("Third value must be a float")
             if not 0 <= per <= 1:
-                print("Third value must be between 0 and 1")
-                raise SystemExit
+                err("Third value must be between 0 and 1")
             ch = set(str(ch))
 
             def evaluate(s):
@@ -1594,7 +1581,8 @@ class Sample(Subcommand):
         parser.add_argument(
             'n',
             help="sample size",
-            type=int,
+            type=counting_number,
+            nargs='?',
             default=1)
         parser.set_defaults(func=self.func)
 
@@ -1636,14 +1624,16 @@ class Sort(Subcommand):
     def generator(self, args, gen):
         seqs = [s for s in gen.next()]
 
+        if args.numeric and not args.regex:
+            err('--numeric does nothing unless with --regex')
+
         # Set type of order determining variable
         if args.numeric:
             def typer(x):
                 try:
                     return(float(x))
                 except ValueError:
-                    print("'{}' cannot be numerically sorted".format(x), file=sys.stderr)
-                    raise SystemExit
+                    err("'{}' cannot be numerically sorted".format(x))
         else:
             def typer(x):
                 return(x)
@@ -1656,11 +1646,9 @@ class Sort(Subcommand):
                     capture = re.search(r, x.header).groups()[0]
                     return(typer(capture))
                 except AttributeError:
-                    print("No match for regex '{}'".format(args.regex), file=sys.stderr)
-                    raise SystemExit
+                    err("No match for regex '{}'".format(args.regex))
                 except IndexError:
-                    print("Nothing was captured in regex '{}'".format(args.regex), file=sys.stderr)
-                    raise SystemExit
+                    err("Nothing was captured in regex '{}'".format(args.regex))
         elif args.length:
             def sortterm(x):
                 return(len(x.seq))
@@ -1725,20 +1713,20 @@ class Head(Subcommand):
             '-n', '--nseqs',
             help='print N sequences',
             metavar='N',
-            type=int,
+            type=counting_number,
             default=1
         )
         parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
@@ -1864,14 +1852,10 @@ class Grep(Subcommand):
     def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
-            print('--count-matches argument is incompatible with --invert-matches',
-                    file=sys.stderr)
-            raise SystemExit
+            err('--count-matches argument is incompatible with --invert-matches')
 
         if args.wrap and args.perl_regexp:
-            print("PATTERNS found in --wrap captures must be literal ",
-                  "(-P option and -w are incompatible)", file=sys.stderr)
-            raise SystemExit
+            err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
 
         if args.ambiguous_nucl:
             args.perl_regexp = True
@@ -1980,8 +1964,7 @@ class Grep(Subcommand):
             pat = apat
 
         if not pat:
-            print('Please provide a pattern', file=sys.stderr)
-            raise SystemExit
+            err('Please provide a pattern')
 
         # TODO searching for perfect matches would be faster without using
         # regex (just <str>.find(pat))
@@ -2207,20 +2190,20 @@ class Tail(Subcommand):
             '-n', '--nseqs',
             help='print N sequences',
             metavar='N',
-            type=int,
+            type=counting_number,
             default=1
         )
         parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
-            type=int
+            type=counting_number
         )
         parser.set_defaults(func=self.func)
 
@@ -2229,8 +2212,7 @@ class Tail(Subcommand):
         try:
             lastseqs = deque(maxlen=args.nseqs)
         except ValueError:
-            print('--nseqs argument must be positive', file=sys.stderr)
-            raise SystemExit
+            err('--nseqs argument must be positive')
         for seq in gen.next():
             lastseqs.append(seq)
 
