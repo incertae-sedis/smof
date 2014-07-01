@@ -7,7 +7,6 @@ Major things
 Minor things
 ============
     * add color subcommand (color sequence by letter, optionally amino acid class)
-    * goto help when no arguments given
     * rewrite split so it doesn't read everything into memory
     * better help for subseq (and everything else)
     * make Unique useful

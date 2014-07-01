@@ -40,10 +40,6 @@ class Parser:
 
 def parse(argv=None):
 
-    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
-        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
-        raise SystemExit
-
     parser = Parser()
 
     Chksum(parser)
@@ -68,6 +64,10 @@ def parse(argv=None):
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
+        raise SystemExit
+
+    if sys.argv[1] in ('idsearch', 'retrieve', 'search', 'rmfields'):
+        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
         raise SystemExit
 
     args = parser.parser.parse_args(argv)
