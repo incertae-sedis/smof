@@ -1445,15 +1445,18 @@ class Subseq(Subcommand):
             '-c', '--color',
             help='color subsequence (do not extract)',
             choices=Colors.COLORS.keys(),
+            metavar='STR',
             default=None
         )
         parser.add_argument(
-            '-f', '--gff-file',
+            '-f', '--gff',
+            metavar='FILE',
             help='get bounds from this gff3 file',
             type=argparse.FileType('r')
         )
         parser.add_argument(
             '-b', '--bounds',
+            metavar='N',
             help="from and to values (indexed from 1)",
             nargs=2,
             type=counting_number
