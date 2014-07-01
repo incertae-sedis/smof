@@ -8,7 +8,6 @@ Minor things
 ============
     * add amino acid class (e.g. polar, aromatic, etc.) to stat
     * add color subcommand (color sequence by letter, optionally amino acid class)
-    * fix interpreter hashbang thing
     * goto help when no arguments given
     * head shouldn't do anything when -n is 0 or less
     * sample -1 etc handling

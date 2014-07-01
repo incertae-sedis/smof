@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#!/usr/bin/env python3
 
 import argparse
 import math
@@ -1926,7 +1926,7 @@ class Grep(Subcommand):
             for p in pat:
                 for m in re.finditer(p, text):
                     match = {'pos':(m.start(), m.end()), 'strand':strand}
-                    pos.append(match)
+                    pos.append(match
             return(pos)
 
         if args.gff or args.count_matches or args.color:
