@@ -1732,17 +1732,28 @@ class Head(Subcommand):
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
+            default=-1,
             type=int
         )
         parser.add_argument(
             '-l', '--last',
             help='print last K letters of each sequence',
             metavar='K',
+            default=-1,
             type=int
         )
         parser.set_defaults(func=self.func)
 
+    def _process_arguments(self, args):
+        if args.nseqs < 1:
+            print('--nseqs must be >= 1', file=sys.stderr)
+            raise SystemExit
+        if args.first < 1 or args.last < 1:
+            print('--first and --last must be > 0, if provided', file=sys.stderr)
+            raise SystemExit
+
     def generator(self, args, gen):
+        self._process_arguments(args)
         i = 1
         for seq in gen.next():
             yield headtailtrunk(seq, args.first, args.last)
@@ -1926,7 +1937,7 @@ class Grep(Subcommand):
             for p in pat:
                 for m in re.finditer(p, text):
                     match = {'pos':(m.start(), m.end()), 'strand':strand}
-                    pos.append(match
+                    pos.append(match)
             return(pos)
 
         if args.gff or args.count_matches or args.color:
