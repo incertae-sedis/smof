@@ -139,58 +139,91 @@ class ColorAA:
 class ColorString:
     def __init__(self,
                  seq=None,
-                 is_colored=False,
                  bgcolor=Colors.OFF,
                  default=Colors.BOLD_RED):
         self.bgcolor = bgcolor
         self.default = default
-        self.seq = []
+        self.cind = []
         if seq:
-            self.setseq(seq, is_colored)
+            self.append(seq)
 
-    def setseq(self, seq, is_colored):
-        '''
-        Pair every character in the input string with a color
-        @param seq: string that will ultimately be colored
-        @type seq: string
-        '''
-        if not self.seq:
-            if is_colored:
-                color = Colors.OFF
-                for item in re.split('(' + Colors.patstr + ')', seq):
-                    if not item:
-                        continue
-                    if item[0] == chr(27):
-                        color = item
-                        continue
-                    for char in item:
-                        self.seq.append([color, char])
-            else:
-                self.seq = [[self.bgcolor, s] for s in seq]
+    def append(self, thing, bg=None):
+        bg = bg if bg else Colors.OFF
+        if isinstance(thing, FSeq):
+            thing = thing.colseq
+        if isinstance(thing, ColorString):
+            newcind = thing.cind
+        elif isinstance(thing, str):
+            newcind = []
+            pos = []
+            color_on = False
+            for s in re.split('((?:{})+)'.format(Colors.patstr), thing):
+                if s and s[0] == chr(27):
+                    # if there are multiple colors, take only the last
+                    col = chr(27) + s.split(chr(27))[-1]
+                    # start a new color
+                    if not color_on and col != self.bgcolor:
+                        newcind.append([pos[-1], None, col])
+                    # end old color (at previous index), start new color
+                    elif color_on and col != self.bgcolor:
+                        newcind[-1][1] = pos[-1] - 1
+                        newcind.append([pos[-1], None, col])
+                    # end old color
+                    elif color_on and col == self.bgcolor:
+                        newcind[-1][1] = pos[-1]
+                    color_on = bool(col != self.bgcolor)
+                else:
+                    last = pos[-1] if pos else 0
+                    pos.append(len(s) + last)
+            if newcind and not newcind[-1][1]:
+                newcind[-1][1] = len(thing)
+        else:
+            err('ColorString can only append strings, Fseq, or ColorString objects')
+        self.cind += [[b + len(self.cind), e + len(self.cind), c] for b,e,c in newcind]
 
-    def colorpos(self, pos, col=None):
-        '''
-        Change color at specified positions
-        @param pos: indices to recolor
-        @type pos: iterable
-        @param col: new color
-        @type col: stringy thing that colorifies
-        '''
+    def subseq(self, a, b):
+        self.cind = [x for x in self.cind if x[0] <=  b]
+        self.cind = [[s - a, e - a, c] for s,e,c in self.cind]
+
+    def reverse(self, length):
+        self.cind = [[e - length, s - length, c] for s,e,c in self.cind]
+
+    def colorpos(self, a, b, col=None):
         col = self.default if not col else col
-        for i in pos:
-            self.seq[i][0] = col
+        self.cind.append([a, b, col])
+        for i in range(len(self.cind)):
+            start,end,col = self.cind[i]
+            # prior starts in interval and extends beyond it
+            if (a <= start <= b) and end > b:
+                # reset start site
+                self.cind[i][0] = b + 1
+            # prior beings before interval and ends within it
+            elif start < a and (a < end < b):
+                # reset end site
+                self.cind[i][1] = a - 1
+            # prior is contained within interval
+            elif a < start and b > end:
+                # color over the prior
+                del self.cind[i]
+            # prior contains interval
+            elif a > start and b < end:
+                # replace prior with colored regions flanking interval
+                del self.cind[i]
+                self.cind.append([start, a - 1, col])
+                self.cind.append([b + 1, end, col])
 
-    def print(self, colwidth=None):
-        lastcol = self.seq[0][0]
-        for i in range(1, len(self.seq)):
-            if(self.seq[i][0] == lastcol):
-                self.seq[i][0] = ''
-            else:
-                lastcol = self.seq[i][0]
-        for i in range(len(self.seq)):
+    def print(self, seq, colwidth=None):
+        starts = {x[0]:x[2] for x in self.cind}
+        ends = set([x[1] for x in self.cind])
+        for i in range(len(seq)):
+            try:
+                print(starts[i], end='')
+            except:
+                if i in ends:
+                    print(self.bgcolor, end='')
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
-            print(''.join(self.seq[i]), end='')
+            print(seq[i], end='')
         print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
@@ -199,7 +232,7 @@ class ColorString:
         for m in re.compile(pattern).finditer(s):
             a = m.start()
             b = m.start() + len(m.group())
-            self.colorpos(list(range(a,b)), col)
+            self.colorpos(a, b, col)
 
 class FileDescription:
     def __init__(self):
@@ -346,21 +379,27 @@ class FSeq:
     revcomp_translator = str.maketrans('acgtACGT', 'tgcaTGCA')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
-
     def __init__(self, header, seq, handle_color=False, purge_color=False):
         self.seq = seq
         self.header = header
-        self.colseq = ColorString()
-        self.colheader = ColorString()
+        self.colseq = None
+        self.colheader = None
         if purge_color or handle_color:
-            if bool(re.search(Colors.pat, seq)):
-                self.seq = self._clear_color(seq)
-                if handle_color:
-                    self.colseq = ColorString(seq, is_colored=True)
-            if bool(re.search(Colors.pat, header)):
-                self.header = self._clear_color(header)
-                if handle_color:
-                    self.colheader = ColorString(header, is_colored=True)
+            self._process_color(handle_color)
+
+    def _process_color(self, handle_color=True):
+        if not self.colseq:
+            self.colseq = ColorString()
+        if not self.colheader:
+            self.colheader = ColorString()
+        if bool(re.search(Colors.pat, self.seq)):
+            if handle_color:
+                self.colseq.append(self.seq)
+            self.seq = self._clear_color(self.seq)
+        if bool(re.search(Colors.pat, self.header)):
+            if handle_color:
+                self.colheader.append(self.header)
+            self.header = self._clear_color(self.header)
 
     def _clear_color(self, text):
         return(re.sub(Colors.pat, '', text))
@@ -372,26 +411,27 @@ class FSeq:
         return((self.header, self.seq) == (other.header, other.seq))
 
     def color_seq(self, *args, **kwargs):
-        if not self.colseq.seq:
-            self.colseq = ColorString(self.seq)
+        if not self.colseq:
+            self._process_color()
         self.colseq.colorpos(*args, **kwargs)
 
     def color_header(self, *args, **kwargs):
-        if not self.colseq.seq:
-            self.colheader = ColorString(self.header)
+        if not self.colheader:
+            self._process_color()
         self.colheader.colorpos(*args, **kwargs)
 
     def ungap(self):
         self.seq = self.seq.translate(ungapper)
 
     def print(self, column_width=80):
-        if self.colheader.seq:
-            self.colheader.print(column_width)
+        print('>', end='')
+        if self.colheader:
+            self.colheader.print(self.header, column_width)
         else:
-            print('>' + self.header)
+            print(self.header)
         for i in range(0, len(self.seq), column_width):
-            if self.colseq.seq:
-                self.colseq.print(column_width)
+            if self.colseq:
+                self.colseq.print(self.seq, column_width)
                 break
             else:
                 print(self.seq[i:i + column_width])
@@ -409,9 +449,22 @@ class FSeq:
     def header_upper(self):
         self.header = self.header.upper()
 
+    def subseq(self, a, b):
+        self.seq = self.seq[a:b]
+        if self.colseq:
+            self.colseq.subseq(a, b)
+
+    def reverse(self, a, b, suffix='|REVERSE'):
+        self.seq = self.seq[::-1]
+        self.colseq.reverse()
+        self.header += suffix
+
     @classmethod
     def getrevcomp(cls, seq):
-        return(seq[::-1].translate(FSeq.revcomp_translator))
+        if isinstance(seq, str):
+            return(seq[::-1].translate(FSeq.revcomp_translator))
+        elif isinstance(seq, FSeq):
+            raise NotImplemented
 
 class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
@@ -1479,18 +1532,17 @@ class Subseq(Subcommand):
 
         if color:
             c = Colors.COLORS[color]
-            if not seq.colseq.seq:
-                seq.colseq = ColorString(seq.seq)
-            seq.colseq.colorpos(range(start-1, end), c)
+            seq.colseq.colorpos(start-1, end, c)
             return(seq)
         else:
             rev = (a > b) and guess_type(seq.seq) == 'dna'
             seqid = ParseHeader.firstword(seq.header)
             seq.header = '{}|SUBSEQ({}..{})'.format(seqid, a, b)
 
-            seq.seq = seq.seq[start-1:end]
+            seq.subseq(start-1, end)
             if rev:
-                seq.seq = FSeq.getrevcomp(seq.seq)
+                raise NotImplemented
+                # seq.seq = FSeq.getrevcomp(seq.seq)
             return(seq)
 
     def _gff_generator(self, args, gen):
