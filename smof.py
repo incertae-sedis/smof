@@ -2155,11 +2155,11 @@ class Grep(Subcommand):
                     m = matcher(text)
                     if (m and not args.invert_match) or (not m and args.invert_match):
                         if args.color:
-                            for pos in [range(*d['pos']) for d in m]:
+                            for pos in [d['pos'] for d in m]:
                                 if args.match_sequence:
-                                    seq.color_seq(pos=pos, col=Colors.BOLD_RED)
+                                    seq.color_seq(*pos, col=Colors.BOLD_RED)
                                 else:
-                                    seq.color_header(pos=pos, col=Colors.BOLD_RED)
+                                    seq.color_header(*pos, col=Colors.BOLD_RED)
                         yield(seq)
         return(sgen)
 
