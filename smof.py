@@ -26,7 +26,6 @@ class Parser:
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
             description='Tools for studying and manipulating fasta files')
-
         parser.add_argument(
             '-v', '--version',
             action='version',
@@ -186,7 +185,7 @@ class ColorString:
         self.cind = [[s - a, e - a, c] for s,e,c in self.cind]
 
     def reverse(self, length):
-        self.cind = [[e - length, s - length, c] for s,e,c in self.cind]
+        self.cind = [[length - e, length - s, c] for s,e,c in self.cind]
 
     def colorpos(self, a, b, col=None):
         col = self.default if not col else col
@@ -384,6 +383,7 @@ class FSeq:
         self.header = header
         self.colseq = None
         self.colheader = None
+        self.handle_color = handle_color
         if purge_color or handle_color:
             self._process_color(handle_color)
 
@@ -465,9 +465,10 @@ class FSeq:
         if self.colseq:
             self.colseq.subseq(a, b)
 
-    def reverse(self, a, b, suffix='|REVERSE'):
+    def reverse(self, suffix='|REVERSE'):
         self.seq = self.seq[::-1]
-        self.colseq.reverse()
+        if self.handle_color:
+            self.colseq.reverse(len(self.seq))
         self.header += suffix
 
     @classmethod
@@ -1178,13 +1179,19 @@ class Reverse(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="reverse each sequence (NOT reverse complement)")
+        parser.add_argument(
+            '-S', '--preserve-color',
+            help='Preserve incoming color',
+            action='store_true',
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Reverse each sequence '''
-        for seq in gen.next():
-            header='{}|REVERSED'.format(ParseHeader.firstword(seq.header))
-            yield FSeq(header, seq.seq[::-1])
+        for seq in gen.next(handle_color=args.preserve_color):
+            seq.reverse()
+            yield seq
 
 class Sniff(Subcommand):
     def _parse(self):
