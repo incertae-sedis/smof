@@ -181,7 +181,7 @@ class ColorString:
         self.cind += [[b + len(self.cind), e + len(self.cind), c] for b,e,c in newcind]
 
     def subseq(self, a, b):
-        self.cind = [x for x in self.cind if not (x[0] > b or x[1] < a)]
+        self.cind = [x for x in self.cind if not (x[0] > b-1 or x[1]-1 < a)]
         self.cind = [[max(0, s - a), e - a, c] for s,e,c in self.cind]
 
     def reverse(self, length):
