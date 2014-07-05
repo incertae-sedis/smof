@@ -165,7 +165,7 @@ class ColorString:
                         newcind.append([pos[-1], None, col])
                     # end old color (at previous index), start new color
                     elif color_on and col != self.bgcolor:
-                        newcind[-1][1] = pos[-1] - 1
+                        newcind[-1][1] = pos[-1]
                         newcind.append([pos[-1], None, col])
                     # end old color
                     elif color_on and col == self.bgcolor:
@@ -189,27 +189,27 @@ class ColorString:
 
     def colorpos(self, a, b, col=None):
         col = self.default if not col else col
-        self.cind.append([a, b, col])
-        for i in range(len(self.cind)):
-            start,end,col = self.cind[i]
+        for i in reversed(range(len(self.cind))):
+            start,end,color = self.cind[i]
             # prior starts in interval and extends beyond it
-            if (a <= start <= b) and end > b:
+            if (a <= start < b) and end > b:
                 # reset start site
-                self.cind[i][0] = b + 1
-            # prior beings before interval and ends within it
+                self.cind[i][0] = b
+            # prior begins before interval and ends within it
             elif start < a and (a < end < b):
                 # reset end site
-                self.cind[i][1] = a - 1
+                self.cind[i][1] = a
             # prior is contained within interval
             elif a < start and b > end:
-                # color over the prior
+                # coloror over the prior
                 del self.cind[i]
             # prior contains interval
             elif a > start and b < end:
-                # replace prior with colored regions flanking interval
+                # replace prior with colorored regions flanking interval
                 del self.cind[i]
-                self.cind.append([start, a - 1, col])
-                self.cind.append([b + 1, end, col])
+                self.cind.append([start, a, color])
+                self.cind.append([b, end, color])
+        self.cind.append([a, b, col])
 
     def print(self, seq, colwidth=None):
         starts = {x[0]:x[2] for x in self.cind}
@@ -223,7 +223,7 @@ class ColorString:
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
             print(seq[i], end='')
-        print(self.bgcolor)
+        print()
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
