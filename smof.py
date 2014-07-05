@@ -5,6 +5,7 @@ import math
 import re
 import sys
 import string
+import copy
 from collections import Counter
 from collections import defaultdict
 from hashlib import md5
@@ -232,6 +233,11 @@ class ColorString:
             a = m.start()
             b = m.start() + len(m.group())
             self.colorpos(a, b, col)
+
+    def copy(self):
+        new_obj = ColorString(bgcolor=self.bgcolor, default=self.default)
+        new_obj.cind = self.cind
+        return(new_obj)
 
 class FileDescription:
     def __init__(self):
@@ -465,7 +471,7 @@ class FSeq:
         header = ParseHeader.firstword(self.header) + suffix
         newseq = FSeq(header, self.seq[a:b])
         if self.colseq:
-            newseq.colseq = self.colseq
+            newseq.colseq = self.colseq.copy()
             newseq.colseq.subseq(a, b)
         return(newseq)
 
@@ -1553,7 +1559,7 @@ class Subseq(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _subseq(self, seq, a, b, color):
+    def _subseq(self, seq, a, b, color=None):
         start,end = sorted([a,b])
         end = min(end, len(seq.seq))
 
@@ -1600,7 +1606,7 @@ class Subseq(Subcommand):
                 yield seq
             else:
                 for s in subseqs[seqid]:
-                    yield self._subseq(seq, s['start'], s['end'], args.color)
+                    yield self._subseq(seq, s['start'], s['end'])
 
     def _bound_generator(self, args, gen):
         for seq in gen.next(handle_color=True):
