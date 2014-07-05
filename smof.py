@@ -460,7 +460,8 @@ class FSeq:
     def header_upper(self):
         self.header = self.header.upper()
 
-    def subseq(self, a, b, suffix='|SUBSEQ(a..b)'):
+    def subseq(self, a, b, suffix=None):
+        suffix = suffix if suffix else '|SUBSEQ({}..{})'.format(a,b)
         header = ParseHeader.firstword(self.header) + suffix
         newseq = FSeq(header, self.seq[a:b])
         if self.colseq:
