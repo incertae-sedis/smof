@@ -181,8 +181,8 @@ class ColorString:
         self.cind += [[b + len(self.cind), e + len(self.cind), c] for b,e,c in newcind]
 
     def subseq(self, a, b):
-        self.cind = [x for x in self.cind if x[0] <=  b]
-        self.cind = [[s - a, e - a, c] for s,e,c in self.cind]
+        self.cind = [x for x in self.cind if not (x[0] > b or x[1] < a)]
+        self.cind = [[max(0, s - a), e - a, c] for s,e,c in self.cind]
 
     def reverse(self, length):
         self.cind = [[length - e, length - s, c] for s,e,c in self.cind]
@@ -460,10 +460,13 @@ class FSeq:
     def header_upper(self):
         self.header = self.header.upper()
 
-    def subseq(self, a, b):
-        self.seq = self.seq[a:b]
+    def subseq(self, a, b, suffix='|SUBSEQ(a..b)'):
+        header = ParseHeader.firstword(self.header) + suffix
+        newseq = FSeq(header, self.seq[a:b])
         if self.colseq:
-            self.colseq.subseq(a, b)
+            newseq.colseq = self.colseq
+            newseq.colseq.subseq(a, b)
+        return(newseq)
 
     def reverse(self, suffix='|REVERSE'):
         self.seq = self.seq[::-1]
@@ -480,7 +483,8 @@ class FSeq:
             newheader = ParseHeader.firstword(seq.header) + '|REVCOM'
             newseq = FSeq(newheader, trans(seq.seq[::-1]))
             if seq.colseq:
-                newseq.colseq.seq = [[c, trans(s)] for c,s in seq.colseq.seq[::-1]]
+                newseq.colseq = seq.colseq
+                newseq.colseq.reverse(len(seq.seq))
             if seq.colheader:
                 # TODO implement this
                 pass
@@ -1561,13 +1565,10 @@ class Subseq(Subcommand):
             seq.colseq.colorpos(start-1, end, c)
             return(seq)
         else:
-            rev = (a > b) and guess_type(seq.seq) == 'dna'
-
-            seq.subseq(start-1, end)
-            if rev:
-                raise NotImplemented
-                # seq.seq = FSeq.getrevcomp(seq.seq)
-            return(seq)
+            outseq = seq.subseq(start-1, end)
+            if (a > b) and guess_type(seq.seq) == 'dna':
+                outseq = FSeq.getrevcomp(outseq)
+            return(outseq)
 
     def _gff_generator(self, args, gen):
         subseqs = defaultdict(list)
