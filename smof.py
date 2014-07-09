@@ -2006,6 +2006,9 @@ class Grep(Subcommand):
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
 
+        if not args.match_sequence and (args.both_strands or args.ambiguous_nucl or args.reverse_only):
+            err('If you want to search sequence, set -q flag')
+
         if args.wrap and args.perl_regexp:
             err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
 
