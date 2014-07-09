@@ -2012,6 +2012,9 @@ class Grep(Subcommand):
         if args.ambiguous_nucl:
             args.perl_regexp = True
 
+        if args.force_color and args.no_color:
+            err("WTF? --force-color AND --no-color?")
+
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
