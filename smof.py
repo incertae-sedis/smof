@@ -225,7 +225,7 @@ class ColorString:
                 print()
             print(seq[i], end='')
         # TODO find the source of color overflow with double gff
-        print(self.bgcolor)
+        # print(self.bgcolor)
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
@@ -392,13 +392,16 @@ class FSeq:
         self.colheader = None
         self.handle_color = handle_color
         if purge_color or handle_color:
-            self._process_color(handle_color)
+            self._process_color(handle_color, purge_color)
 
-    def _process_color(self, handle_color=True):
-        if not self.colseq:
-            self.colseq = ColorString()
-        if not self.colheader:
-            self.colheader = ColorString()
+    def _process_color(self, handle_color=True, purge_color=False):
+        if purge_color:
+            self.colseq, self.colheader = None, None
+        else:
+            if not self.colseq:
+                self.colseq = ColorString()
+            if not self.colheader:
+                self.colheader = ColorString()
         if bool(re.search(Colors.pat, self.seq)):
             if handle_color:
                 self.colseq.append(self.seq)
@@ -990,7 +993,6 @@ class Clean(Subcommand):
             if irr:
                 trans = str.maketrans(a, b)
 
-        colorpat = re.compile(chr(27) + '\[\d+m')
         for seq in gen.next(purge_color=True):
 
             # Irregular or lowercase to unknown
