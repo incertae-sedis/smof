@@ -993,9 +993,6 @@ class Clean(Subcommand):
 
         for seq in gen.next(purge_color=True):
 
-            # Don't even think about printing in color
-            super().__setitem__(color, False)
-
             # Irregular or lowercase to unknown
             if trans:
                 seq.seq = seq.seq.translate(trans)
