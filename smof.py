@@ -224,8 +224,6 @@ class ColorString:
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
             print(seq[i], end='')
-        # TODO find the source of color overflow with double gff
-        # print(self.bgcolor)
         print()
 
     def colormatch(self, pattern, col=None):
