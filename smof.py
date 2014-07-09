@@ -992,6 +992,12 @@ class Clean(Subcommand):
                 trans = str.maketrans(a, b)
 
         for seq in gen.next(purge_color=True):
+            # WARNING: order is important here, don't swap thoughtlesly
+            # Remove all nonletters or wanted, otherwise just remove space
+            if args.toseq:
+                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
+            else:
+                seq.seq = re.sub('[^\S]', '', seq.seq)
 
             # Irregular or lowercase to unknown
             if trans:
@@ -1002,12 +1008,6 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.upper()
             elif args.tolower:
                 seq.seq = seq.seq.lower()
-
-            # Remove all nonletters or wanted, otherwise just remove space
-            if args.toseq:
-                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
-            else:
-                seq.seq = re.sub('[^\S]', '', seq.seq)
 
             yield seq
 
