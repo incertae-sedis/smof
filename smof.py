@@ -226,6 +226,7 @@ class ColorString:
             print(seq[i], end='')
         # TODO find the source of color overflow with double gff
         # print(self.bgcolor)
+        print()
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
@@ -392,16 +393,13 @@ class FSeq:
         self.colheader = None
         self.handle_color = handle_color
         if purge_color or handle_color:
-            self._process_color(handle_color, purge_color)
+            self._process_color(handle_color)
 
-    def _process_color(self, handle_color=True, purge_color=False):
-        if purge_color:
-            self.colseq, self.colheader = None, None
-        else:
-            if not self.colseq:
-                self.colseq = ColorString()
-            if not self.colheader:
-                self.colheader = ColorString()
+    def _process_color(self, handle_color=True):
+        if not self.colseq:
+            self.colseq = ColorString()
+        if not self.colheader:
+            self.colheader = ColorString()
         if bool(re.search(Colors.pat, self.seq)):
             if handle_color:
                 self.colseq.append(self.seq)
@@ -444,14 +442,14 @@ class FSeq:
     def ungap(self):
         self.seq = self.seq.translate(ungapper)
 
-    def print(self, column_width=80):
+    def print(self, column_width=80, color=True):
         print('>', end='')
-        if self.colheader:
+        if self.colheader and color:
             self.colheader.print(self.header, column_width)
         else:
             print(self.header)
         for i in range(0, len(self.seq), column_width):
-            if self.colseq:
+            if self.colseq and color:
                 self.colseq.print(self.seq, column_width)
                 break
             else:
@@ -796,7 +794,8 @@ def err(msg):
 # ====================
 
 class Subcommand:
-    def __init__(self, parser_obj, write=True):
+    def __init__(self, parser_obj, write=True, force_color=False):
+        self.force_color = force_color
         self.func = self.write if write else self.generator
         self.usage = parser_obj.usage
         self.subparsers = parser_obj.subparsers
@@ -811,7 +810,8 @@ class Subcommand:
     def write(self, args, gen):
         for out in self.generator(args, gen):
             if(isinstance(out, FSeq)):
-                out.print()
+                color = sys.stdout.isatty() or self.force_color
+                out.print(color=color)
             else:
                 print(out)
 
@@ -994,6 +994,9 @@ class Clean(Subcommand):
                 trans = str.maketrans(a, b)
 
         for seq in gen.next(purge_color=True):
+
+            # Don't even think about printing in color
+            super().__setitem__(color, False)
 
             # Irregular or lowercase to unknown
             if trans:
@@ -1199,10 +1202,17 @@ class Reverse(Subcommand):
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty (DANGEROUS)',
+            action='store_true',
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Reverse each sequence '''
+        self.force_color = args.force_color
         for seq in gen.next(handle_color=args.preserve_color):
             seq.reverse()
             yield seq
@@ -1560,6 +1570,12 @@ class Subseq(Subcommand):
             nargs=2,
             type=counting_number
         )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty (DANGEROUS)',
+            action='store_true',
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     def _subseq(self, seq, a, b, color=None):
@@ -1616,6 +1632,7 @@ class Subseq(Subcommand):
             yield self._subseq(seq, *args.bounds, color=args.color)
 
     def generator(self, args, gen):
+        self.force_color = args.force_color
         if args.gff:
             sgen = self._gff_generator
         else:
@@ -2175,7 +2192,6 @@ class Grep(Subcommand):
         return(sgen)
 
     def generator(self, args, gen):
-
         args = self._process_arguments(args)
 
         pat = self._get_pattern(args)
@@ -2192,6 +2208,7 @@ class Grep(Subcommand):
 
         sgen = self._makegen(args)
 
+        self.force_color = args.force_color
         for item in sgen(gen, matcher):
             yield item
 
