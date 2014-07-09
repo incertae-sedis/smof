@@ -215,16 +215,20 @@ class ColorString:
     def print(self, seq, colwidth=None):
         starts = {x[0]:x[2] for x in self.cind}
         ends = set([x[1] for x in self.cind])
+        colored = False
         for i in range(len(seq)):
             try:
                 print(starts[i], end='')
+                colored = True
             except:
                 if i in ends:
+                    colored -= 1
                     print(self.bgcolor, end='')
+                    colored = False
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
             print(seq[i], end='')
-        print()
+        print(self.bgcolor if colored else '')
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
