@@ -5,11 +5,12 @@ import math
 import re
 import sys
 import string
+import copy
 from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.9.6"
+__version__ = "1.10.0"
 
 # ================
 # Argument Parsing
@@ -214,16 +215,20 @@ class ColorString:
     def print(self, seq, colwidth=None):
         starts = {x[0]:x[2] for x in self.cind}
         ends = set([x[1] for x in self.cind])
+        colored = False
         for i in range(len(seq)):
             try:
                 print(starts[i], end='')
+                colored = True
             except:
                 if i in ends:
+                    colored -= 1
                     print(self.bgcolor, end='')
+                    colored = False
             if(colwidth and i % colwidth == 0 and i != 0):
                 print()
             print(seq[i], end='')
-        print()
+        print(self.bgcolor if colored else '')
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
@@ -232,6 +237,11 @@ class ColorString:
             a = m.start()
             b = m.start() + len(m.group())
             self.colorpos(a, b, col)
+
+    def copy(self):
+        new_obj = ColorString(bgcolor=self.bgcolor, default=self.default)
+        new_obj.cind = self.cind
+        return(new_obj)
 
 class FileDescription:
     def __init__(self):
@@ -434,14 +444,14 @@ class FSeq:
     def ungap(self):
         self.seq = self.seq.translate(ungapper)
 
-    def print(self, column_width=80):
+    def print(self, column_width=80, color=True):
         print('>', end='')
-        if self.colheader:
+        if self.colheader and color:
             self.colheader.print(self.header, column_width)
         else:
             print(self.header)
         for i in range(0, len(self.seq), column_width):
-            if self.colseq:
+            if self.colseq and color:
                 self.colseq.print(self.seq, column_width)
                 break
             else:
@@ -465,7 +475,7 @@ class FSeq:
         header = ParseHeader.firstword(self.header) + suffix
         newseq = FSeq(header, self.seq[a:b])
         if self.colseq:
-            newseq.colseq = self.colseq
+            newseq.colseq = self.colseq.copy()
             newseq.colseq.subseq(a, b)
         return(newseq)
 
@@ -786,7 +796,8 @@ def err(msg):
 # ====================
 
 class Subcommand:
-    def __init__(self, parser_obj, write=True):
+    def __init__(self, parser_obj, write=True, force_color=False):
+        self.force_color = force_color
         self.func = self.write if write else self.generator
         self.usage = parser_obj.usage
         self.subparsers = parser_obj.subparsers
@@ -801,7 +812,8 @@ class Subcommand:
     def write(self, args, gen):
         for out in self.generator(args, gen):
             if(isinstance(out, FSeq)):
-                out.print()
+                color = sys.stdout.isatty() or self.force_color
+                out.print(color=color)
             else:
                 print(out)
 
@@ -983,8 +995,13 @@ class Clean(Subcommand):
             if irr:
                 trans = str.maketrans(a, b)
 
-        colorpat = re.compile(chr(27) + '\[\d+m')
         for seq in gen.next(purge_color=True):
+            # WARNING: order is important here, don't swap thoughtlesly
+            # Remove all nonletters or wanted, otherwise just remove space
+            if args.toseq:
+                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
+            else:
+                seq.seq = re.sub('[^\S]', '', seq.seq)
 
             # Irregular or lowercase to unknown
             if trans:
@@ -995,12 +1012,6 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.upper()
             elif args.tolower:
                 seq.seq = seq.seq.lower()
-
-            # Remove all nonletters or wanted, otherwise just remove space
-            if args.toseq:
-                seq.seq = re.sub('[^A-Za-z]', '', seq.seq)
-            else:
-                seq.seq = re.sub('[^\S]', '', seq.seq)
 
             yield seq
 
@@ -1190,10 +1201,17 @@ class Reverse(Subcommand):
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty (DANGEROUS)',
+            action='store_true',
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Reverse each sequence '''
+        self.force_color = args.force_color
         for seq in gen.next(handle_color=args.preserve_color):
             seq.reverse()
             yield seq
@@ -1551,9 +1569,15 @@ class Subseq(Subcommand):
             nargs=2,
             type=counting_number
         )
+        parser.add_argument(
+            '-Y', '--force-color',
+            help='print in color even to non-tty (DANGEROUS)',
+            action='store_true',
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
-    def _subseq(self, seq, a, b, color):
+    def _subseq(self, seq, a, b, color=None):
         start,end = sorted([a,b])
         end = min(end, len(seq.seq))
 
@@ -1600,13 +1624,14 @@ class Subseq(Subcommand):
                 yield seq
             else:
                 for s in subseqs[seqid]:
-                    yield self._subseq(seq, s['start'], s['end'], args.color)
+                    yield self._subseq(seq, s['start'], s['end'])
 
     def _bound_generator(self, args, gen):
         for seq in gen.next(handle_color=True):
             yield self._subseq(seq, *args.bounds, color=args.color)
 
     def generator(self, args, gen):
+        self.force_color = args.force_color
         if args.gff:
             sgen = self._gff_generator
         else:
@@ -1985,11 +2010,17 @@ class Grep(Subcommand):
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
 
+        if not args.match_sequence and (args.both_strands or args.ambiguous_nucl or args.reverse_only):
+            err('If you want to search sequence, set -q flag')
+
         if args.wrap and args.perl_regexp:
             err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
 
         if args.ambiguous_nucl:
             args.perl_regexp = True
+
+        if args.force_color and args.no_color:
+            err("WTF? --force-color AND --no-color?")
 
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
@@ -2166,7 +2197,6 @@ class Grep(Subcommand):
         return(sgen)
 
     def generator(self, args, gen):
-
         args = self._process_arguments(args)
 
         pat = self._get_pattern(args)
@@ -2183,6 +2213,7 @@ class Grep(Subcommand):
 
         sgen = self._makegen(args)
 
+        self.force_color = args.force_color
         for item in sgen(gen, matcher):
             yield item
 
