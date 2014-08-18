@@ -262,17 +262,8 @@ class FileDescription:
             'initial-Met':0,
             'internal-stop':0,
             'terminal-stop':0}
-        self.nfeat = {
-            'start|coding|stop':0,
-            'start|coding':0,
-            'start|nonsense|stop':0,
-            'start|nonsense':0,
-            'coding|stop':0,
-            'nonsense|stop':0,
-            'start|n|stop':0,
-            'start':0,
-            'stop':0,
-            'not-CDS':0}
+        from itertools import product
+        self.nfeat = {''.join(c):0 for c in product('01', repeat=4)}
         self.ufeat = {
             'gapped':0,
             'unknown':0,
@@ -300,52 +291,55 @@ class FileDescription:
         if scase not in 'upper':
             counts = counter_caser(counts)
 
+        s = seq.seq.upper()
+
         # ('prot'|'dna'|'rna'|'amb'|'bad')
         stype = self._handle_type(counts)
 
         if stype == 'prot':
-            self.ufeat['unknown'] += 'X' in counts
-            self.ufeat['ambiguous'] += bool(Alphabet.PROT_AMB & set(counts))
+            tstop = bool('*' == s[-1])
+            self.pfeat['terminal-stop']  += tstop
+            self.pfeat['internal-stop']  += (counts['*'] - tstop) > 0
             self.pfeat['selenocysteine'] += 'U' in counts
-            self.pfeat['initial-Met'] += 'M' == seq.seq[0].upper()
-            tstop = '*' == seq.seq[-1]
-            self.pfeat['terminal-stop'] += tstop
-            self.pfeat['internal-stop'] += (counts['*'] - tstop) > 0
+            self.pfeat['initial-Met']    += 'M' == s[0]
+            self.ufeat['unknown']        += 'X' in counts
+            self.ufeat['ambiguous']      += bool(Alphabet.PROT_AMB & set(counts))
         elif stype in ('dna', 'rna'):
-            self.ufeat['unknown'] += 'N' in counts
+            self.ufeat['unknown'] += bool('N' in counts)
             self.ufeat['ambiguous'] += bool(Alphabet.DNA_AMB & set(counts))
-            triple = len(seq.seq) % 3 == 0
-            # Is last three bases STOP?
-            tstop = seq.seq[-3:].upper() in Alphabet.STOP
 
-            codons_1 = [seq.seq[i:i+3].upper() for i in range(0, len(seq.seq) - 3, 3)]
-            start_1 = 'ATG' == codons_1[0]
-            stop_1 = codons_1[-1] in Alphabet.STOP
-            internal_stop_1 = bool(set(codons_1[:-1]) & Alphabet.STOP)
+            start  = self._has_start(s)
+            stop   = self._has_stop(s)
+            triple = self._is_triple(s)
+            sense  = self._is_sense(s)
 
-            # Triplet and START-STOP
-            if start_1 and triple and stop_1 and not internal_stop_1:
-                self.nfeat['start|coding|stop'] += 1
-            elif start_1 and triple and stop_1 and internal_stop_1:
-                self.nfeat['start|nonsense|stop'] += 1
-            # Triplet and START
-            elif start_1 and triple and not stop_1 and not internal_stop_1:
-                self.nfeat['start|coding'] += 1
-            elif start_1 and triple and not stop_1 and internal_stop_1:
-                self.nfeat['start|nonsense'] += 1
-            # Triplet and STOP
-            elif not start_1 and tstop and triple and not internal_stop_1:
-                self.nfeat['coding|stop'] += 1
+            profile = ''.join([str(int(x)) for x in (start, stop, triple, sense)])
+            self.nfeat[profile] += 1
 
-            # START and terminal-STOP
-            elif start_1 and tstop and not triple:
-                self.nfeat['start|n|stop'] += 1
-            elif start_1 and not tstop:
-                self.nfeat['start'] += 1
-            elif not start_1 and not tstop:
-                self.nfeat['stop'] += 1
-            else:
-                self.nfeat['not-CDS'] += 1
+    def _has_start(self, s):
+        '''
+        Tests if the first codon is the START codon, assumes uppercase
+        '''
+        return(s[0:3] == 'ATG')
+
+    def _has_stop(self, s):
+        '''
+        Tests if the last three letters are a STOP codon, assumes uppercase
+        '''
+        return(s[-3:] in Alphabet.STOP)
+
+    def _is_triple(self, s):
+        '''
+        Tests is the sequence is multiple of three
+        '''
+        return(len(s) % 3 == 0)
+
+    def _is_sense(self, s):
+        '''
+        Tests if there are no internal STOP codons in the first frame
+        '''
+        codons = [s[i:i+3] for i in range(0, len(s) - 3, 3)]
+        return(bool(set(codons[:-1]) & Alphabet.STOP))
 
     def print_counts(self):
         '''
@@ -1277,14 +1271,15 @@ class Sniff(Subcommand):
         nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'rna'}])
         nprot = sum([v for k,v in seqsum.ntype.items() if k == 'prot'])
 
-        def write_feat(d, text, N):
+        def write_feat(d, text, N, drop=False):
             if not N:
-                return(0)
+                return
             print(text)
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
-                print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
+                if (drop and v != 0) or not drop:
+                    print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
 
-        write_feat(seqsum.nfeat, "Nucleotide Features:", nnucl)
+        write_feat(seqsum.nfeat, "Nucleotide Features", nnucl, drop=True)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
         write_feat(seqsum.ufeat, "Universal Features:", nseqs)
 
