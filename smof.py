@@ -441,8 +441,10 @@ class FSeq:
             self._process_color()
         self.colheader.colorpos(*args, **kwargs)
 
-    def ungap(self):
+    def ungap(self, suffix='|UNGAPPED'):
         self.seq = self.seq.translate(FSeq.ungapper)
+        if suffix:
+            self.header = self.header + suffix
 
     def print(self, column_width=80, color=True):
         print('>', end='')
