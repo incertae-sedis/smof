@@ -347,6 +347,16 @@ class FileDescription:
             else:
                 self.nfeat['not-CDS'] += 1
 
+    def print_counts(self):
+        '''
+        Used solely for debugging
+        '''
+        print("ntype: " + str(self.ntype))
+        print("ncase: " + str(self.ncase))
+        print("pfeat: " + str(self.pfeat))
+        print("nfeat: " + str(self.nfeat))
+        print("ufeat: " + str(self.ufeat))
+
     def _handle_gaps(self, seq, counts):
         # Handle gaps
         if Alphabet.GAP & set(counts):
