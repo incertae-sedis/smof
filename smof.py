@@ -316,30 +316,34 @@ class FileDescription:
             profile = ''.join([str(int(x)) for x in (start, stop, triple, sense)])
             self.nfeat[profile] += 1
 
-    def _has_start(self, s):
+    @classmethod
+    def _has_start(cls, s):
         '''
         Tests if the first codon is the START codon, assumes uppercase
         '''
         return(s[0:3] == 'ATG')
 
-    def _has_stop(self, s):
+    @classmethod
+    def _has_stop(cls, s):
         '''
         Tests if the last three letters are a STOP codon, assumes uppercase
         '''
         return(s[-3:] in Alphabet.STOP)
 
-    def _is_triple(self, s):
+    @classmethod
+    def _is_triple(cls, s):
         '''
         Tests is the sequence is multiple of three
         '''
         return(len(s) % 3 == 0)
 
-    def _is_sense(self, s):
+    @classmethod
+    def _is_sense(cls, s):
         '''
         Tests if there are no internal STOP codons in the first frame
         '''
-        codons = [s[i:i+3] for i in range(0, len(s) - 3, 3)]
-        return(bool(set(codons[:-1]) & Alphabet.STOP))
+        codons = set(s[i:i+3] for i in range(0, len(s) - 3, 3))
+        return(bool(not codons & Alphabet.STOP))
 
     def print_counts(self):
         '''
