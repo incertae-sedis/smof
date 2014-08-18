@@ -442,7 +442,7 @@ class FSeq:
         self.colheader.colorpos(*args, **kwargs)
 
     def ungap(self):
-        self.seq = self.seq.translate(ungapper)
+        self.seq = self.seq.translate(FSeq.ungapper)
 
     def print(self, column_width=80, color=True):
         print('>', end='')
