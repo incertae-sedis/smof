@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.0"
+__version__ = "1.11.1"
 
 # ================
 # Argument Parsing
@@ -51,11 +51,10 @@ def parse(argv=None):
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
-        raise SystemExit
+        sys.exit(0)
 
     if sys.argv[1] in ['idsearch', 'retrieve', 'search', 'rmfields']:
-        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
-        raise SystemExit
+        err("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
 
     args = parser.parser.parse_args(argv)
 
@@ -513,30 +512,36 @@ class FSeq:
 
 class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
+        '''
+        fh can be any iterable object
+        '''
         self.fh = fh
 
     def next(self, *args, **kwargs):
         seq_list = []
         header = ''
-        nseqs = 0
         for line in self.fh:
             line = line.strip()
-            if not line:
+            if not line or line[0] == '#':
                 continue
             if ">" == line[0]:
-                if(seq_list):
-                    nseqs += 1
+                if seq_list:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+                elif header:
+                    # If no sequence but there is a header ...
+                    err("Illegally empty sequence")
                 seq_list = []
-                header = line.split('>')[1]
+                header = line[1:]
             elif header:
                 seq_list.append(line)
             else:
                 err("First fasta line must begin with '>'")
         if header:
-            nseqs += 1
-            yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-        if not nseqs:
+            if seq_list:
+                yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+            else:
+                err("Illegally empty sequence")
+        else:
             err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
@@ -722,9 +727,19 @@ def guess_type(counts):
     '''
     Predict sequence type from character counts (dna|rna|prot|ambiguous|illegal)
     '''
+    if(isinstance(counts, str)):
+        counts = Counter(counts)
+    elif(isinstance(counts, FSeq)):
+        counts = Counter(counts.seq)
+
+    # Convert all to upper case
+    counts = counter_caser(counts)
+    # Remove gaps from Counter
+    counts = Counter({k:n for k,n in counts.items() if k not in Alphabet.GAP})
+
     # If all chars are in ACGT
     if set(counts) <= Alphabet.DNA:
-        stype = 'dna'
+        stype = 'ambiguous' if sum(counts.values()) < 3 else 'dna'
     # If all chars in ACGU
     elif set(counts) <= Alphabet.RNA:
         stype = 'rna'
@@ -738,7 +753,10 @@ def guess_type(counts):
     elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
         # If more than 80% look like nucleic acids, set 'amb_nucl'
         if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-            stype = 'rna' if 'U' in counts else 'dna'
+            if 'U' in counts:
+                stype = 'illegal' if 'T' in counts else 'rna'
+            else:
+                stype = 'dna'
         # Otherwise set as ambibuous
         else:
             stype = 'ambiguous'
@@ -753,24 +771,31 @@ def headtailtrunk(seq, first, last):
     This function is used by the Head and Tail classes to portray partial
     sections of sequences.
     '''
+
+    outseq = FSeq(None, None)
     if first and last:
         if first + last < len(seq.seq):
-            seq.header = ParseHeader.firstword(seq.header) + \
+            outseq.header = ParseHeader.firstword(seq.header) + \
                     '|TRUNCATED:first-{}_last-{}'.format(first, last)
-            seq.seq = '{}{}{}'.format(
+            outseq.seq = '{}{}{}'.format(
                 seq.seq[0:first],
                 '...',
                 seq.seq[-last:]
             )
+        else:
+            outseq.header = seq.header
+            outseq.seq = seq.seq
     elif first:
-        seq.header = ParseHeader.firstword(seq.header) + \
+        outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:first-{}'.format(first)
-        seq.seq = seq.seq[0:first]
+        outseq.seq = seq.seq[0:first]
     elif last:
-        seq.header = ParseHeader.firstword(seq.header) + \
+        outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:last-{}'.format(last)
-        seq.seq = seq.seq[-last:]
-    return(seq)
+        outseq.seq = seq.seq[-last:]
+    else:
+        err("Illegal empty sequence, dying ...")
+    return(outseq)
 
 def ascii_histchar(dif, chars=' .~*O'):
     if dif <= 0:
@@ -798,7 +823,7 @@ def positive_int(i):
 
 def err(msg):
     print(msg, file=sys.stderr)
-    raise SystemExit
+    sys.exit(1)
 
 
 # ====================
