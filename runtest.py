@@ -5,6 +5,7 @@ import unittest
 import argparse
 import sys
 from tempfile import TemporaryFile
+from collections import Counter
 
 class TestFSeq(unittest.TestCase):
     def test_subseq(self):
@@ -286,6 +287,104 @@ class TestFileDescription(unittest.TestCase):
         for prof in [''.join(c) for c in product('01', repeat=4)]:
             self.assertTrue(test_profile(prof), 'nfeat profile: %s, failed' % prof)
 
+class TestUtilities(unittest.TestCase):
+    def setUp(self):
+        self.seq = smof.FSeq('seq', 'ACDEFSTVWY')
+
+    def test_counter_caser(self):
+        self.assertEqual(smof.counter_caser(Counter('Aaa')), {'A':3})
+        self.assertEqual(smof.counter_caser(Counter('Aaa'), True), {'a':3})
+
+    def test_sum_lower(self):
+        self.assertEqual(smof.sum_lower(Counter('AaaFf')), 3)
+        self.assertEqual(smof.sum_lower(Counter('AAAFF')), 0)
+        self.assertEqual(smof.sum_lower(Counter('AaaF.{')), 2)
+
+    def test_guess_type_input(self):
+        # String input
+        self.assertEqual(smof.guess_type('FFFF'), 'prot')
+        # Counter object input
+        self.assertEqual(smof.guess_type(Counter('FFFF')), 'prot')
+        # FSeq object input
+        self.assertEqual(smof.guess_type(smof.FSeq('s1', 'FFFF')), 'prot')
+        # Gaps should be ignored
+        self.assertEqual(smof.guess_type(smof.FSeq('s1', 'F-F_F.F')), 'prot')
+        # Case should be ignored
+        self.assertEqual(smof.guess_type(smof.FSeq('s1', 'ffff')), 'prot')
+
+    def test_guess_type_dna(self):
+        self.assertEqual(smof.guess_type('GATACA'), 'dna')
+        self.assertEqual(smof.guess_type('GATACANNN'), 'dna')
+        self.assertEqual(smof.guess_type('NNNNNN'), 'dna')
+
+    def test_guess_type_rna(self):
+        self.assertEqual(smof.guess_type('GAUACA'), 'rna')
+
+    def test_guess_type_prot(self):
+        self.assertEqual(smof.guess_type('FAMNX'), 'prot')
+        self.assertEqual(smof.guess_type('XXXXX'), 'prot')
+
+    def test_guess_type_illegal(self):
+        self.assertEqual(smof.guess_type('DAMO'), 'illegal')
+        self.assertEqual(smof.guess_type('DAM!'), 'illegal')
+        # A nucleotide sequence can't have both U and T
+        self.assertEqual(smof.guess_type('GATU'), 'illegal')
+        # Space is illegal
+        self.assertEqual(smof.guess_type('DAM '), 'illegal')
+        # Gaps should NOT be counted as illegal
+        self.assertNotEqual(smof.guess_type('D.A-M_'), 'illegal')
+        # * should not be illegal (indicates STOP in protein sequence)
+        self.assertNotEqual(smof.guess_type('DA*M*'), 'illegal')
+
+    def test_guess_type_ambiguous(self):
+        self.assertEqual(smof.guess_type('A'), 'ambiguous')
+        self.assertEqual(smof.guess_type('AT'), 'ambiguous')
+        self.assertNotEqual(smof.guess_type('ATG'), 'ambiguous')
+        self.assertNotEqual(smof.guess_type('AUG'), 'ambiguous')
+        # Greater than 80% nucleotide characters with ambiguous is dna
+        self.assertEqual(smof.guess_type('ATGGR'), 'ambiguous')
+        self.assertEqual(smof.guess_type('ATGGGR'), 'dna')
+        # Sequences containing only ambiguous nucleotides (could be dna or
+        # protein) are counted as ambiguous regardless of lenght
+        self.assertEqual(smof.guess_type('WYS'), 'ambiguous')
+        self.assertEqual(smof.guess_type('RYSWKMDBHV'), 'ambiguous')
+        # But if one unambiguous aa is added ('F')
+        self.assertEqual(smof.guess_type('FRYSWKMDBHV'), 'prot')
+
+    def test_counting_number(self):
+        import argparse
+        self.assertRaises(argparse.ArgumentTypeError, smof.counting_number, 0)
+        self.assertRaises(argparse.ArgumentTypeError, smof.counting_number, -1)
+
+    def test_positive_int(self):
+        import argparse
+        self.assertRaises(argparse.ArgumentTypeError, smof.positive_int, -1)
+        try:
+            smof.positive_int(0)
+            zero_calls_exception = False
+        except argparse.ArgumentTypeError:
+            zero_calls_exception = True
+        self.assertFalse(zero_calls_exception)
+
+    def test_headtailtrunk_first(self):
+        # Note: argparse will only allow positive integers
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=1, last=0).seq, 'A')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=5, last=0).seq, 'ACDEF')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=20, last=0).seq, 'ACDEFSTVWY')
+
+    def test_headtailtrunk_last(self):
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=0, last=1).seq, 'Y')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=0, last=5).seq, 'STVWY')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=0, last=20).seq, 'ACDEFSTVWY')
+
+    def test_headtailtrunk_firstandlast(self):
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=1, last=1).seq, 'A...Y')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=2, last=3).seq, 'AC...VWY')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=5, last=5).seq, 'ACDEFSTVWY')
+        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=6, last=6).seq, 'ACDEFSTVWY')
+
+    def test_headtailtrunk_doublezero(self):
+        self.assertRaises(SystemExit, smof.headtailtrunk, seq=self.seq, first=0, last=0)
 
 
 if __name__ == '__main__':
