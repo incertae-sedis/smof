@@ -727,6 +727,11 @@ def guess_type(counts):
     elif(isinstance(counts, FSeq)):
         counts = Counter(counts.seq)
 
+    # Convert all to upper case
+    counts = counter_caser(counts)
+    # Remove gaps from Counter
+    counts = Counter({k:n for k,n in counts.items() if k not in Alphabet.GAP})
+
     # If all chars are in ACGT
     if set(counts) <= Alphabet.DNA:
         stype = 'dna'
