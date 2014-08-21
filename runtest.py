@@ -386,8 +386,110 @@ class TestUtilities(unittest.TestCase):
     def test_headtailtrunk_doublezero(self):
         self.assertRaises(SystemExit, smof.headtailtrunk, seq=self.seq, first=0, last=0)
 
+class TestFSeqGenerator(unittest.TestCase):
+    def setUp(self):
+        self.seq1 = smof.FSeq(header='seq1', seq='ACGTA')
+        self.seq2 = smof.FSeq(header='seq2', seq='GGTT')
+        self.seq1_spaced = smof.FSeq(header='seq1', seq='AC GTA')
+        self.seq2_spaced = smof.FSeq(header='seq2', seq='GGTT')
+        self.seq1_weird = smof.FSeq(header="seq1 >weirdness", seq='ACGTA')
+
+        self.good = [
+            ">seq1", "ACGT", "A",
+            ">seq2", "GGT", "T"
+        ]
+        self.good_empty_lines = [
+            ">seq1", "ACGT", "A", "\n",
+            ">seq2", "GGT", "T", "\n"
+        ]
+        self.weird_empty_lines = [
+            "\n", ">seq1", "ACGT", "\n", "A", "\n",
+            ">seq2", "GGT", "T", "\n"
+        ]
+        self.spaced = [
+            " >seq1", "AC GT", "A",
+            " >seq2 ", " GGT", "T "
+        ]
+        self.well_commented = [
+            "# this is a comment",
+            "# so is this",
+            ">seq1", "ACGT", "A",
+            ">seq2", "GGT", "T"
+        ]
+        self.interspersed_comments = [
+            "# this is a comment",
+            ">seq1", "ACGT", "A",
+            "# so is this",
+            ">seq2", "GGT", "T"
+        ]
+        self.bad_first = [
+            "A",
+            ">seq1", "ACGT", "A",
+            ">seq2", "GGT", "T"
+        ]
+        self.empty_seq = [
+            ">seq1",
+            ">seq2", "GGT", "T"
+        ]
+        self.empty_last_seq = [
+            ">seq1", "ACGT", "A",
+            ">seq2"
+        ]
+        self.internal_gt = [
+            ">seq1 >weirdness", "ACGT", "A",
+        ]
+        self.no_sequence = []
+
+    def cmp_seqs(self, fh, exp_seqs):
+        g = smof.FSeqGenerator(fh)
+        obs_seqs = [s for s in g.next()]
+        for obs, exp in zip(obs_seqs, exp_seqs):
+            if (obs.header != exp.header) or (obs.seq != exp.seq):
+                print([obs.header, exp.header])
+                return(False)
+        return(True)
+
+    def is_valid(self, fh):
+        try:
+            g = smof.FSeqGenerator(fh)
+            out = [s for s in g.next()]
+            return(True)
+        except BaseException:
+            return(False)
+
+    def test_good(self):
+        self.assertTrue(self.cmp_seqs(self.good, (self.seq1, self.seq2)))
+
+    def test_good_empty_lines(self):
+        self.assertTrue(self.cmp_seqs(self.good_empty_lines, (self.seq1, self.seq2)))
+
+    def test_weird_empty_lines(self):
+        self.assertTrue(self.cmp_seqs(self.weird_empty_lines, (self.seq1, self.seq2)))
+
+    def test_spaced(self):
+        self.assertTrue(self.cmp_seqs(self.spaced, (self.seq1_spaced, self.seq2_spaced)))
+
+    def test_well_commented(self):
+        self.assertTrue(self.cmp_seqs(self.well_commented, (self.seq1, self.seq2)))
+
+    def test_interspersed_comments(self):
+        self.assertTrue(self.cmp_seqs(self.interspersed_comments, (self.seq1, self.seq2)))
+
+    def test_internal_gt(self):
+        self.assertTrue(self.cmp_seqs(self.internal_gt, [self.seq1_weird]))
+
+    def test_bad_first(self):
+        self.assertFalse(self.is_valid(self.bad_first))
+
+    def test_empty_seq(self):
+        self.assertFalse(self.is_valid(self.empty_seq))
+
+    def test_empty_last_seq(self):
+        self.assertFalse(self.is_valid(self.empty_last_seq))
+
+    def test_no_sequence(self):
+        self.assertFalse(self.is_valid(self.no_sequence))
+
 
 if __name__ == '__main__':
-    # a = ['>seq1','AcGGNttt','AGGGG','>seq2','atgat']
-    # gen = getgen(a)
     unittest.main()
