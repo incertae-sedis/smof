@@ -51,11 +51,10 @@ def parse(argv=None):
 
     if(len(sys.argv) == 1):
         parser.parser.print_help()
-        raise SystemExit
+        sys.exit(0)
 
     if sys.argv[1] in ['idsearch', 'retrieve', 'search', 'rmfields']:
-        print("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
-        raise SystemExit
+        err("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
 
     args = parser.parser.parse_args(argv)
 
@@ -766,24 +765,31 @@ def headtailtrunk(seq, first, last):
     This function is used by the Head and Tail classes to portray partial
     sections of sequences.
     '''
+
+    outseq = FSeq(None, None)
     if first and last:
         if first + last < len(seq.seq):
-            seq.header = ParseHeader.firstword(seq.header) + \
+            outseq.header = ParseHeader.firstword(seq.header) + \
                     '|TRUNCATED:first-{}_last-{}'.format(first, last)
-            seq.seq = '{}{}{}'.format(
+            outseq.seq = '{}{}{}'.format(
                 seq.seq[0:first],
                 '...',
                 seq.seq[-last:]
             )
+        else:
+            outseq.header = seq.header
+            outseq.seq = seq.seq
     elif first:
-        seq.header = ParseHeader.firstword(seq.header) + \
+        outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:first-{}'.format(first)
-        seq.seq = seq.seq[0:first]
+        outseq.seq = seq.seq[0:first]
     elif last:
-        seq.header = ParseHeader.firstword(seq.header) + \
+        outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:last-{}'.format(last)
-        seq.seq = seq.seq[-last:]
-    return(seq)
+        outseq.seq = seq.seq[-last:]
+    else:
+        err("Illegal empty sequence, dying ...")
+    return(outseq)
 
 def ascii_histchar(dif, chars=' .~*O'):
     if dif <= 0:
@@ -811,7 +817,7 @@ def positive_int(i):
 
 def err(msg):
     print(msg, file=sys.stderr)
-    raise SystemExit
+    sys.exit(1)
 
 
 # ====================
