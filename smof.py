@@ -722,6 +722,11 @@ def guess_type(counts):
     '''
     Predict sequence type from character counts (dna|rna|prot|ambiguous|illegal)
     '''
+    if(isinstance(counts, str)):
+        counts = Counter(counts)
+    elif(isinstance(counts, FSeq)):
+        counts = Counter(counts.seq)
+
     # If all chars are in ACGT
     if set(counts) <= Alphabet.DNA:
         stype = 'dna'
