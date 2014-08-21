@@ -748,7 +748,10 @@ def guess_type(counts):
     elif set(counts) <= (Alphabet.PROT | Alphabet.PROT_AMB):
         # If more than 80% look like nucleic acids, set 'amb_nucl'
         if (sum([counts[x] for x in 'ACGTUN' if x in counts]) / sum(counts.values())) > 0.8:
-            stype = 'rna' if 'U' in counts else 'dna'
+            if 'U' in counts:
+                stype = 'illegal' if 'T' in counts else 'rna'
+            else:
+                stype = 'dna'
         # Otherwise set as ambibuous
         else:
             stype = 'ambiguous'
