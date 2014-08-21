@@ -734,7 +734,7 @@ def guess_type(counts):
 
     # If all chars are in ACGT
     if set(counts) <= Alphabet.DNA:
-        stype = 'dna'
+        stype = 'ambiguous' if sum(counts.values()) < 3 else 'dna'
     # If all chars in ACGU
     elif set(counts) <= Alphabet.RNA:
         stype = 'rna'
