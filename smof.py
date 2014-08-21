@@ -512,30 +512,36 @@ class FSeq:
 
 class FSeqGenerator:
     def __init__(self, fh=sys.stdin):
+        '''
+        fh can be any iterable object
+        '''
         self.fh = fh
 
     def next(self, *args, **kwargs):
         seq_list = []
         header = ''
-        nseqs = 0
         for line in self.fh:
             line = line.strip()
-            if not line:
+            if not line or line[0] == '#':
                 continue
             if ">" == line[0]:
-                if(seq_list):
-                    nseqs += 1
+                if seq_list:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+                elif header:
+                    # If no sequence but there is a header ...
+                    err("Illegally empty sequence")
                 seq_list = []
-                header = line.split('>')[1]
+                header = line[1:]
             elif header:
                 seq_list.append(line)
             else:
                 err("First fasta line must begin with '>'")
         if header:
-            nseqs += 1
-            yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-        if not nseqs:
+            if seq_list:
+                yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+            else:
+                err("Illegally empty sequence")
+        else:
             err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
