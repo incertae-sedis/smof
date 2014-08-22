@@ -6,6 +6,8 @@ import argparse
 import sys
 from tempfile import TemporaryFile
 from collections import Counter
+from io import StringIO
+
 
 class TestFSeq(unittest.TestCase):
     def test_subseq(self):
@@ -386,6 +388,9 @@ class TestUtilities(unittest.TestCase):
     def test_headtailtrunk_doublezero(self):
         self.assertRaises(SystemExit, smof.headtailtrunk, seq=self.seq, first=0, last=0)
 
+    def test_headtailtrunk_doublenone(self):
+        self.assertEqual(smof.headtailtrunk(seq=self.seq).seq, 'ACDEFSTVWY')
+
 class TestFSeqGenerator(unittest.TestCase):
     def setUp(self):
         self.seq1 = smof.FSeq(header='seq1', seq='ACGTA')
@@ -393,10 +398,11 @@ class TestFSeqGenerator(unittest.TestCase):
         self.seq1_spaced = smof.FSeq(header='seq1', seq='AC GTA')
         self.seq2_spaced = smof.FSeq(header='seq2', seq='GGTT')
         self.seq1_weird = smof.FSeq(header="seq1 >weirdness", seq='ACGTA')
+        self.seq1_funky = smof.FSeq(header="seq1|asdf:!@(*#& !@#$%^&*())_+", seq="ACGTA")
 
         self.good = [
-            ">seq1", "ACGT", "A",
-            ">seq2", "GGT", "T"
+            ">seq1\n", "ACGT\n", "A\n",
+            ">seq2\n", "GGT\n", "T\n"
         ]
         self.good_empty_lines = [
             ">seq1", "ACGT", "A", "\n",
@@ -436,7 +442,10 @@ class TestFSeqGenerator(unittest.TestCase):
             ">seq2"
         ]
         self.internal_gt = [
-            ">seq1 >weirdness", "ACGT", "A",
+            ">seq1 >weirdness", "ACGT", "A"
+        ]
+        self.funky_header = [
+            ">seq1|asdf:!@(*#& !@#$%^&*())_+", "ACGT", "A"
         ]
         self.no_sequence = []
 
@@ -475,6 +484,9 @@ class TestFSeqGenerator(unittest.TestCase):
     def test_interspersed_comments(self):
         self.assertTrue(self.cmp_seqs(self.interspersed_comments, (self.seq1, self.seq2)))
 
+    def test_funky_header(self):
+        self.assertTrue(self.cmp_seqs(self.funky_header, [self.seq1_funky]))
+
     def test_internal_gt(self):
         self.assertTrue(self.cmp_seqs(self.internal_gt, [self.seq1_weird]))
 
@@ -489,6 +501,33 @@ class TestFSeqGenerator(unittest.TestCase):
 
     def test_no_sequence(self):
         self.assertFalse(self.is_valid(self.no_sequence))
+
+
+def get_output(seq, argv):
+    argv = [str(s) for s in argv]
+    out = StringIO()
+    gen = smof.FSeqGenerator(seq)
+    args = smof.parse(argv)
+    args.func(args, gen, out=out)
+    return(out.getvalue().strip().split("\n"))
+
+class TestHeadandTail(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a','GATACA',
+                  '>b','GALLIF',
+                  '>c','SPARTA']
+
+    def test_defaults(self):
+        self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
+        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
+
+    def test_n(self):
+        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
+
+    def test_fl(self):
+        self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
+        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
 
 
 if __name__ == '__main__':
