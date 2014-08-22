@@ -768,13 +768,13 @@ def guess_type(counts):
         stype = 'illegal'
     return(stype)
 
-def headtailtrunk(seq, first, last):
+def headtailtrunk(seq, first=None, last=None):
     '''
     This function is used by the Head and Tail classes to portray partial
     sections of sequences.
     '''
 
-    outseq = FSeq(None, None)
+    outseq = FSeq(seq.header, seq.seq)
     if first and last:
         if first + last < len(seq.seq):
             outseq.header = ParseHeader.firstword(seq.header) + \
@@ -784,9 +784,6 @@ def headtailtrunk(seq, first, last):
                 '...',
                 seq.seq[-last:]
             )
-        else:
-            outseq.header = seq.header
-            outseq.seq = seq.seq
     elif first:
         outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:first-{}'.format(first)
@@ -795,7 +792,7 @@ def headtailtrunk(seq, first, last):
         outseq.header = ParseHeader.firstword(seq.header) + \
                 '|TRUNCATED:last-{}'.format(last)
         outseq.seq = seq.seq[-last:]
-    else:
+    elif first == 0 and last == 0:
         err("Illegal empty sequence, dying ...")
     return(outseq)
 
