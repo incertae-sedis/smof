@@ -213,23 +213,25 @@ class ColorString:
                 self.cind.append([b, end, color])
         self.cind.append([a, b, col])
 
-    def print(self, seq, colwidth=None):
+    def print(self, seq, colwidth=None, out=sys.stdout):
         starts = {x[0]:x[2] for x in self.cind}
         ends = set([x[1] for x in self.cind])
         colored = False
         for i in range(len(seq)):
             try:
-                print(starts[i], end='')
+                out.write(starts[i])
                 colored = True
             except:
                 if i in ends:
                     colored -= 1
-                    print(self.bgcolor, end='')
+                    out.write(self.bgcolor)
                     colored = False
             if(colwidth and i % colwidth == 0 and i != 0):
-                print()
-            print(seq[i], end='')
-        print(self.bgcolor if colored else '')
+               out.write("\n")
+            out.write(seq[i])
+        out.write(self.bgcolor if colored else '')
+        out.write("\n")
+
 
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
@@ -346,16 +348,6 @@ class FileDescription:
         codons = set(s[i:i+3] for i in range(0, len(s) - 3, 3))
         return(bool(not codons & Alphabet.STOP))
 
-    def print_counts(self):
-        '''
-        Used solely for debugging
-        '''
-        print("ntype: " + str(self.ntype))
-        print("ncase: " + str(self.ncase))
-        print("pfeat: " + str(self.pfeat))
-        print("nfeat: " + str(self.nfeat))
-        print("ufeat: " + str(self.ufeat))
-
     def _handle_gaps(self, seq, counts):
         # Handle gaps
         if Alphabet.GAP & set(counts):
@@ -455,18 +447,18 @@ class FSeq:
         if suffix:
             self.header = self.header + suffix
 
-    def print(self, column_width=80, color=True):
-        print('>', end='')
+    def print(self, column_width=80, color=True, out=sys.stdout):
+        out.write('>')
         if self.colheader and color:
-            self.colheader.print(self.header, column_width)
+            self.colheader.print(self.header, column_width, out=out)
         else:
-            print(self.header)
+            out.write('%s\n' % self.header)
         for i in range(0, len(self.seq), column_width):
             if self.colseq and color:
-                self.colseq.print(self.seq, column_width)
+                self.colseq.print(self.seq, column_width, out=out)
                 break
             else:
-                print(self.seq[i:i + column_width])
+                out.write('%s\n' % self.seq[i:i + column_width])
 
     def get_pretty_string(self, column_width=80):
         out = ['>' + self.header]
@@ -704,7 +696,7 @@ def csvrowGenerator(filename):
         f.seek(0)
         reader = csv.reader(f, dialect)
     except IOError as e:
-        print(e)
+        print(e, file=sys.stderr)
         sys.exit(0)
     for row in reader:
         yield row
@@ -773,7 +765,6 @@ def headtailtrunk(seq, first=None, last=None):
     This function is used by the Head and Tail classes to portray partial
     sections of sequences.
     '''
-
     outseq = FSeq(seq.header, seq.seq)
     if first and last:
         if first + last < len(seq.seq):
@@ -830,9 +821,9 @@ def err(msg):
 # ====================
 
 class Subcommand:
-    def __init__(self, parser_obj, write=True, force_color=False):
+    def __init__(self, parser_obj, force_color=False):
         self.force_color = force_color
-        self.func = self.write if write else self.generator
+        self.func = self.write
         self.usage = parser_obj.usage
         self.subparsers = parser_obj.subparsers
         self._parse()
@@ -843,13 +834,13 @@ class Subcommand:
     def generator(self, args, gen):
         raise NotImplemented
 
-    def write(self, args, gen):
-        for out in self.generator(args, gen):
-            if(isinstance(out, FSeq)):
+    def write(self, args, gen, out=sys.stdout):
+        for output in self.generator(args, gen):
+            if(isinstance(output, FSeq)):
                 color = sys.stdout.isatty() or self.force_color
-                out.print(color=color)
+                output.print(color=color, out=out)
             else:
-                print(out)
+                out.write('%s\n' % output)
 
 class Chksum(Subcommand):
     def _parse(self):
@@ -1266,7 +1257,7 @@ class Sniff(Subcommand):
             seqsum.add_seq(seq)
         yield seqsum
 
-    def write(self, args, gen):
+    def write(self, args, gen, out=sys.stdout):
         seqsum = next(self.generator(args, gen))
         nseqs = sum(seqsum.ncase.values())
 
@@ -1275,23 +1266,23 @@ class Sniff(Subcommand):
         has_bad = seqsum.ntype['illegal'] != 0
 
         if has_degen_seqs:
-            print("{} uniq sequences ({} total)".format(len(seqsum.seqs), nseqs))
+            out.write("{} uniq sequences ({} total)\n".format(len(seqsum.seqs), nseqs))
         else:
-            print("Total sequences: {}".format(nseqs))
+            out.write("Total sequences: {}\n".format(nseqs))
 
         if has_degen_headers:
-            print("WARNING: headers are not unique ({}/{})".format(len(seqsum.headers), nseqs))
+            out.write("WARNING: headers are not unique ({}/{})\n".format(len(seqsum.headers), nseqs))
         if has_bad:
-            print("WARNING: illegal characters found")
+            out.write("WARNING: illegal characters found\n")
 
         def write_dict(d, name, N):
             uniq = [[k,v] for  k,v in d.items() if v != 0]
             if len(uniq) == 1:
-                print("All {}".format(uniq[0][0]))
+                out.write("All {}\n".format(uniq[0][0]))
             else:
-                print("{}:".format(name))
+                out.write("{}:\n".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
-                    print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
+                    out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
         write_dict(seqsum.ntype, 'Sequence types', nseqs)
         write_dict(seqsum.ncase, 'Sequences cases', nseqs)
@@ -1302,10 +1293,10 @@ class Sniff(Subcommand):
         def write_feat(d, text, N, drop=False):
             if not N:
                 return
-            print(text)
+            out.write('%s\n' % text)
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
                 if (drop and v != 0) or not drop:
-                    print("  {:<20} {:<10} {:>7.4%}".format(k + ':', v, v/N))
+                    out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
         write_feat(seqsum.nfeat, "Nucleotide Features", nnucl, drop=True)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
@@ -1875,7 +1866,7 @@ class Split(Subcommand):
         for s in gen.next():
             yield s
 
-    def write(self, args, gen):
+    def write(self, args, gen, out=None):
         k = int(args.nfiles)
         p = args.prefix
         seqs = list(self.generator(args, gen))
@@ -2365,14 +2356,14 @@ class Wc(Subcommand):
         yield nseqs
         yield nchars
 
-    def write(self, args, gen):
+    def write(self, args, gen, out=sys.stdout):
         nseqs, nchars = list(self.generator(args, gen))
         if args.chars and not args.lines:
-            print(nchars)
+            out.write('%s\n' % nchars)
         elif args.lines and not args.chars:
-            print(nseqs)
+            out.write('%s\n' % nseqs)
         else:
-            print("{}\t{}".format(nseqs, nchars))
+            out.write("{}\t{}\n".format(nseqs, nchars))
 
 class Tail(Subcommand):
     def _parse(self):
@@ -2423,4 +2414,4 @@ class Tail(Subcommand):
 if __name__ == '__main__':
     gen = FSeqGenerator()
     args = parse()
-    args.func(args, gen)
+    args.func(args, gen, out=sys.stdout)
