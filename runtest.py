@@ -6,6 +6,8 @@ import argparse
 import sys
 from tempfile import TemporaryFile
 from collections import Counter
+from io import StringIO
+
 
 class TestFSeq(unittest.TestCase):
     def test_subseq(self):
@@ -501,11 +503,32 @@ class TestFSeqGenerator(unittest.TestCase):
         self.assertFalse(self.is_valid(self.no_sequence))
 
 
-# class TestHead(unittest.TestCase):
-#     def test_defaults(self):
-#         gen = smof.FSeqGenerator(['>a','ACG','>b','GG'])
-#         args = smof.parse(['head'])
-#         args.func(args, gen)
+def get_output(seq, argv):
+    argv = [str(s) for s in argv]
+    out = StringIO()
+    gen = smof.FSeqGenerator(seq)
+    args = smof.parse(argv)
+    args.func(args, gen, out=out)
+    return(out.getvalue().strip().split("\n"))
+
+class TestHeadandTail(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a','GATACA',
+                  '>b','GALLIF',
+                  '>c','SPARTA']
+
+    def test_defaults(self):
+        self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
+        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
+
+    def test_n(self):
+        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
+
+    def test_fl(self):
+        self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
+        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
+
 
 if __name__ == '__main__':
     unittest.main()
