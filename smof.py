@@ -49,12 +49,14 @@ def parse(argv=None):
     for cmd in subcommands:
         cmd(parser)
 
-    if(len(sys.argv) == 1):
+    argv = argv if argv else sys.argv[1:]
+
+    if not argv:
         parser.parser.print_help()
         sys.exit(0)
 
-    if sys.argv[1] in ['idsearch', 'retrieve', 'search', 'rmfields']:
-        err("{} is deprecated, use 'smof grep'".format(sys.argv[1]))
+    if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
+        err("{} is deprecated, use 'smof grep'".format(argv[0]))
 
     args = parser.parser.parse_args(argv)
 
