@@ -529,6 +529,20 @@ class TestHeadandTail(unittest.TestCase):
         self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
         self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
 
+class TestWc(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a','CAT',
+                  '>b','HAT',
+                  '>c','A']
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['wc']), ['3\t7'])
+
+    def test_nseqs(self):
+        self.assertEqual(get_output(self.seq, ['wc', '-l']), ['3'])
+
+    def test_nchars(self):
+        self.assertEqual(get_output(self.seq, ['wc', '-m']), ['7'])
+
 
 if __name__ == '__main__':
     unittest.main()
