@@ -543,6 +543,40 @@ class TestWc(unittest.TestCase):
     def test_nchars(self):
         self.assertEqual(get_output(self.seq, ['wc', '-m']), ['7'])
 
+class TestUniq(unittest.TestCase):
+    def setUp(self):
+        self.all_uniq=[
+            '>a','CAT',
+            '>b','HAT',
+            '>c','A']
+        self.unsorted=[
+            '>b','HAT',
+            '>a','CAT',
+            '>c','A']
+        self.repeated=[
+            '>a','CAT',
+            '>b','HAT',
+            '>c','A',
+            '>b','HAT',
+            '>c','A'
+        ]
+
+    def test_default(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq']), self.all_uniq)
+        self.assertEqual(get_output(self.repeated, ['uniq']), self.all_uniq)
+        self.assertEqual(get_output(self.unsorted, ['uniq']), self.unsorted)
+
+    def test_uniq(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-u']), self.all_uniq)
+        self.assertEqual(get_output(self.repeated, ['uniq', '-u']), ['>a', 'CAT'])
+
+    def test_duplicated(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-d']), [''])
+        self.assertEqual(get_output(self.repeated, ['uniq', '-d']), ['>b', 'HAT',  '>c', 'A'])
+
+    def test_count(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
+        self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
 
 if __name__ == '__main__':
     unittest.main()
