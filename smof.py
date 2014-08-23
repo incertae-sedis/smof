@@ -2285,7 +2285,7 @@ class Uniq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="emulates UNIX uniq command (prior sorting needless)"
+            help="prints entries if header/sequence pair is unique"
         )
         parser.add_argument(
             '-c', '--count',
@@ -2308,9 +2308,13 @@ class Uniq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqs = defaultdict(int)
+        from collections import OrderedDict
+        seqs = OrderedDict()
         for seq in gen.next():
-            seqs[seq] += 1
+            try:
+                seqs[seq] += 1
+            except KeyError:
+                seqs[seq] = 1
 
         if args.repeated:
             sgen = ((k,v) for k,v in seqs.items() if v > 1)
