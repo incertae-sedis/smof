@@ -391,6 +391,21 @@ class TestUtilities(unittest.TestCase):
     def test_headtailtrunk_doublenone(self):
         self.assertEqual(smof.headtailtrunk(seq=self.seq).seq, 'ACDEFSTVWY')
 
+class TestAmbiguous2Perl(unittest.TestCase):
+    def test_simple(self):
+        self.assertEqual(smof.ambiguous2perl('Y'), '[CT]')
+
+    def test_escaped(self):
+        self.assertEqual(smof.ambiguous2perl('\Y'), 'Y')
+        self.assertEqual(smof.ambiguous2perl('\YY'), 'Y[CT]')
+        self.assertEqual(smof.ambiguous2perl('Y\Y+Y\\{2'), '[CT]Y+[CT]\\{2')
+
+    def test_bracketed(self):
+        self.assertEqual(smof.ambiguous2perl('[Y]'), '[CT]')
+        self.assertEqual(smof.ambiguous2perl('[Y\]]'), '[CT\]]')
+        # Of course, '[' and ']' should NEVER be in a DNA sequence, but ...
+        self.assertEqual(smof.ambiguous2perl('[\[Y\]]'), '[\[CT\]]')
+
 class TestFSeqGenerator(unittest.TestCase):
     def setUp(self):
         self.seq1 = smof.FSeq(header='seq1', seq='ACGTA')
@@ -578,8 +593,6 @@ class TestUniq(unittest.TestCase):
         self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
         self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
 
-
-
 class TestRename(unittest.TestCase):
     def setUp(self):
         self.seq=[
@@ -593,6 +606,118 @@ class TestRename(unittest.TestCase):
 
     def test_replace_where(self):
         self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
+
+class TestColorlessHeaderGrep(unittest.TestCase):
+    def setUp(self):
+        self.headers = [
+            '>gg sco 12', 'A',
+            '>gg bob 48a', 'A',
+            '>gl har 61', 'A',
+            '>aL har 61', 'A'
+        ]
+
+    def test_default(self):
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-y', 'bob']),
+            ['>gg bob 48a', 'A'])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-y', 'gg']),
+            ['>gg sco 12', 'A', '>gg bob 48a', 'A'])
+
+    def test_perl(self):
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yP', '.g']),
+            ['>gg sco 12', 'A', '>gg bob 48a', 'A'])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yP', 'bob|sco']),
+            ['>gg sco 12', 'A', '>gg bob 48a', 'A'])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yP', '\d+[a-z]']),
+            ['>gg bob 48a', 'A'])
+
+    def test_invert(self):
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yvP', '^g']),
+            ['>aL har 61', 'A'])
+
+    def test_case_sensitive(self):
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yI', 'aL']),
+            ['>aL har 61', 'A'])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-yI', 'al']),
+            [''])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-y', 'al']),
+            ['>aL har 61', 'A'])
+        self.assertEqual(get_output(self.headers,
+            ['grep', '-y', 'aL']),
+            ['>aL har 61', 'A'])
+
+    def test_count(self):
+        self.assertEqual(get_output(self.headers, ['grep', '-cP', 'gg']), ['2'])
+
+class TestColorlessSequenceGrep(unittest.TestCase):
+    def setUp(self):
+        self.seqs = [
+            '>a', 'AAGATACA',
+            '>b', 'GAACATAACAT',
+            '>c', 'aaaaa',
+            '>d', 'aaaaaa',
+            '>e', 'A'
+        ]
+        self.revseqs = [
+            '>a', 'AAG',
+            '>b', 'CTT']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seqs,
+            ['grep', '-qy', 'gataca']),
+            ['>a', 'AAGATACA'])
+
+    def test_ambiguous_nucl_encodings(self):
+            for h,q in [
+             ('M', 'AC'),
+             ('R', 'AG'),
+             ('W', 'AT'),
+             ('S', 'CG'),
+             ('Y', 'CT'),
+             ('K', 'GT'),
+             ('V', 'ACG'),
+             ('H', 'ACT'),
+             ('D', 'AGT'),
+             ('B', 'CGT'),
+             ('N', 'ACGT')]:
+                self.assertNotEqual(get_output(['>{}'.format(h), q], ['grep', '-qyB', '^{}+$'.format(h)]), [''])
+                compl = ''.join(set('ACGT') - set(q))
+                if compl:
+                    self.assertEqual(get_output(['>{}'.format(h), compl], ['grep', '-qyB', h]), [''])
+
+    def test_ambiguous_nucl_regex(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qyB', 'R{4}Y']), ['>a', 'AAGATACA'])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qyB', '[^Y]{4}Y']), ['>a', 'AAGATACA'])
+
+    def test_count(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-cq', 'aa']), ['4'])
+
+    def test_matches(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qm', 'aa']), ['8'])
+
+    def test_count_matches(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qcm', 'aa']), ['4\t8'])
+
+    def test_both_strands(self):
+        self.assertEqual(get_output(self.revseqs, ['grep', '-qy', 'AA']), self.revseqs[0:2])
+        self.assertEqual(get_output(self.revseqs, ['grep', '-qby', 'AA']), self.revseqs)
+        self.assertEqual(get_output(self.revseqs, ['grep', '-qy', 'AG']), self.revseqs[0:2])
+        self.assertEqual(get_output(self.revseqs, ['grep', '-qby', 'AG']), self.revseqs)
+
+    def test_reverse_only(self):
+        self.assertEqual(get_output(self.revseqs, ['grep', '-qry', 'AG']), self.revseqs[2:4])
+
+    def test_gff(self):
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()
