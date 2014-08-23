@@ -815,6 +815,27 @@ def err(msg):
     print(msg, file=sys.stderr)
     sys.exit(1)
 
+def ambiguous2perl(pattern):
+    perlpat = []
+    in_bracket = False
+    escaped = False
+    for c in pattern:
+        amb = c in Maps.DNA_AMB
+        if c == '\\':
+            escaped = True
+            continue
+        elif escaped:
+            c = c if amb else '\\' + c
+            escaped = False
+        elif amb:
+            v = Maps.DNA_AMB[c]
+            c = v if in_bracket else '[%s]' % v
+        elif c == '[':
+            in_bracket = True
+        elif c == ']':
+            in_bracket = False
+        perlpat.append(c)
+    return(''.join(perlpat))
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -2145,9 +2166,7 @@ class Grep(Subcommand):
         if args.ambiguous_nucl:
             apat = set()
             for p in pat:
-                perlpat = p
-                for k,v in Maps.DNA_AMB.items():
-                    perlpat = re.sub(k, '[%s]' % v, perlpat)
+                perlpat = ambiguous2perl(p)
                 apat.update([perlpat])
             pat = apat
 
