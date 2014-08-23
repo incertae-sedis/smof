@@ -718,6 +718,19 @@ class TestColorlessSequenceGrep(unittest.TestCase):
     def test_gff(self):
         pass
 
+class TestSample(unittest.TestCase):
+    def setUp(self):
+        self.seqs=[
+            '>1', 'A',
+            '>2', 'A',
+            '>3', 'A',
+            '>4', 'A',
+            '>5', 'A']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5']), ['>5', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '2']), ['>5', 'A', '>3', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
 
 if __name__ == '__main__':
     unittest.main()
