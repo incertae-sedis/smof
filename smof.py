@@ -1212,10 +1212,17 @@ class Perm(Subcommand):
             metavar='INT',
             default=0
         )
+        parser.add_argument(
+            '--seed',
+            help='set random seed (for reproducibility/debugging)',
+            type=counting_number
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         import random
+        if args.seed:
+            random.seed(args.seed)
         w = args.word_size
         start = args.start_offset
         end = args.end_offset
@@ -1787,11 +1794,18 @@ class Sample(Subcommand):
             type=counting_number,
             nargs='?',
             default=1)
+        parser.add_argument(
+            '--seed',
+            help='set random seed (for reproducibility/debugging)',
+            type=counting_number
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
         import random
+        if args.seed:
+            random.seed(args.seed)
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
