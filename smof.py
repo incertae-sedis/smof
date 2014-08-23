@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.2"
+__version__ = "1.11.3"
 
 # ================
 # Argument Parsing
@@ -815,6 +815,27 @@ def err(msg):
     print(msg, file=sys.stderr)
     sys.exit(1)
 
+def ambiguous2perl(pattern):
+    perlpat = []
+    in_bracket = False
+    escaped = False
+    for c in pattern:
+        amb = c in Maps.DNA_AMB
+        if c == '\\':
+            escaped = True
+            continue
+        elif escaped:
+            c = c if amb else '\\' + c
+            escaped = False
+        elif amb:
+            v = Maps.DNA_AMB[c]
+            c = v if in_bracket else '[%s]' % v
+        elif c == '[':
+            in_bracket = True
+        elif c == ']':
+            in_bracket = False
+        perlpat.append(c)
+    return(''.join(perlpat))
 
 # ====================
 # ONE-BY-ONE FUNCTIONS
@@ -2145,9 +2166,7 @@ class Grep(Subcommand):
         if args.ambiguous_nucl:
             apat = set()
             for p in pat:
-                perlpat = p
-                for k,v in Maps.DNA_AMB.items():
-                    perlpat = re.sub(k, '[%s]' % v, perlpat)
+                perlpat = ambiguous2perl(p)
                 apat.update([perlpat])
             pat = apat
 
@@ -2285,7 +2304,7 @@ class Uniq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="emulates UNIX uniq command (prior sorting needless)"
+            help="prints entries if header/sequence pair is unique"
         )
         parser.add_argument(
             '-c', '--count',
@@ -2308,9 +2327,13 @@ class Uniq(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqs = defaultdict(int)
+        from collections import OrderedDict
+        seqs = OrderedDict()
         for seq in gen.next():
-            seqs[seq] += 1
+            try:
+                seqs[seq] += 1
+            except KeyError:
+                seqs[seq] = 1
 
         if args.repeated:
             sgen = ((k,v) for k,v in seqs.items() if v > 1)
