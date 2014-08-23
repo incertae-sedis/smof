@@ -578,5 +578,21 @@ class TestUniq(unittest.TestCase):
         self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
         self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
 
+
+
+class TestRename(unittest.TestCase):
+    def setUp(self):
+        self.seq=[
+            '>freddy','A',
+            '>fred','A',
+            '>bob','A']
+
+    def test_replace(self):
+        self.assertEqual(get_output(self.seq, ['rename', 'fred', 'a']), ['>ady', 'A', '>a', 'A', '>bob', 'A'])
+        self.assertEqual(get_output(self.seq, ['rename', '[frb]', '']), ['>eddy', 'A', '>ed', 'A', '>o', 'A'])
+
+    def test_replace_where(self):
+        self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
+
 if __name__ == '__main__':
     unittest.main()
