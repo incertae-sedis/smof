@@ -1710,7 +1710,7 @@ class Winnow(Subcommand):
         parser.add_argument(
             '-C', '--not-contain',
             metavar='STR',
-            help="remove if contains any of these characters"
+            help="remove if not contains any of these characters"
         )
         parser.add_argument(
             '-s', '--shorter-than',
