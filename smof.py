@@ -1742,7 +1742,7 @@ class Winnow(Subcommand):
         if args.contain:
             tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
         if args.not_contain:
-            tests.append(lambda s, v=args.not_contain: bool(set(v) & set(s)))
+            tests.append(lambda s, v=args.not_contain: not bool(set(v) & set(s)))
         if args.longer_than:
             tests.append(lambda s, v=args.longer_than: len(s) > v)
         if args.shorter_than:
