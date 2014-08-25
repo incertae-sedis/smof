@@ -1708,25 +1708,14 @@ class Winnow(Subcommand):
             help="remove if contains any of these characters"
         )
         parser.add_argument(
-            '-C', '--not-contain',
-            metavar='STR',
-            help="remove if not contains any of these characters"
-        )
-        parser.add_argument(
             '-s', '--shorter-than',
-            help="remove if sequence is shorter than i",
-            type=counting_number,
-            metavar='INT'
-        )
-        parser.add_argument(
-            '-S', '--longer-than',
-            help="remove if sequence is longer than i",
+            help="remove if len(seq) < INT",
             type=counting_number,
             metavar='INT'
         )
         parser.add_argument(
             '-v', '--invert',
-            help="invert selection",
+            help="invert selection (i.e. keep when condition holds)",
             action='store_true',
             default=False
         )
@@ -1741,10 +1730,6 @@ class Winnow(Subcommand):
         tests = []
         if args.contain:
             tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
-        if args.not_contain:
-            tests.append(lambda s, v=args.not_contain: not bool(set(v) & set(s)))
-        if args.longer_than:
-            tests.append(lambda s, v=args.longer_than: len(s) > v)
         if args.shorter_than:
             tests.append(lambda s, v=args.shorter_than: len(s) < v)
         if args.composition:
