@@ -766,6 +766,60 @@ class TestPerm(unittest.TestCase):
             ['perm', '--seed', 123, '-w', 4, '-e', 3]),
             ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
 
+class TestSort(unittest.TestCase):
+    def setUp(self):
+        self.unsorted=[
+            '>g=c;d=100','AAA',
+            '>g=d;d=30','AA',
+            '>g=b;d=9','AAAA',
+            '>g=a;d=200','A',
+        ]
+        self.default=[
+            '>g=a;d=200','A',
+            '>g=b;d=9','AAAA',
+            '>g=c;d=100','AAA',
+            '>g=d;d=30','AA',
+        ]
+        self.default_reverse=[
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=b;d=9','AAAA',
+            '>g=a;d=200','A',
+        ]
+        self.length=[
+            '>g=a;d=200','A',
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=b;d=9','AAAA',
+        ]
+        self.regex=[
+            '>g=c;d=100','AAA',
+            '>g=a;d=200','A',
+            '>g=d;d=30','AA',
+            '>g=b;d=9','AAAA',
+        ]
+        self.regex_numeric=[
+            '>g=b;d=9','AAAA',
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=a;d=200','A',
+        ]
+
+    def test_default(self):
+        self.assertEqual(get_output(self.unsorted, ['sort']), self.default)
+
+    def test_default(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-r']), self.default_reverse)
+
+    def test_length_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-l']), self.length)
+
+    def test_regex_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)']), self.regex)
+
+    def test_numeric_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)', '-n']), self.regex_numeric)
+
 
 if __name__ == '__main__':
     unittest.main()
