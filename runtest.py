@@ -718,6 +718,144 @@ class TestColorlessSequenceGrep(unittest.TestCase):
     def test_gff(self):
         pass
 
+class TestSample(unittest.TestCase):
+    def setUp(self):
+        self.seqs=[
+            '>1', 'A',
+            '>2', 'A',
+            '>3', 'A',
+            '>4', 'A',
+            '>5', 'A']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5']), ['>5', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '2']), ['>5', 'A', '>3', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
+
+class TestPerm(unittest.TestCase):
+    def setUp(self):
+        self.seq = ['>a', 'WHEREISMYTARDIS']
+
+    def test_default(self):
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 42]),
+            ['>a|PERMUTATION:start=0;end=0;word_size=1', 'MTISSADYHEIERWR'])
+
+    def test_word_size(self):
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 42, '-w', 3]),
+            ['>a|PERMUTATION:start=0;end=0;word_size=3', 'TARREISMYDISWHE'])
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 42, '-w', 5]),
+            ['>a|PERMUTATION:start=0;end=0;word_size=5', 'ARDISISMYTWHERE'])
+
+    def test_offsets(self):
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 42, '-w', 4, '-s', 3]),
+            ['>a|PERMUTATION:start=3;end=0;word_size=4', 'WHERDISMYTAREIS'])
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 123, '-w', 4, '-s', 5]),
+            ['>a|PERMUTATION:start=5;end=0;word_size=4', 'WHEREISTARDISMY'])
+        self.assertEqual(get_output(
+            self.seq,
+            ['perm', '--seed', 123, '-w', 4, '-e', 3]),
+            ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
+
+class TestSort(unittest.TestCase):
+    def setUp(self):
+        self.unsorted=[
+            '>g=c;d=100','AAA',
+            '>g=d;d=30','AA',
+            '>g=b;d=9','AAAA',
+            '>g=a;d=200','A',
+        ]
+        self.default=[
+            '>g=a;d=200','A',
+            '>g=b;d=9','AAAA',
+            '>g=c;d=100','AAA',
+            '>g=d;d=30','AA',
+        ]
+        self.default_reverse=[
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=b;d=9','AAAA',
+            '>g=a;d=200','A',
+        ]
+        self.length=[
+            '>g=a;d=200','A',
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=b;d=9','AAAA',
+        ]
+        self.regex=[
+            '>g=c;d=100','AAA',
+            '>g=a;d=200','A',
+            '>g=d;d=30','AA',
+            '>g=b;d=9','AAAA',
+        ]
+        self.regex_numeric=[
+            '>g=b;d=9','AAAA',
+            '>g=d;d=30','AA',
+            '>g=c;d=100','AAA',
+            '>g=a;d=200','A',
+        ]
+
+    def test_default(self):
+        self.assertEqual(get_output(self.unsorted, ['sort']), self.default)
+
+    def test_default(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-r']), self.default_reverse)
+
+    def test_length_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-l']), self.length)
+
+    def test_regex_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)']), self.regex)
+
+    def test_numeric_sort(self):
+        self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)', '-n']), self.regex_numeric)
+
+class TestWinnow(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a', 'ASDFX',
+            '>b', 'ASDF',
+            '>c', 'ASD'
+        ]
+
+    def test_contain(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'X'])[0::2], ['>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'XF'])[0::2], ['>c'])
+
+    def test_not_contain(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'X'])[0::2], ['>a'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'XF'])[0::2], ['>a', '>b'])
+
+    def test_shorter_than(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 3])[0::2], ['>a', '>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 4])[0::2], ['>a', '>b'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 5])[0::2], ['>a'])
+
+    def test_longer_than(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 3])[0::2], [''])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 4])[0::2], ['>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 5])[0::2], ['>b', '>c'])
+
+    def test_composition(self):
+        comp = [
+            '>a', 'AAAAG.....',
+            '>b', 'AG........'
+        ]
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 1'])[0::2], [''])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG <= 0.5'])[0::2], [''])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
+
 
 if __name__ == '__main__':
     unittest.main()

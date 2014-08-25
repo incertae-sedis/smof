@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.3"
+__version__ = "1.11.4"
 
 # ================
 # Argument Parsing
@@ -1212,10 +1212,17 @@ class Perm(Subcommand):
             metavar='INT',
             default=0
         )
+        parser.add_argument(
+            '--seed',
+            help='set random seed (for reproducibility/debugging)',
+            type=counting_number
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         import random
+        if args.seed:
+            random.seed(args.seed)
         w = args.word_size
         start = args.start_offset
         end = args.end_offset
@@ -1701,25 +1708,14 @@ class Winnow(Subcommand):
             help="remove if contains any of these characters"
         )
         parser.add_argument(
-            '-C', '--not-contain',
-            metavar='STR',
-            help="remove if contains any of these characters"
-        )
-        parser.add_argument(
             '-s', '--shorter-than',
-            help="remove if sequence is shorter than i",
-            type=counting_number,
-            metavar='INT'
-        )
-        parser.add_argument(
-            '-S', '--longer-than',
-            help="remove if sequence is longer than i",
+            help="remove if len(seq) < INT",
             type=counting_number,
             metavar='INT'
         )
         parser.add_argument(
             '-v', '--invert',
-            help="invert selection",
+            help="invert selection (i.e. keep when condition holds)",
             action='store_true',
             default=False
         )
@@ -1734,10 +1730,6 @@ class Winnow(Subcommand):
         tests = []
         if args.contain:
             tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
-        if args.not_contain:
-            tests.append(lambda s, v=args.not_contain: bool(set(v) & set(s)))
-        if args.longer_than:
-            tests.append(lambda s, v=args.longer_than: len(s) > v)
         if args.shorter_than:
             tests.append(lambda s, v=args.shorter_than: len(s) < v)
         if args.composition:
@@ -1787,11 +1779,18 @@ class Sample(Subcommand):
             type=counting_number,
             nargs='?',
             default=1)
+        parser.add_argument(
+            '--seed',
+            help='set random seed (for reproducibility/debugging)',
+            type=counting_number
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         ''' Randomly sample n entries from input file '''
         import random
+        if args.seed:
+            random.seed(args.seed)
         seqs = [s for s in gen.next()]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
         for i in sample_indices:
