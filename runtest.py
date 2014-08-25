@@ -820,6 +820,42 @@ class TestSort(unittest.TestCase):
     def test_numeric_sort(self):
         self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)', '-n']), self.regex_numeric)
 
+class TestWinnow(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a', 'ASDFX',
+            '>b', 'ASDF',
+            '>c', 'ASD'
+        ]
+
+    def test_contain(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'X'])[0::2], ['>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'XF'])[0::2], ['>c'])
+
+    def test_not_contain(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'X'])[0::2], ['>a'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'XF'])[0::2], ['>a', '>b'])
+
+    def test_shorter_than(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 3])[0::2], ['>a', '>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 4])[0::2], ['>a', '>b'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-s', 5])[0::2], ['>a'])
+
+    def test_longer_than(self):
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 3])[0::2], [''])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 4])[0::2], ['>c'])
+        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 5])[0::2], ['>b', '>c'])
+
+    def test_composition(self):
+        comp = [
+            '>a', 'AAAAG.....',
+            '>b', 'AG........'
+        ]
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 1'])[0::2], [''])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG <= 0.5'])[0::2], [''])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
+        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
+
 
 if __name__ == '__main__':
     unittest.main()
