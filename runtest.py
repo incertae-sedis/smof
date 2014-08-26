@@ -856,6 +856,80 @@ class TestWinnow(unittest.TestCase):
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
 
+class TestFasta2Csv(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a1', 'AAA',
+            '>b2', 'CCC'
+        ]
+        self.tsv = [
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+        self.csv = [
+            'a1,AAA',
+            'b2,CCC'
+        ]
+        self.headers = [
+            'seqid\tseq',
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
+
+    def test_delimiter(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
+
+    def test_header(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
+
+class TestColorlessReverse(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a1', 'LIVED',
+            '>b2', 'MILLER'
+        ]
+        self.reverse = [
+            '>a1|REVERSE', 'DEVIL',
+            '>b2|REVERSE', 'RELLIM'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
+
+class TestColorlessClean(unittest.TestCase):
+    def setUp(self):
+        self.seq = ['>a', ' gAtA cA-NY ']
+        self.aaseq = ['>p', ' gAtA cA-NB ']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
+
+    def test_case(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-u'])[1], 'GATACA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-l'])[1], 'gataca-ny')
+
+    def test_masking(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-m'])[1], 'NANANA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-mr'])[1], 'NANANA-NN')
+
+    def test_type(self):
+        for d in ['n', 'nu', 'nuc', 'nucl', 'dna']:
+            self.assertEqual(get_output(self.seq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NN')
+        for d in ['p', 'pro', 'prot', 'protein', 'aa', 'pep']:
+            self.assertEqual(get_output(self.aaseq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NX')
+
+    def test_toseq(self):
+        self.assertEqual(get_output(['>a', 'ASD!@(#*& D'], ['clean', '-x'])[1], 'ASDD')
+
+    def test_irregulars(self):
+        self.assertEqual(get_output(['>p', 'YbJuZ'], ['clean', '-t', 'p', '-r'])[1], 'YXXXX')
+        self.assertEqual(get_output(['>n', 'ATRySWkMDbHVG'], ['clean', '-t', 'n', '-r'])[1], 'ATNNNNNNNNNNG')
+
+        # Unambiguously illegal characters are not masked
+        self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
+        self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
+
 
 if __name__ == '__main__':
     unittest.main()
