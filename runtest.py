@@ -607,7 +607,7 @@ class TestRename(unittest.TestCase):
     def test_replace_where(self):
         self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
 
-class TestColorlessHeaderGrep(unittest.TestCase):
+class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
         self.headers = [
             '>gg sco 12', 'A',
@@ -657,7 +657,7 @@ class TestColorlessHeaderGrep(unittest.TestCase):
     def test_count(self):
         self.assertEqual(get_output(self.headers, ['grep', '-cP', 'gg']), ['2'])
 
-class TestColorlessSequenceGrep(unittest.TestCase):
+class TestSequenceGrep(unittest.TestCase):
     def setUp(self):
         self.seqs = [
             '>a', 'AAGATACA',
@@ -884,7 +884,7 @@ class TestFasta2Csv(unittest.TestCase):
     def test_header(self):
         self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
 
-class TestColorlessReverse(unittest.TestCase):
+class TestReverse(unittest.TestCase):
     def setUp(self):
         self.seq = [
             '>a1', 'LIVED',
@@ -897,7 +897,7 @@ class TestColorlessReverse(unittest.TestCase):
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
 
-class TestColorlessClean(unittest.TestCase):
+class TestClean(unittest.TestCase):
     def setUp(self):
         self.seq = ['>a', ' gAtA cA-NY ']
         self.aaseq = ['>p', ' gAtA cA-NB ']
@@ -929,6 +929,27 @@ class TestColorlessClean(unittest.TestCase):
         # Unambiguously illegal characters are not masked
         self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
         self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
+
+class TestSubseq(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a', 'GATACA']
+        self.aaseq=['>p', 'PICKLE']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 1])[1], 'G')
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 5, 6])[1], 'CA')
+
+    def test_overbounds(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 100])[1], 'GATACA')
+        self.assertRaises(SystemExit, get_output, self.seq, ['subseq', '-b', 7, 7])
+
+    def test_revcomp(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 3, 6])[1], 'TACA')
+        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 1, 3])[1], 'PIC')
+        # guess_type function adientifies GATACA as dna, then takes revcomp
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 6, 3])[1], 'TGTA')
+        # PICKLE however doesn't appear to be dna, so reversing does nothing
+        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 3, 1])[1], 'PIC')
 
 
 if __name__ == '__main__':
