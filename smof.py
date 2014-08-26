@@ -837,6 +837,7 @@ def ambiguous2perl(pattern):
         perlpat.append(c)
     return(''.join(perlpat))
 
+
 # ====================
 # ONE-BY-ONE FUNCTIONS
 # ====================
@@ -976,30 +977,6 @@ class Clean(Subcommand):
             action='store_true',
             default=False
         )
-        parser.add_argument(
-            '--nir',
-            help='nucleotide irregulars [default=(not ACGT)]',
-            metavar='STR',
-            default=''.join(set(string.ascii_letters) - set('ACGTNacgtn'))
-        )
-        parser.add_argument(
-            '--pir',
-            metavar='STR',
-            help='protein irregulars [default=BJOUZbjouz]',
-            default='BJOUXZbjouxz'
-        )
-        parser.add_argument(
-            '--nunk',
-            metavar='CHAR',
-            help='nucleotide unknown character (default=N)',
-            default='N'
-        )
-        parser.add_argument(
-            '--punk',
-            metavar='CHAR',
-            help='protein unknown character (default=X)',
-            default='X'
-        )
         parser.set_defaults(func=self.func)
 
     def _process_args(self, args):
@@ -1018,18 +995,21 @@ class Clean(Subcommand):
         trans = None
         if args.type:
             if args.type.lower()[0] in ['a', 'p']:
-                irr = args.pir
-                unk = args.punk
+                # irregulars proteins include selenocysteine (U) and protein
+                # ambiguous characters
+                irr = ''.join(Alphabet.PROT_AMB) + 'U'
+                unk = 'X'
             elif args.type.lower()[0] in ['n', 'd']:
-                irr = args.nir
-                unk = args.nunk
+                # irregular nucleotides are ambiguous characters
+                irr = ''.join(Alphabet.DNA_AMB)
+                unk = 'N'
             else:
                 err('Type not recognized')
 
             a = ''
             # Get irregular characters
             if args.mask_irregular:
-                a += irr
+                a += irr.upper() + irr.lower()
 
             # convert lowercase to unknown
             if args.mask_lowercase:
