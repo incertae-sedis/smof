@@ -856,6 +856,47 @@ class TestWinnow(unittest.TestCase):
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
 
+class TestFasta2Csv(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a1', 'AAA',
+            '>b2', 'CCC'
+        ]
+        self.tsv = [
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+        self.csv = [
+            'a1,AAA',
+            'b2,CCC'
+        ]
+        self.headers = [
+            'seqid\tseq',
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
+
+    def test_delimiter(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
+
+    def test_header(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
+
+class TestColorlessReverse(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a1', 'LIVED',
+            '>b2', 'MILLER'
+        ]
+        self.reverse = [
+            '>a1|REVERSE', 'DEVIL',
+            '>b2|REVERSE', 'RELLIM'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
+
 
 if __name__ == '__main__':
     unittest.main()
