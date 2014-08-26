@@ -897,6 +897,39 @@ class TestColorlessReverse(unittest.TestCase):
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
 
+class TestColorlessClean(unittest.TestCase):
+    def setUp(self):
+        self.seq = ['>a', ' gAtA cA-NY ']
+        self.aaseq = ['>p', ' gAtA cA-NB ']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
+
+    def test_case(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-u'])[1], 'GATACA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-l'])[1], 'gataca-ny')
+
+    def test_masking(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-m'])[1], 'NANANA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-mr'])[1], 'NANANA-NN')
+
+    def test_type(self):
+        for d in ['n', 'nu', 'nuc', 'nucl', 'dna']:
+            self.assertEqual(get_output(self.seq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NN')
+        for d in ['p', 'pro', 'prot', 'protein', 'aa', 'pep']:
+            self.assertEqual(get_output(self.aaseq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NX')
+
+    def test_toseq(self):
+        self.assertEqual(get_output(['>a', 'ASD!@(#*& D'], ['clean', '-x'])[1], 'ASDD')
+
+    def test_irregulars(self):
+        self.assertEqual(get_output(['>p', 'YbJuZ'], ['clean', '-t', 'p', '-r'])[1], 'YXXXX')
+        self.assertEqual(get_output(['>n', 'ATRySWkMDbHVG'], ['clean', '-t', 'n', '-r'])[1], 'ATNNNNNNNNNNG')
+
+        # Unambiguously illegal characters are not masked
+        self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
+        self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
+
 
 if __name__ == '__main__':
     unittest.main()
