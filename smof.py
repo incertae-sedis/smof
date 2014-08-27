@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.5"
+__version__ = "1.11.6"
 
 # ================
 # Argument Parsing
@@ -880,12 +880,6 @@ class Chksum(Subcommand):
         )
         method = parser.add_mutually_exclusive_group(required=False)
         method.add_argument(
-            '-w', '--whole-file',
-            help='calculate single md5sum for all headers and sequences (default action)',
-            action='store_true',
-            default=False
-        )
-        method.add_argument(
             '-q', '--each-sequence',
             help='calculate md5sum for each sequence, write as TAB delimited list',
             action='store_true',
@@ -913,9 +907,11 @@ class Chksum(Subcommand):
         # Hash the headers only (in input order)
         elif(args.all_headers):
             fun = lambda s,h: md5hash.update(h)
-        # DEFAULT: Hash each header-sequence pair
+        # DEFAULT: Hash headers and sequences (concatenated)
+        # Equivalent to:
+        # $ tr -d '\n>' < myfile.fa | md5sum
         else:
-            fun = lambda s,h: md5hash.update(h + b'\n' + s)
+            fun = lambda s,h: md5hash.update(h+s)
 
         for seq in gen.next():
             if args.ignore_case:
@@ -927,7 +923,7 @@ class Chksum(Subcommand):
             h = seq.header.encode('ascii')
             # Write <header>\t<sequence hash> for each sequence
             if(args.each_sequence):
-                yield h.decode() + '\t' + md5(s).hexdigest()
+                yield '{}\t{}'.format(h.decode(), md5(s).hexdigest())
             else:
                 fun(s,h)
 
