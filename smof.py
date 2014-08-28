@@ -43,7 +43,7 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Complexity, Fasta2csv, Grep,
+    subcommands = [Chksum, Clean, Fasta2csv, Grep,
                    Head, Perm, Rename, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
     for cmd in subcommands:
@@ -1036,101 +1036,6 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.lower()
 
             yield seq
-
-class Complexity(Subcommand):
-    def _parse(self):
-        cmd_name = 'complexity'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='calculates linguistic complexity'
-        )
-        parser.add_argument(
-            '-k', '--alphabet-size',
-            help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
-            type=counting_number,
-            metavar='INT',
-            default=4
-        )
-        parser.add_argument(
-            '-w', '--window-length',
-            help='window length (if provided, output will average of window complexities)',
-            type=counting_number,
-            metavar='INT',
-            default=100
-        )
-        parser.add_argument(
-            '-m', '--word-length',
-            help='length of each word',
-            type=counting_number,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-j', '--jump',
-            help='distance between adjacent windows',
-            type=counting_number,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-o', '--offset',
-            help='index of start pocounting_number',
-            type=positive_int,
-            metavar='INT',
-            default=0
-        )
-        parser.add_argument(
-            '-d', '--drop',
-            help="drop sequence if contains this character (e.g. 'X' or 'N')",
-            metavar='CHAR',
-            default=None
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        try:
-            w = int(args.window_length)
-            m = int(args.word_length)
-            k = pow(int(args.alphabet_size), m)
-            p = int(args.jump)
-            offset = int(args.offset)
-        except ValueError:
-            err('All values must be integers')
-
-        # Calculates the variable component of a single window's score
-        def varscore_generator(seq, words):
-            for i in range(offset, len(seq) - w + 1, p):
-                counts = defaultdict(int)
-                for j in range(i, i+w):
-                    try:
-                        counts[words[j]] += 1
-                    except IndexError:
-                        break
-                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-        w_fact = math.log(math.factorial(w), k)
-
-        for seq in gen.next():
-            mean = 'NA'
-            var = 'NA'
-            seqid = ParseHeader.firstword(seq.header)
-            if len(seq.seq) >= w + offset:
-                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-                varscores = tuple(score for score in varscore_generator(seq.seq, words))
-                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-                mean = sum(winscores) / len(winscores)
-                try:
-                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-                except ZeroDivisionError:
-                    var = 'NA'
-            elif args.drop and args.drop in seq.seq:
-                continue
-
-            mean = mean if mean == 'NA' else '{:.5f}'.format(mean)
-            var = var if var == 'NA' else '{:.5e}'.format(var)
-
-            yield '\t'.join((seqid, mean, var))
 
 class Fasta2csv(Subcommand):
     def _parse(self):
