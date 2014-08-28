@@ -319,6 +319,15 @@ class FileDescription:
             profile = ''.join([str(int(x)) for x in (start, stop, triple, sense)])
             self.nfeat[profile] += 1
 
+    def get_nseqs(self):
+        return(sum(self.ntype.values()))
+
+    def count_degenerate_headers(self):
+        return(self.get_nseqs() - len(self.headers))
+
+    def count_degenerate_seqs(self):
+        return(self.get_nseqs() - len(self.seqs))
+
     @classmethod
     def _has_start(cls, s):
         '''
@@ -1167,21 +1176,26 @@ class Sniff(Subcommand):
         yield seqsum
 
     def write(self, args, gen, out=sys.stdout):
+        # The generator yields only this one item: a FileDescription object
         seqsum = next(self.generator(args, gen))
-        nseqs = sum(seqsum.ncase.values())
 
-        has_degen_headers = nseqs != len(seqsum.headers)
-        has_degen_seqs = nseqs != len(seqsum.seqs)
-        has_bad = seqsum.ntype['illegal'] != 0
+        # Total number of sequences
+        nseqs = seqsum.get_nseqs()
 
-        if has_degen_seqs:
-            out.write("{} uniq sequences ({} total)\n".format(len(seqsum.seqs), nseqs))
+        #Print number of uniq and total sequences
+        if seqsum.count_degenerate_seqs():
+            uniq = nseqs - seqsum.count_degenerate_seqs()
+            out.write("{} uniq sequences ({} total)\n".format(uniq, nseqs))
         else:
             out.write("Total sequences: {}\n".format(nseqs))
 
-        if has_degen_headers:
-            out.write("WARNING: headers are not unique ({}/{})\n".format(len(seqsum.headers), nseqs))
-        if has_bad:
+        # Warn if there are any duplicate headers
+        if seqsum.count_degenerate_headers():
+            uniq = nseqs - seqsum.count_degenerate_headers()
+            out.write("WARNING: headers are not unique ({}/{})\n".format(uniq, nseqs))
+
+        # Warn if there are any illegal characters
+        if seqsum.ntype['illegal']:
             out.write("WARNING: illegal characters found\n")
 
         def write_dict(d, name, N):
@@ -1193,12 +1207,6 @@ class Sniff(Subcommand):
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
-        write_dict(seqsum.ntype, 'Sequence types', nseqs)
-        write_dict(seqsum.ncase, 'Sequences cases', nseqs)
-
-        nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'rna'}])
-        nprot = sum([v for k,v in seqsum.ntype.items() if k == 'prot'])
-
         def write_feat(d, text, N, drop=False):
             if not N:
                 return
@@ -1207,6 +1215,11 @@ class Sniff(Subcommand):
                 if (drop and v != 0) or not drop:
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
+        write_dict(seqsum.ntype, 'Sequence types', nseqs)
+        write_dict(seqsum.ncase, 'Sequences cases', nseqs)
+
+        nnucl = seqsum.ntype['dna'] + seqsum.ntype['rna']
+        nprot = seqsum.ntype['prot']
         write_feat(seqsum.nfeat, "Nucleotide Features", nnucl, drop=True)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
         write_feat(seqsum.ufeat, "Universal Features:", nseqs)
