@@ -1176,6 +1176,10 @@ class Sniff(Subcommand):
         yield seqsum
 
     def write(self, args, gen, out=sys.stdout):
+        '''
+        This function basically just formats and prints the information in a
+        FileDescription object
+        '''
         # The generator yields only this one item: a FileDescription object
         seqsum = next(self.generator(args, gen))
 
@@ -1199,19 +1203,25 @@ class Sniff(Subcommand):
             out.write("WARNING: illegal characters found\n")
 
         def write_dict(d, name, N):
-            uniq = [[k,v] for  k,v in d.items() if v != 0]
+            # Print keys if value is greater than 0
+            uniq = [[k,v] for  k,v in d.items() if v > 0]
+            # E.g. If all of the sequences are proteins, print 'All prot'
             if len(uniq) == 1:
                 out.write("All {}\n".format(uniq[0][0]))
+            # Otherwise print the count and proportion of each represented type
             else:
                 out.write("{}:\n".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
         def write_feat(d, text, N, drop=False):
-            if not N:
+            # If no sequences are of this type (e.g. 'prot'), do nothing
+            if N == 0:
                 return
             out.write('%s\n' % text)
+            # Sort the dictionary by value
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
+                # If the key is represented, print its count and proportion
                 if (drop and v != 0) or not drop:
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
