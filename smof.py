@@ -821,8 +821,7 @@ def positive_int(i):
     return i
 
 def err(msg):
-    print(msg, file=sys.stderr)
-    sys.exit(1)
+    sys.exit(msg)
 
 def ambiguous2perl(pattern):
     perlpat = []
