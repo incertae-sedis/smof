@@ -717,11 +717,13 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(self.revseqs, ['grep', '-qy', 'AG']), self.revseqs[0:2])
         self.assertEqual(get_output(self.revseqs, ['grep', '-qby', 'AG']), self.revseqs)
 
-    def test_reverse_only(self):
-        self.assertEqual(get_output(self.revseqs, ['grep', '-qry', 'AG']), self.revseqs[2:4])
-
     def test_gff(self):
-        pass
+        self.assertEqual(
+            get_output(self.seqs,
+            ['grep', '--gff', 'CAT']),
+            ['b	smof-1.9.0	regex_match	4	6	.	.	.	.',
+            'b	smof-1.9.0	regex_match	9	11	.	.	.	.'])
+
 
 class TestHeadandTail(unittest.TestCase):
     def setUp(self):
