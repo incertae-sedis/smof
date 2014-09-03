@@ -723,6 +723,12 @@ class TestSequenceGrep(unittest.TestCase):
             ['grep', '--gff', 'CAT']),
             ['b\tsmof-{}\tregex_match\t4\t6\t.\t.\t.\t.'.format(smof.__version__),
              'b\tsmof-{}\tregex_match\t9\t11\t.\t.\t.\t.'.format(smof.__version__)])
+    def test_gff_seqid(self):
+        self.assertEqual(
+            get_output(['>a|b.1 desc', 'AC'], ['grep', '--gff', 'A']),
+            ['a|b.1\tsmof-{}\tregex_match\t1\t1\t.\t.\t.\t.'.format(smof.__version__)]
+        )
+
 
 
 class TestHeadandTail(unittest.TestCase):
