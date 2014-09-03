@@ -721,8 +721,8 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(
             get_output(self.seqs,
             ['grep', '--gff', 'CAT']),
-            ['b	smof-1.9.0	regex_match	4	6	.	.	.	.',
-            'b	smof-1.9.0	regex_match	9	11	.	.	.	.'])
+            ['b\tsmof-{}\tregex_match\t4\t6\t.\t.\t.\t.'.format(smof.__version__),
+             'b\tsmof-{}\tregex_match\t9\t11\t.\t.\t.\t.'.format(smof.__version__)])
 
 
 class TestHeadandTail(unittest.TestCase):
