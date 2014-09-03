@@ -2103,7 +2103,7 @@ class Grep(Subcommand):
                        '.'      #9 attributes
                       ]
                 for seq in gen.next():
-                    row[0] = re.sub('^>(\S+)', '\1', seq.header)
+                    row[0] = ParseHeader.firstword(seq.header)
                     for m in matcher(seq.seq):
                         row[3] = m['pos'][0] + 1
                         row[4] = m['pos'][1]
