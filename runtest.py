@@ -526,86 +526,91 @@ def get_output(seq, argv):
     args.func(args, gen, out=out)
     return(out.getvalue().strip().split("\n"))
 
-class TestHeadandTail(unittest.TestCase):
+class TestChksum(unittest.TestCase):
     def setUp(self):
-        self.seq=['>a','GATACA',
-                  '>b','GALLIF',
-                  '>c','SPARTA']
-
-    def test_defaults(self):
-        self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
-        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
-
-    def test_n(self):
-        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
-        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
-
-    def test_fl(self):
-        self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
-        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
-
-class TestWc(unittest.TestCase):
-    def setUp(self):
-        self.seq=['>a','CAT',
-                  '>b','HAT',
-                  '>c','A']
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['wc']), ['3\t7'])
-
-    def test_nseqs(self):
-        self.assertEqual(get_output(self.seq, ['wc', '-l']), ['3'])
-
-    def test_nchars(self):
-        self.assertEqual(get_output(self.seq, ['wc', '-m']), ['7'])
-
-class TestUniq(unittest.TestCase):
-    def setUp(self):
-        self.all_uniq=[
-            '>a','CAT',
-            '>b','HAT',
-            '>c','A']
-        self.unsorted=[
-            '>b','HAT',
-            '>a','CAT',
-            '>c','A']
-        self.repeated=[
-            '>a','CAT',
-            '>b','HAT',
-            '>c','A',
-            '>b','HAT',
-            '>c','A'
+        self.seqs = [
+            '>asdf', 'ASDF',
+            '>qwer', 'TYUI'
         ]
+    def test_default(self):
+        self.assertEqual(
+            get_output(self.seqs, ['chksum']),
+            ['28fd532b933aaa89d2188b98241a8b46'])
+    def test_eachseq(self):
+        self.assertEqual(
+            get_output(self.seqs, ['chksum', '-q']),
+                ['asdf\t6d87a19f011653459575ceb722db3b69',
+                 'qwer\t6e9758614cca89162b2d19922de103bb']
+            )
+    def test_headers(self):
+        self.assertEqual(
+            get_output(self.seqs, ['chksum', '-d']),
+            ['c69874b898abb180ac71bd99bc16f8fb'])
+    def test_seqs(self):
+        self.assertEqual(
+            get_output(self.seqs, ['chksum', '-s']),
+            ['ed9b124094bc93e7f611da252d06f628'])
+
+class TestClean(unittest.TestCase):
+    def setUp(self):
+        self.seq = ['>a', ' gAtA cA-NY ']
+        self.aaseq = ['>p', ' gAtA cA-NB ']
 
     def test_default(self):
-        self.assertEqual(get_output(self.all_uniq, ['uniq']), self.all_uniq)
-        self.assertEqual(get_output(self.repeated, ['uniq']), self.all_uniq)
-        self.assertEqual(get_output(self.unsorted, ['uniq']), self.unsorted)
+        self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
 
-    def test_uniq(self):
-        self.assertEqual(get_output(self.all_uniq, ['uniq', '-u']), self.all_uniq)
-        self.assertEqual(get_output(self.repeated, ['uniq', '-u']), ['>a', 'CAT'])
+    def test_case(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-u'])[1], 'GATACA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-l'])[1], 'gataca-ny')
 
-    def test_duplicated(self):
-        self.assertEqual(get_output(self.all_uniq, ['uniq', '-d']), [''])
-        self.assertEqual(get_output(self.repeated, ['uniq', '-d']), ['>b', 'HAT',  '>c', 'A'])
+    def test_masking(self):
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-m'])[1], 'NANANA-NY')
+        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-mr'])[1], 'NANANA-NN')
 
-    def test_count(self):
-        self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
-        self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
+    def test_type(self):
+        for d in ['n', 'nu', 'nuc', 'nucl', 'dna']:
+            self.assertEqual(get_output(self.seq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NN')
+        for d in ['p', 'pro', 'prot', 'protein', 'aa', 'pep']:
+            self.assertEqual(get_output(self.aaseq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NX')
 
-class TestRename(unittest.TestCase):
+    def test_toseq(self):
+        self.assertEqual(get_output(['>a', 'ASD!@(#*& D'], ['clean', '-x'])[1], 'ASDD')
+
+    def test_irregulars(self):
+        self.assertEqual(get_output(['>p', 'YbJuZ'], ['clean', '-t', 'p', '-r'])[1], 'YXXXX')
+        self.assertEqual(get_output(['>n', 'ATRySWkMDbHVG'], ['clean', '-t', 'n', '-r'])[1], 'ATNNNNNNNNNNG')
+
+        # Unambiguously illegal characters are not masked
+        self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
+        self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
+
+class TestFasta2Csv(unittest.TestCase):
     def setUp(self):
-        self.seq=[
-            '>freddy','A',
-            '>fred','A',
-            '>bob','A']
+        self.seq = [
+            '>a1', 'AAA',
+            '>b2', 'CCC'
+        ]
+        self.tsv = [
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+        self.csv = [
+            'a1,AAA',
+            'b2,CCC'
+        ]
+        self.headers = [
+            'seqid\tseq',
+            'a1\tAAA',
+            'b2\tCCC'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
 
-    def test_replace(self):
-        self.assertEqual(get_output(self.seq, ['rename', 'fred', 'a']), ['>ady', 'A', '>a', 'A', '>bob', 'A'])
-        self.assertEqual(get_output(self.seq, ['rename', '[frb]', '']), ['>eddy', 'A', '>ed', 'A', '>o', 'A'])
+    def test_delimiter(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
 
-    def test_replace_where(self):
-        self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
+    def test_header(self):
+        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
 
 class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
@@ -712,25 +717,31 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(self.revseqs, ['grep', '-qy', 'AG']), self.revseqs[0:2])
         self.assertEqual(get_output(self.revseqs, ['grep', '-qby', 'AG']), self.revseqs)
 
-    def test_reverse_only(self):
-        self.assertEqual(get_output(self.revseqs, ['grep', '-qry', 'AG']), self.revseqs[2:4])
-
     def test_gff(self):
-        pass
+        self.assertEqual(
+            get_output(self.seqs,
+            ['grep', '--gff', 'CAT']),
+            ['b	smof-1.9.0	regex_match	4	6	.	.	.	.',
+            'b	smof-1.9.0	regex_match	9	11	.	.	.	.'])
 
-class TestSample(unittest.TestCase):
+
+class TestHeadandTail(unittest.TestCase):
     def setUp(self):
-        self.seqs=[
-            '>1', 'A',
-            '>2', 'A',
-            '>3', 'A',
-            '>4', 'A',
-            '>5', 'A']
+        self.seq=['>a','GATACA',
+                  '>b','GALLIF',
+                  '>c','SPARTA']
 
-    def test_default(self):
-        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5']), ['>5', 'A'])
-        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '2']), ['>5', 'A', '>3', 'A'])
-        self.assertEqual(get_output(self.seqs, ['sample', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
+    def test_defaults(self):
+        self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
+        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
+
+    def test_n(self):
+        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
+
+    def test_fl(self):
+        self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
+        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
 
 class TestPerm(unittest.TestCase):
     def setUp(self):
@@ -765,6 +776,47 @@ class TestPerm(unittest.TestCase):
             self.seq,
             ['perm', '--seed', 123, '-w', 4, '-e', 3]),
             ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
+
+class TestRename(unittest.TestCase):
+    def setUp(self):
+        self.seq=[
+            '>freddy','A',
+            '>fred','A',
+            '>bob','A']
+
+    def test_replace(self):
+        self.assertEqual(get_output(self.seq, ['rename', 'fred', 'a']), ['>ady', 'A', '>a', 'A', '>bob', 'A'])
+        self.assertEqual(get_output(self.seq, ['rename', '[frb]', '']), ['>eddy', 'A', '>ed', 'A', '>o', 'A'])
+
+    def test_replace_where(self):
+        self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
+
+class TestReverse(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a1', 'LIVED',
+            '>b2', 'MILLER'
+        ]
+        self.reverse = [
+            '>a1|REVERSE', 'DEVIL',
+            '>b2|REVERSE', 'RELLIM'
+        ]
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
+
+class TestSample(unittest.TestCase):
+    def setUp(self):
+        self.seqs=[
+            '>1', 'A',
+            '>2', 'A',
+            '>3', 'A',
+            '>4', 'A',
+            '>5', 'A']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5']), ['>5', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '2']), ['>5', 'A', '>3', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
 
 class TestSort(unittest.TestCase):
     def setUp(self):
@@ -820,6 +872,76 @@ class TestSort(unittest.TestCase):
     def test_numeric_sort(self):
         self.assertEqual(get_output(self.unsorted, ['sort', '-x', 'd=(\d+)', '-n']), self.regex_numeric)
 
+class TestSubseq(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a', 'GATACA']
+        self.aaseq=['>p', 'PICKLE']
+
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 1])[1], 'G')
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 5, 6])[1], 'CA')
+
+    def test_overbounds(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 100])[1], 'GATACA')
+        self.assertRaises(SystemExit, get_output, self.seq, ['subseq', '-b', 7, 7])
+
+    def test_revcomp(self):
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 3, 6])[1], 'TACA')
+        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 1, 3])[1], 'PIC')
+        # guess_type function adientifies GATACA as dna, then takes revcomp
+        self.assertEqual(get_output(self.seq, ['subseq', '-b', 6, 3])[1], 'TGTA')
+        # PICKLE however doesn't appear to be dna, so reversing does nothing
+        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 3, 1])[1], 'PIC')
+
+class TestUniq(unittest.TestCase):
+    def setUp(self):
+        self.all_uniq=[
+            '>a','CAT',
+            '>b','HAT',
+            '>c','A']
+        self.unsorted=[
+            '>b','HAT',
+            '>a','CAT',
+            '>c','A']
+        self.repeated=[
+            '>a','CAT',
+            '>b','HAT',
+            '>c','A',
+            '>b','HAT',
+            '>c','A'
+        ]
+
+    def test_default(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq']), self.all_uniq)
+        self.assertEqual(get_output(self.repeated, ['uniq']), self.all_uniq)
+        self.assertEqual(get_output(self.unsorted, ['uniq']), self.unsorted)
+
+    def test_uniq(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-u']), self.all_uniq)
+        self.assertEqual(get_output(self.repeated, ['uniq', '-u']), ['>a', 'CAT'])
+
+    def test_duplicated(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-d']), [''])
+        self.assertEqual(get_output(self.repeated, ['uniq', '-d']), ['>b', 'HAT',  '>c', 'A'])
+
+    def test_count(self):
+        self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
+        self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
+
+class TestWc(unittest.TestCase):
+    def setUp(self):
+        self.seq=['>a','CAT',
+                  '>b','HAT',
+                  '>c','A']
+    def test_default(self):
+        self.assertEqual(get_output(self.seq, ['wc']), ['3\t7'])
+
+    def test_nseqs(self):
+        self.assertEqual(get_output(self.seq, ['wc', '-l']), ['3'])
+
+    def test_nchars(self):
+        self.assertEqual(get_output(self.seq, ['wc', '-m']), ['7'])
+
 class TestWinnow(unittest.TestCase):
     def setUp(self):
         self.seq = [
@@ -855,127 +977,6 @@ class TestWinnow(unittest.TestCase):
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG <= 0.5'])[0::2], [''])
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
         self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
-
-class TestFasta2Csv(unittest.TestCase):
-    def setUp(self):
-        self.seq = [
-            '>a1', 'AAA',
-            '>b2', 'CCC'
-        ]
-        self.tsv = [
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-        self.csv = [
-            'a1,AAA',
-            'b2,CCC'
-        ]
-        self.headers = [
-            'seqid\tseq',
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
-
-    def test_delimiter(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
-
-    def test_header(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
-
-class TestReverse(unittest.TestCase):
-    def setUp(self):
-        self.seq = [
-            '>a1', 'LIVED',
-            '>b2', 'MILLER'
-        ]
-        self.reverse = [
-            '>a1|REVERSE', 'DEVIL',
-            '>b2|REVERSE', 'RELLIM'
-        ]
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
-
-class TestClean(unittest.TestCase):
-    def setUp(self):
-        self.seq = ['>a', ' gAtA cA-NY ']
-        self.aaseq = ['>p', ' gAtA cA-NB ']
-
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
-
-    def test_case(self):
-        self.assertEqual(get_output(self.seq, ['clean', '-u'])[1], 'GATACA-NY')
-        self.assertEqual(get_output(self.seq, ['clean', '-l'])[1], 'gataca-ny')
-
-    def test_masking(self):
-        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-m'])[1], 'NANANA-NY')
-        self.assertEqual(get_output(self.seq, ['clean', '-t', 'nucl', '-mr'])[1], 'NANANA-NN')
-
-    def test_type(self):
-        for d in ['n', 'nu', 'nuc', 'nucl', 'dna']:
-            self.assertEqual(get_output(self.seq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NN')
-        for d in ['p', 'pro', 'prot', 'protein', 'aa', 'pep']:
-            self.assertEqual(get_output(self.aaseq, ['clean', '-t', d, '-r'])[1], 'gAtAcA-NX')
-
-    def test_toseq(self):
-        self.assertEqual(get_output(['>a', 'ASD!@(#*& D'], ['clean', '-x'])[1], 'ASDD')
-
-    def test_irregulars(self):
-        self.assertEqual(get_output(['>p', 'YbJuZ'], ['clean', '-t', 'p', '-r'])[1], 'YXXXX')
-        self.assertEqual(get_output(['>n', 'ATRySWkMDbHVG'], ['clean', '-t', 'n', '-r'])[1], 'ATNNNNNNNNNNG')
-
-        # Unambiguously illegal characters are not masked
-        self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
-        self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
-
-class TestSubseq(unittest.TestCase):
-    def setUp(self):
-        self.seq=['>a', 'GATACA']
-        self.aaseq=['>p', 'PICKLE']
-
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 1])[1], 'G')
-        self.assertEqual(get_output(self.seq, ['subseq', '-b', 5, 6])[1], 'CA')
-
-    def test_overbounds(self):
-        self.assertEqual(get_output(self.seq, ['subseq', '-b', 1, 100])[1], 'GATACA')
-        self.assertRaises(SystemExit, get_output, self.seq, ['subseq', '-b', 7, 7])
-
-    def test_revcomp(self):
-        self.assertEqual(get_output(self.seq, ['subseq', '-b', 3, 6])[1], 'TACA')
-        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 1, 3])[1], 'PIC')
-        # guess_type function adientifies GATACA as dna, then takes revcomp
-        self.assertEqual(get_output(self.seq, ['subseq', '-b', 6, 3])[1], 'TGTA')
-        # PICKLE however doesn't appear to be dna, so reversing does nothing
-        self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 3, 1])[1], 'PIC')
-
-class TestChksum(unittest.TestCase):
-    def setUp(self):
-        self.seqs = [
-            '>asdf', 'ASDF',
-            '>qwer', 'TYUI'
-        ]
-    def test_default(self):
-        self.assertEqual(
-            get_output(self.seqs, ['chksum']),
-            ['28fd532b933aaa89d2188b98241a8b46'])
-    def test_eachseq(self):
-        self.assertEqual(
-            get_output(self.seqs, ['chksum', '-q']),
-                ['asdf\t6d87a19f011653459575ceb722db3b69',
-                 'qwer\t6e9758614cca89162b2d19922de103bb']
-            )
-    def test_headers(self):
-        self.assertEqual(
-            get_output(self.seqs, ['chksum', '-d']),
-            ['c69874b898abb180ac71bd99bc16f8fb'])
-    def test_seqs(self):
-        self.assertEqual(
-            get_output(self.seqs, ['chksum', '-s']),
-            ['ed9b124094bc93e7f611da252d06f628'])
-
 
 
 if __name__ == '__main__':

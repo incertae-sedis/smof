@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.6"
+__version__ = "1.11.7"
 
 # ================
 # Argument Parsing
@@ -43,7 +43,7 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Complexity, Fasta2csv, Grep,
+    subcommands = [Chksum, Clean, Fasta2csv, Grep,
                    Head, Perm, Rename, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
     for cmd in subcommands:
@@ -318,6 +318,15 @@ class FileDescription:
 
             profile = ''.join([str(int(x)) for x in (start, stop, triple, sense)])
             self.nfeat[profile] += 1
+
+    def get_nseqs(self):
+        return(sum(self.ntype.values()))
+
+    def count_degenerate_headers(self):
+        return(self.get_nseqs() - len(self.headers))
+
+    def count_degenerate_seqs(self):
+        return(self.get_nseqs() - len(self.seqs))
 
     @classmethod
     def _has_start(cls, s):
@@ -812,8 +821,7 @@ def positive_int(i):
     return i
 
 def err(msg):
-    print(msg, file=sys.stderr)
-    sys.exit(1)
+    sys.exit(msg)
 
 def ambiguous2perl(pattern):
     perlpat = []
@@ -1037,101 +1045,6 @@ class Clean(Subcommand):
 
             yield seq
 
-class Complexity(Subcommand):
-    def _parse(self):
-        cmd_name = 'complexity'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='calculates linguistic complexity'
-        )
-        parser.add_argument(
-            '-k', '--alphabet-size',
-            help='number of letters in the alphabet (4 for DNA, 20 for proteins)',
-            type=counting_number,
-            metavar='INT',
-            default=4
-        )
-        parser.add_argument(
-            '-w', '--window-length',
-            help='window length (if provided, output will average of window complexities)',
-            type=counting_number,
-            metavar='INT',
-            default=100
-        )
-        parser.add_argument(
-            '-m', '--word-length',
-            help='length of each word',
-            type=counting_number,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-j', '--jump',
-            help='distance between adjacent windows',
-            type=counting_number,
-            metavar='INT',
-            default=1
-        )
-        parser.add_argument(
-            '-o', '--offset',
-            help='index of start pocounting_number',
-            type=positive_int,
-            metavar='INT',
-            default=0
-        )
-        parser.add_argument(
-            '-d', '--drop',
-            help="drop sequence if contains this character (e.g. 'X' or 'N')",
-            metavar='CHAR',
-            default=None
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        try:
-            w = int(args.window_length)
-            m = int(args.word_length)
-            k = pow(int(args.alphabet_size), m)
-            p = int(args.jump)
-            offset = int(args.offset)
-        except ValueError:
-            err('All values must be integers')
-
-        # Calculates the variable component of a single window's score
-        def varscore_generator(seq, words):
-            for i in range(offset, len(seq) - w + 1, p):
-                counts = defaultdict(int)
-                for j in range(i, i+w):
-                    try:
-                        counts[words[j]] += 1
-                    except IndexError:
-                        break
-                yield sum([math.log(math.factorial(x), k) for x in counts.values()])
-
-        w_fact = math.log(math.factorial(w), k)
-
-        for seq in gen.next():
-            mean = 'NA'
-            var = 'NA'
-            seqid = ParseHeader.firstword(seq.header)
-            if len(seq.seq) >= w + offset:
-                words = tuple(seq.seq[i:i+m] for i in range(offset, len(seq.seq) - m + 1))
-                varscores = tuple(score for score in varscore_generator(seq.seq, words))
-                winscores = tuple((1 / w) * (w_fact - v) for v in varscores)
-                mean = sum(winscores) / len(winscores)
-                try:
-                    var = sum([pow(mean - x, 2) for x in winscores]) / (len(varscores) - 1)
-                except ZeroDivisionError:
-                    var = 'NA'
-            elif args.drop and args.drop in seq.seq:
-                continue
-
-            mean = mean if mean == 'NA' else '{:.5f}'.format(mean)
-            var = var if var == 'NA' else '{:.5e}'.format(var)
-
-            yield '\t'.join((seqid, mean, var))
-
 class Fasta2csv(Subcommand):
     def _parse(self):
         cmd_name = 'fasta2csv'
@@ -1262,46 +1175,60 @@ class Sniff(Subcommand):
         yield seqsum
 
     def write(self, args, gen, out=sys.stdout):
+        '''
+        This function basically just formats and prints the information in a
+        FileDescription object
+        '''
+        # The generator yields only this one item: a FileDescription object
         seqsum = next(self.generator(args, gen))
-        nseqs = sum(seqsum.ncase.values())
 
-        has_degen_headers = nseqs != len(seqsum.headers)
-        has_degen_seqs = nseqs != len(seqsum.seqs)
-        has_bad = seqsum.ntype['illegal'] != 0
+        # Total number of sequences
+        nseqs = seqsum.get_nseqs()
 
-        if has_degen_seqs:
-            out.write("{} uniq sequences ({} total)\n".format(len(seqsum.seqs), nseqs))
+        #Print number of uniq and total sequences
+        if seqsum.count_degenerate_seqs():
+            uniq = nseqs - seqsum.count_degenerate_seqs()
+            out.write("{} uniq sequences ({} total)\n".format(uniq, nseqs))
         else:
             out.write("Total sequences: {}\n".format(nseqs))
 
-        if has_degen_headers:
-            out.write("WARNING: headers are not unique ({}/{})\n".format(len(seqsum.headers), nseqs))
-        if has_bad:
+        # Warn if there are any duplicate headers
+        if seqsum.count_degenerate_headers():
+            uniq = nseqs - seqsum.count_degenerate_headers()
+            out.write("WARNING: headers are not unique ({}/{})\n".format(uniq, nseqs))
+
+        # Warn if there are any illegal characters
+        if seqsum.ntype['illegal']:
             out.write("WARNING: illegal characters found\n")
 
         def write_dict(d, name, N):
-            uniq = [[k,v] for  k,v in d.items() if v != 0]
+            # Print keys if value is greater than 0
+            uniq = [[k,v] for  k,v in d.items() if v > 0]
+            # E.g. If all of the sequences are proteins, print 'All prot'
             if len(uniq) == 1:
                 out.write("All {}\n".format(uniq[0][0]))
+            # Otherwise print the count and proportion of each represented type
             else:
                 out.write("{}:\n".format(name))
                 for k,v in sorted(uniq, key=lambda x: -x[1]):
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
-        write_dict(seqsum.ntype, 'Sequence types', nseqs)
-        write_dict(seqsum.ncase, 'Sequences cases', nseqs)
-
-        nnucl = sum([v for k,v in seqsum.ntype.items() if k in {'dna', 'rna'}])
-        nprot = sum([v for k,v in seqsum.ntype.items() if k == 'prot'])
-
         def write_feat(d, text, N, drop=False):
-            if not N:
+            # If no sequences are of this type (e.g. 'prot'), do nothing
+            if N == 0:
                 return
             out.write('%s\n' % text)
+            # Sort the dictionary by value
             for k,v in sorted(list(d.items()), key=lambda x: -x[1]):
+                # If the key is represented, print its count and proportion
                 if (drop and v != 0) or not drop:
                     out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ':', v, v/N))
 
+        write_dict(seqsum.ntype, 'Sequence types', nseqs)
+        write_dict(seqsum.ncase, 'Sequences cases', nseqs)
+
+        nnucl = seqsum.ntype['dna'] + seqsum.ntype['rna']
+        nprot = seqsum.ntype['prot']
         write_feat(seqsum.nfeat, "Nucleotide Features", nnucl, drop=True)
         write_feat(seqsum.pfeat, "Protein Features:", nprot)
         write_feat(seqsum.ufeat, "Universal Features:", nseqs)
