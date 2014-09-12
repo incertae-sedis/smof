@@ -4,7 +4,6 @@ import smof
 import unittest
 import argparse
 import sys
-from tempfile import TemporaryFile
 from collections import Counter
 from io import StringIO
 
