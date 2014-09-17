@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.11.8"
+__version__ = "1.11.9"
 
 # ================
 # Argument Parsing
@@ -544,8 +544,6 @@ class FSeqGenerator:
                 yield FSeq(header, ''.join(seq_list), *args, **kwargs)
             else:
                 err("Illegally empty sequence")
-        else:
-            err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
     DNA_AMB = {

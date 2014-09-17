@@ -4,7 +4,6 @@ import smof
 import unittest
 import argparse
 import sys
-from tempfile import TemporaryFile
 from collections import Counter
 from io import StringIO
 
@@ -515,7 +514,7 @@ class TestFSeqGenerator(unittest.TestCase):
         self.assertFalse(self.is_valid(self.empty_last_seq))
 
     def test_no_sequence(self):
-        self.assertFalse(self.is_valid(self.no_sequence))
+        self.assertTrue(self.is_valid(self.no_sequence))
 
 
 def get_output(seq, argv):
