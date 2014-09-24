@@ -1899,6 +1899,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-o', '--only-matching',
+            help="show only the part that matches PATTERN",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-c', '--count',
             help='print number of entries with matches',
             action='store_true',
@@ -1971,6 +1977,9 @@ class Grep(Subcommand):
         if args.force_color and args.no_color:
             err("WTF? --force-color AND --no-color?")
 
+        if args.only_matching and (args.gff or args.count or args.count_matches or args.invert_match):
+            err("--only-matching is incompatible with --gff, --count, --count-matches, and --inver-match")
+
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
@@ -1982,9 +1991,10 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if args.gff or args.count_matches and args.color:
+        if (args.gff or args.count_matches or args.only_matching) and args.color:
             args.color = False
 
+        # gff overides certain other options
         if args.gff:
             args.count = False
             args.count_matches = False
@@ -2024,10 +2034,32 @@ class Grep(Subcommand):
                     pos.append(match)
             return(pos)
 
+        # return list of matches (used by --only-match)
+        def subseq_patmatcher(text, strand='.'):
+            subseqs = []
+            for p in pat:
+                for m in re.finditer(p, text):
+                    subseqs.append(m.group(0))
+            return(subseqs)
+
+        # return list of matches (used by --only-match)
+        def subseq_wrpmatcher(text, strand='.'):
+            subseqs = []
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    subseqs.append(m.group(1))
+            return(subseqs)
+
         if args.gff or args.count_matches or args.color:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
+
+        if args.only_matching:
+            if args.wrap:
+                return(subseq_wrpmatcher)
+            else:
+                return(subseq_patmatcher)
 
         if args.reverse_only or args.both_strands:
             if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
@@ -2128,6 +2160,15 @@ class Grep(Subcommand):
                     yield count
                 elif args.count_matches:
                     yield matches
+
+        elif args.only_matching:
+            def sgen(gen, matcher):
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    for s in m:
+                        yield s
+
         else:
             def sgen(gen, matcher):
                 for seq in gen.next(handle_color=args.preserve_color):
