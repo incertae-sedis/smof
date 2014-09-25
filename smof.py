@@ -544,8 +544,6 @@ class FSeqGenerator:
                 yield FSeq(header, ''.join(seq_list), *args, **kwargs)
             else:
                 err("Illegally empty sequence")
-        else:
-            err("smof could not retrieve any sequence from this file, exiting")
 
 class Maps:
     DNA_AMB = {
