@@ -2071,8 +2071,6 @@ class Grep(Subcommand):
                     pos.append(match)
             return(pos)
 
-        # return list of matches (used by --only-match)
-
         if args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
@@ -2114,7 +2112,6 @@ class Grep(Subcommand):
             return(onlymatching)
 
         return matcher2
-
 
     def _get_pattern(self, args):
         pat = set()

@@ -752,11 +752,16 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-B 1', 'A.']), ['GAC', 'FAD'])
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-B 2', 'A.']), ['GAC', 'CFAD'])
 
-    def test_only_matching_context_reverse(self):
+    def test_only_matching_context_both(self):
         self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qoPb', '-A 1', 'AA']), ['AAG', 'GTT'])
+    def test_only_matching_context_reverse(self):
+        self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qoPr', '-A 1', 'AA']), ['GTT'])
 
     def test_only_matching_wrap(self):
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD']), ['AD'])
+    def test_only_matching_wrap_reverse(self):
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD']), ['AD'])
+        self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qbw', 'AAC(..)', '-o', 'CC']), ['GG'])
 
 class TestGrepBadCombinations(unittest.TestCase):
     def setUp(self):
