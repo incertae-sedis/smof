@@ -1879,7 +1879,7 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-B', '--ambiguous-nucl',
+            '-G', '--ambiguous-nucl',
             help='parse extended nucleotide alphabet',
             action='store_true',
             default=False
