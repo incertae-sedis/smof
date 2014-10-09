@@ -1903,6 +1903,27 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-B', '--before-context',
+            help='Include N characters before match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-A', '--after-context',
+            help='Include N characters after match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-C', '--context',
+            help='Include N characters before and after match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
             '-c', '--count',
             help='print number of entries with matches',
             action='store_true',
@@ -1997,9 +2018,35 @@ class Grep(Subcommand):
             args.count = False
             args.count_matches = False
 
+        # -A and -B take priority over -C
+        args.before_context = args.before_context if args.before_context else args.context
+        args.after_context = args.after_context if args.after_context else args.context
+
         return(args)
 
     def _create_matcher(self, args, pat, wrapper):
+
+        has_context = args.before_context or args.after_context
+        if has_context:
+            if args.both_strands or args.reverse_only:
+                def contexter(start, stop, seqlength, strand):
+                    before, after = args.after_context, args.before_context
+                    if strand == "-":
+                        after, before = before, after
+                    start = max(0, start - before)
+                    stop = min(stop + after, seqlength)
+                    return(start, stop)
+
+            else:
+                def contexter(start, stop, seqlength, strand=None):
+                    start = max(0, start - args.before_context)
+                    stop = min(stop + args.after_context, seqlength)
+                    return(start, stop)
+        else:
+            def contexter(start, stop, *args):
+                return(start, stop)
+
+
         # Check existence for matches to wrapper captures
         def swrpmatcher(text, strand='.'):
             for m in re.finditer(wrapper, text):
@@ -2019,7 +2066,8 @@ class Grep(Subcommand):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
 
@@ -2028,7 +2076,8 @@ class Grep(Subcommand):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
 
@@ -2037,7 +2086,8 @@ class Grep(Subcommand):
             subseqs = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    subseqs.append(m.group(0))
+                    start, end = contexter(m.start(0), m.end(0), len(text), strand)
+                    subseqs.append(text[start:end])
             return(subseqs)
 
         # return list of matches (used by --only-match)
@@ -2045,7 +2095,8 @@ class Grep(Subcommand):
             subseqs = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    subseqs.append(m.group(1))
+                    start, end = contexter(m.start(1), m.end(1), len(text), strand)
+                    subseqs.append(text[start:end])
             return(subseqs)
 
         if args.gff or args.count_matches or args.color:
@@ -2117,6 +2168,8 @@ class Grep(Subcommand):
             gettext = lambda x: x.seq
         else:
             gettext = lambda x: x.header
+
+        has_context = bool(args.before_context or args.after_context)
 
         if args.gff:
             def sgen(gen, matcher):
