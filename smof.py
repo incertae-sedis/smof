@@ -2056,7 +2056,7 @@ class Grep(Subcommand):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    start, end = contexter(m.start(), m.end(), len(text))
+                    start, end = contexter(m.start(1), m.end(1), len(text))
                     match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
@@ -2072,43 +2072,21 @@ class Grep(Subcommand):
             return(pos)
 
         # return list of matches (used by --only-match)
-        def subseq_patmatcher(text, strand='.'):
-            subseqs = []
-            for p in pat:
-                for m in re.finditer(p, text):
-                    start, end = contexter(m.start(0), m.end(0), len(text))
-                    subseqs.append(text[start:end])
-            return(subseqs)
 
-        # return list of matches (used by --only-match)
-        def subseq_wrpmatcher(text, strand='.'):
-            subseqs = []
-            for m in re.finditer(wrapper, text):
-                if m.group(1) in pat:
-                    start, end = contexter(m.start(1), m.end(1), len(text))
-                    subseqs.append(text[start:end])
-            return(subseqs)
-
-        if args.gff or args.count_matches or args.color:
+        if args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
-
-        if args.only_matching:
-            if args.wrap:
-                return(subseq_wrpmatcher)
-            else:
-                return(subseq_patmatcher)
 
         if args.reverse_only or args.both_strands:
             if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
                 if args.reverse_only:
                     def rmatcher(text):
-                        match = matcher(FSeq.getrevcomp(text))
+                        match = matcher(text, "-")
                         return(match)
                 else:
                     def rmatcher(text):
-                        match = matcher(text) + matcher(FSeq.getrevcomp(text))
+                        match = matcher(text, strand="+") + matcher(FSeq.getrevcomp(text), strand="-")
                         return(match)
             else:
                 def rev(matcher, text):
@@ -2125,9 +2103,18 @@ class Grep(Subcommand):
                         fmatch = matcher(text)
                         rmatch = rev(matcher, text)
                         return(fmatch + rmatch)
-            return(rmatcher)
+            matcher2 = rmatcher
         else:
-            return(matcher)
+            matcher2 = matcher
+
+        if args.only_matching:
+            def onlymatching(text):
+                for d in matcher2(text):
+                    yield text[d['pos'][0]:d['pos'][1]]
+            return(onlymatching)
+
+        return matcher2
+
 
     def _get_pattern(self, args):
         pat = set()
