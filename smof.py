@@ -1879,7 +1879,7 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-B', '--ambiguous-nucl',
+            '-G', '--ambiguous-nucl',
             help='parse extended nucleotide alphabet',
             action='store_true',
             default=False
@@ -1901,6 +1901,27 @@ class Grep(Subcommand):
             help="show only the part that matches PATTERN",
             action='store_true',
             default=False
+        )
+        parser.add_argument(
+            '-B', '--before-context',
+            help='Include N characters before match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-A', '--after-context',
+            help='Include N characters after match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-C', '--context',
+            help='Include N characters before and after match',
+            metavar='N',
+            type=positive_int,
+            default=0
         )
         parser.add_argument(
             '-c', '--count',
@@ -1997,9 +2018,25 @@ class Grep(Subcommand):
             args.count = False
             args.count_matches = False
 
+        # -A and -B take priority over -C
+        args.before_context = args.before_context if args.before_context else args.context
+        args.after_context = args.after_context if args.after_context else args.context
+
         return(args)
 
     def _create_matcher(self, args, pat, wrapper):
+
+        has_context = args.before_context or args.after_context
+        if has_context:
+            def contexter(start, stop, seqlength):
+                start = max(0, start - args.before_context)
+                stop = min(stop + args.after_context, seqlength)
+                return(start, stop)
+        else:
+            def contexter(start, stop, *args):
+                return(start, stop)
+
+
         # Check existence for matches to wrapper captures
         def swrpmatcher(text, strand='.'):
             for m in re.finditer(wrapper, text):
@@ -2019,7 +2056,8 @@ class Grep(Subcommand):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(1), m.end(1), len(text))
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
 
@@ -2028,46 +2066,25 @@ class Grep(Subcommand):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(), m.end(), len(text))
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
 
-        # return list of matches (used by --only-match)
-        def subseq_patmatcher(text, strand='.'):
-            subseqs = []
-            for p in pat:
-                for m in re.finditer(p, text):
-                    subseqs.append(m.group(0))
-            return(subseqs)
-
-        # return list of matches (used by --only-match)
-        def subseq_wrpmatcher(text, strand='.'):
-            subseqs = []
-            for m in re.finditer(wrapper, text):
-                if m.group(1) in pat:
-                    subseqs.append(m.group(1))
-            return(subseqs)
-
-        if args.gff or args.count_matches or args.color:
+        if args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
-
-        if args.only_matching:
-            if args.wrap:
-                return(subseq_wrpmatcher)
-            else:
-                return(subseq_patmatcher)
 
         if args.reverse_only or args.both_strands:
             if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
                 if args.reverse_only:
                     def rmatcher(text):
-                        match = matcher(FSeq.getrevcomp(text))
+                        match = matcher(text, "-")
                         return(match)
                 else:
                     def rmatcher(text):
-                        match = matcher(text) + matcher(FSeq.getrevcomp(text))
+                        match = matcher(text, strand="+") + matcher(FSeq.getrevcomp(text), strand="-")
                         return(match)
             else:
                 def rev(matcher, text):
@@ -2084,9 +2101,17 @@ class Grep(Subcommand):
                         fmatch = matcher(text)
                         rmatch = rev(matcher, text)
                         return(fmatch + rmatch)
-            return(rmatcher)
+            matcher2 = rmatcher
         else:
-            return(matcher)
+            matcher2 = matcher
+
+        if args.only_matching:
+            def onlymatching(text):
+                for d in matcher2(text):
+                    yield text[d['pos'][0]:d['pos'][1]]
+            return(onlymatching)
+
+        return matcher2
 
     def _get_pattern(self, args):
         pat = set()
@@ -2117,6 +2142,8 @@ class Grep(Subcommand):
             gettext = lambda x: x.seq
         else:
             gettext = lambda x: x.header
+
+        has_context = bool(args.before_context or args.after_context)
 
         if args.gff:
             def sgen(gen, matcher):
