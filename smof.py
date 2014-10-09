@@ -2028,20 +2028,10 @@ class Grep(Subcommand):
 
         has_context = args.before_context or args.after_context
         if has_context:
-            if args.both_strands or args.reverse_only:
-                def contexter(start, stop, seqlength, strand):
-                    before, after = args.after_context, args.before_context
-                    if strand == "-":
-                        after, before = before, after
-                    start = max(0, start - before)
-                    stop = min(stop + after, seqlength)
-                    return(start, stop)
-
-            else:
-                def contexter(start, stop, seqlength, strand=None):
-                    start = max(0, start - args.before_context)
-                    stop = min(stop + args.after_context, seqlength)
-                    return(start, stop)
+            def contexter(start, stop, seqlength):
+                start = max(0, start - args.before_context)
+                stop = min(stop + args.after_context, seqlength)
+                return(start, stop)
         else:
             def contexter(start, stop, *args):
                 return(start, stop)
@@ -2066,7 +2056,7 @@ class Grep(Subcommand):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    start, end = contexter(m.start(), m.end(), len(text))
                     match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
@@ -2076,7 +2066,7 @@ class Grep(Subcommand):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    start, end = contexter(m.start(), m.end(), len(text))
                     match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
@@ -2086,7 +2076,7 @@ class Grep(Subcommand):
             subseqs = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    start, end = contexter(m.start(0), m.end(0), len(text), strand)
+                    start, end = contexter(m.start(0), m.end(0), len(text))
                     subseqs.append(text[start:end])
             return(subseqs)
 
@@ -2095,7 +2085,7 @@ class Grep(Subcommand):
             subseqs = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    start, end = contexter(m.start(1), m.end(1), len(text), strand)
+                    start, end = contexter(m.start(1), m.end(1), len(text))
                     subseqs.append(text[start:end])
             return(subseqs)
 
