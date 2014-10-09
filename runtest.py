@@ -661,6 +661,10 @@ class TestHeaderGrep(unittest.TestCase):
     def test_count(self):
         self.assertEqual(get_output(self.headers, ['grep', '-cP', 'gg']), ['2'])
 
+    def test_only_matching(self):
+        self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-oP', 'g..b\.']), ['glob.'])
+    def test_only_matching_wrap(self):
+        self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-w', 'a;([^.]+)', '-o', 'glob']), ['glob'])
 class TestSequenceGrep(unittest.TestCase):
     def setUp(self):
         self.seqs = [
@@ -692,14 +696,14 @@ class TestSequenceGrep(unittest.TestCase):
              ('D', 'AGT'),
              ('B', 'CGT'),
              ('N', 'ACGT')]:
-                self.assertNotEqual(get_output(['>{}'.format(h), q], ['grep', '-qyB', '^{}+$'.format(h)]), [''])
+                self.assertNotEqual(get_output(['>{}'.format(h), q], ['grep', '-qyG', '^{}+$'.format(h)]), [''])
                 compl = ''.join(set('ACGT') - set(q))
                 if compl:
-                    self.assertEqual(get_output(['>{}'.format(h), compl], ['grep', '-qyB', h]), [''])
+                    self.assertEqual(get_output(['>{}'.format(h), compl], ['grep', '-qyG', h]), [''])
 
     def test_ambiguous_nucl_regex(self):
-        self.assertEqual(get_output(self.seqs, ['grep', '-qyB', 'R{4}Y']), ['>a', 'AAGATACA'])
-        self.assertEqual(get_output(self.seqs, ['grep', '-qyB', '[^Y]{4}Y']), ['>a', 'AAGATACA'])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qyG', 'R{4}Y']), ['>a', 'AAGATACA'])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qyG', '[^Y]{4}Y']), ['>a', 'AAGATACA'])
 
     def test_count(self):
         self.assertEqual(get_output(self.seqs, ['grep', '-cq', 'aa']), ['4'])
@@ -722,12 +726,54 @@ class TestSequenceGrep(unittest.TestCase):
             ['grep', '--gff', 'CAT']),
             ['b\tsmof-{}\tregex_match\t4\t6\t.\t.\t.\t.'.format(smof.__version__),
              'b\tsmof-{}\tregex_match\t9\t11\t.\t.\t.\t.'.format(smof.__version__)])
+    def test_gff_context(self):
+        self.assertEqual(
+            get_output(self.seqs,
+            ['grep', '--gff', '-A 1', 'CAT']),
+            ['b\tsmof-{}\tregex_match\t4\t7\t.\t.\t.\t.'.format(smof.__version__),
+             'b\tsmof-{}\tregex_match\t9\t11\t.\t.\t.\t.'.format(smof.__version__)])
+        self.assertEqual(
+            get_output(self.seqs,
+            ['grep', '--gff', '-B 1', 'CAT']),
+            ['b\tsmof-{}\tregex_match\t3\t6\t.\t.\t.\t.'.format(smof.__version__),
+             'b\tsmof-{}\tregex_match\t8\t11\t.\t.\t.\t.'.format(smof.__version__)])
     def test_gff_seqid(self):
         self.assertEqual(
             get_output(['>a|b.1 desc', 'AC'], ['grep', '--gff', 'A']),
             ['a|b.1\tsmof-{}\tregex_match\t1\t1\t.\t.\t.\t.'.format(smof.__version__)]
         )
 
+    def test_only_matching(self):
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', 'A.']), ['AC', 'AD'])
+        self.assertEqual(get_output(['>a', 'GAACFADE'], ['grep', '-qoP', 'A.*?D']), ['AACFAD'])
+    def test_only_matching_context(self):
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-A 1', 'A.']), ['ACF', 'ADE'])
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-A 2', 'A.']), ['ACFA', 'ADE'])
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-B 1', 'A.']), ['GAC', 'FAD'])
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qoP', '-B 2', 'A.']), ['GAC', 'CFAD'])
+
+    def test_only_matching_wrap(self):
+        self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD']), ['AD'])
+
+class TestGrepBadCombinations(unittest.TestCase):
+    def setUp(self):
+        self.seq = ['>a', 'A']
+    def test_wrap_incompatible_options(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-Pw', 'a(b)', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-Gw', 'a(b)', 'a'])
+    def test_mv(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-mv', 'a'])
+    def test_seq_only_matches_against_header(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-b', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-r', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-G', 'a'])
+    def test_contradictory_options(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-yY', 'a'])
+    def test_only_matching_incompatible_options(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-o', '--gff', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-oc', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-om', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-ov', 'a'])
 
 
 class TestHeadandTail(unittest.TestCase):

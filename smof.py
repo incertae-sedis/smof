@@ -1879,7 +1879,7 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-B', '--ambiguous-nucl',
+            '-G', '--ambiguous-nucl',
             help='parse extended nucleotide alphabet',
             action='store_true',
             default=False
@@ -1895,6 +1895,33 @@ class Grep(Subcommand):
             help='print non-matching entries',
             action='store_true',
             default=False
+        )
+        parser.add_argument(
+            '-o', '--only-matching',
+            help="show only the part that matches PATTERN",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-B', '--before-context',
+            help='Include N characters before match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-A', '--after-context',
+            help='Include N characters after match',
+            metavar='N',
+            type=positive_int,
+            default=0
+        )
+        parser.add_argument(
+            '-C', '--context',
+            help='Include N characters before and after match',
+            metavar='N',
+            type=positive_int,
+            default=0
         )
         parser.add_argument(
             '-c', '--count',
@@ -1969,6 +1996,9 @@ class Grep(Subcommand):
         if args.force_color and args.no_color:
             err("WTF? --force-color AND --no-color?")
 
+        if args.only_matching and (args.gff or args.count or args.count_matches or args.invert_match):
+            err("--only-matching is incompatible with --gff, --count, --count-matches, and --inver-match")
+
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
@@ -1980,16 +2010,43 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if args.gff or args.count_matches and args.color:
+        if (args.gff or args.count_matches or args.only_matching) and args.color:
             args.color = False
 
+        # gff overides certain other options
         if args.gff:
             args.count = False
             args.count_matches = False
 
+        # -A and -B take priority over -C
+        args.before_context = args.before_context if args.before_context else args.context
+        args.after_context = args.after_context if args.after_context else args.context
+
         return(args)
 
     def _create_matcher(self, args, pat, wrapper):
+
+        has_context = args.before_context or args.after_context
+        if has_context:
+            if args.both_strands or args.reverse_only:
+                def contexter(start, stop, seqlength, strand):
+                    before, after = args.after_context, args.before_context
+                    if strand == "-":
+                        after, before = before, after
+                    start = max(0, start - before)
+                    stop = min(stop + after, seqlength)
+                    return(start, stop)
+
+            else:
+                def contexter(start, stop, seqlength, strand=None):
+                    start = max(0, start - args.before_context)
+                    stop = min(stop + args.after_context, seqlength)
+                    return(start, stop)
+        else:
+            def contexter(start, stop, *args):
+                return(start, stop)
+
+
         # Check existence for matches to wrapper captures
         def swrpmatcher(text, strand='.'):
             for m in re.finditer(wrapper, text):
@@ -2009,7 +2066,8 @@ class Grep(Subcommand):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
 
@@ -2018,14 +2076,39 @@ class Grep(Subcommand):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
-                    match = {'pos':(m.start(), m.end()), 'strand':strand}
+                    start, end = contexter(m.start(), m.end(), len(text), strand)
+                    match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
             return(pos)
+
+        # return list of matches (used by --only-match)
+        def subseq_patmatcher(text, strand='.'):
+            subseqs = []
+            for p in pat:
+                for m in re.finditer(p, text):
+                    start, end = contexter(m.start(0), m.end(0), len(text), strand)
+                    subseqs.append(text[start:end])
+            return(subseqs)
+
+        # return list of matches (used by --only-match)
+        def subseq_wrpmatcher(text, strand='.'):
+            subseqs = []
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    start, end = contexter(m.start(1), m.end(1), len(text), strand)
+                    subseqs.append(text[start:end])
+            return(subseqs)
 
         if args.gff or args.count_matches or args.color:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
+
+        if args.only_matching:
+            if args.wrap:
+                return(subseq_wrpmatcher)
+            else:
+                return(subseq_patmatcher)
 
         if args.reverse_only or args.both_strands:
             if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
@@ -2086,6 +2169,8 @@ class Grep(Subcommand):
         else:
             gettext = lambda x: x.header
 
+        has_context = bool(args.before_context or args.after_context)
+
         if args.gff:
             def sgen(gen, matcher):
                 source = "smof-{}".format(__version__)
@@ -2126,6 +2211,15 @@ class Grep(Subcommand):
                     yield count
                 elif args.count_matches:
                     yield matches
+
+        elif args.only_matching:
+            def sgen(gen, matcher):
+                for seq in gen.next():
+                    text = gettext(seq)
+                    m = matcher(text)
+                    for s in m:
+                        yield s
+
         else:
             def sgen(gen, matcher):
                 for seq in gen.next(handle_color=args.preserve_color):
