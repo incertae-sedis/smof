@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.12.0"
+__version__ = "1.12.1"
 
 # ================
 # Argument Parsing
@@ -2101,17 +2101,9 @@ class Grep(Subcommand):
                         fmatch = matcher(text)
                         rmatch = rev(matcher, text)
                         return(fmatch + rmatch)
-            matcher2 = rmatcher
+            return(rmatcher)
         else:
-            matcher2 = matcher
-
-        if args.only_matching:
-            def onlymatching(text):
-                for d in matcher2(text):
-                    yield text[d['pos'][0]:d['pos'][1]]
-            return(onlymatching)
-
-        return matcher2
+            return(matcher)
 
     def _get_pattern(self, args):
         pat = set()
@@ -2191,8 +2183,14 @@ class Grep(Subcommand):
                 for seq in gen.next():
                     text = gettext(seq)
                     m = matcher(text)
-                    for s in m:
-                        yield s
+                    for d in m:
+                        match = text[d['pos'][0]:d['pos'][1]]
+                        if args.match_sequence:
+                            header = ParseHeader.firstword(seq.header) + \
+                                     "|SUBSEQ(%d..%d)" % (d['pos'][0], d['pos'][1])
+                            yield FSeq(header, match)
+                        else:
+                            yield match
 
         else:
             def sgen(gen, matcher):
