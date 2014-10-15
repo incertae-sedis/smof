@@ -44,7 +44,7 @@ def parse(argv=None):
     parser = Parser()
 
     subcommands = [Chksum, Clean, Grep,
-                   Head, Perm, Rename, Reverse, Sample, Sniff,
+                   Head, Perm, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
     for cmd in subcommands:
         cmd(parser)
@@ -55,7 +55,7 @@ def parse(argv=None):
         parser.parser.print_help()
         sys.exit(0)
 
-    if argv[0] in ['fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
+    if argv[0] in ['rename', 'fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
 
     args = parser.parser.parse_args(argv)
@@ -2200,42 +2200,6 @@ class Grep(Subcommand):
         self.force_color = args.force_color
         for item in sgen(gen, matcher):
             yield item
-
-class Rename(Subcommand):
-    def _parse(self):
-        cmd_name = 'rename'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Larry Wall's rename pythonized for headers"
-        )
-        parser.add_argument(
-            'pattern',
-            metavar='PATTERN',
-            help="regex pattern"
-        )
-        parser.add_argument(
-            'replacement',
-            metavar='REPLACEMENT',
-            nargs='?',
-            default='',
-            help="regex replacement (default='', i.e. delete PATTERN)"
-        )
-        parser.add_argument(
-            'headers',
-            metavar='HEADERS',
-            nargs='?',
-            default=None,
-            help="regex to select headers (if not supplied, select all)"
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        matcher = re.compile(args.headers) if args.headers else None
-        for seq in gen.next():
-            if not matcher or re.search(matcher, seq.header):
-                seq.header = re.sub(args.pattern, args.replacement, seq.header)
-            yield seq
 
 class Uniq(Subcommand):
     def _parse(self):

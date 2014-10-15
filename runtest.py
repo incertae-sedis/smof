@@ -808,20 +808,6 @@ class TestPerm(unittest.TestCase):
             ['perm', '--seed', 123, '-w', 4, '-e', 3]),
             ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
 
-class TestRename(unittest.TestCase):
-    def setUp(self):
-        self.seq=[
-            '>freddy','A',
-            '>fred','A',
-            '>bob','A']
-
-    def test_replace(self):
-        self.assertEqual(get_output(self.seq, ['rename', 'fred', 'a']), ['>ady', 'A', '>a', 'A', '>bob', 'A'])
-        self.assertEqual(get_output(self.seq, ['rename', '[frb]', '']), ['>eddy', 'A', '>ed', 'A', '>o', 'A'])
-
-    def test_replace_where(self):
-        self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
-
 class TestReverse(unittest.TestCase):
     def setUp(self):
         self.seq = [
