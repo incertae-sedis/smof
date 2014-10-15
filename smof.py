@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.12.1"
+__version__ = "1.13.0"
 
 # ================
 # Argument Parsing
@@ -43,8 +43,8 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Fasta2csv, Grep,
-                   Head, Perm, Rename, Reverse, Sample, Sniff,
+    subcommands = [Chksum, Clean, Grep,
+                   Head, Perm, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
     for cmd in subcommands:
         cmd(parser)
@@ -55,7 +55,7 @@ def parse(argv=None):
         parser.parser.print_help()
         sys.exit(0)
 
-    if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
+    if argv[0] in ['rename', 'fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
 
     args = parser.parser.parse_args(argv)
@@ -1043,33 +1043,6 @@ class Clean(Subcommand):
 
             yield seq
 
-class Fasta2csv(Subcommand):
-    def _parse(self):
-        cmd_name = 'fasta2csv'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="converts a fasta file to 2-column csv")
-        parser.add_argument(
-            '-d', '--delimiter',
-            help="set delimiter (TAB by default)",
-            metavar='CHAR',
-            default='\t')
-        parser.add_argument(
-            '-r', '--header',
-            help='write header (default=False)',
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        if(args.header):
-            yield 'seqid{}seq'.format(args.delimiter)
-
-        for seq in gen.next():
-            seqid = ParseHeader.firstword(seq.header)
-            yield '{}{}{}'.format(seqid, args.delimiter, seq.seq)
-
 class Perm(Subcommand):
     def _parse(self):
         cmd_name = 'perm'
@@ -1810,14 +1783,13 @@ class Head(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write first N sequences (default=1)"
+            help="Write first -N sequences (default=1)"
         )
         parser.add_argument(
-            '-n', '--nseqs',
-            help='print N sequences',
+            'nseqs',
+            help='print -N sequences (e.g. smof head -5)',
+            nargs="?",
             metavar='N',
-            type=counting_number,
-            default=1
         )
         parser.add_argument(
             '-f', '--first',
@@ -1831,13 +1803,22 @@ class Head(Subcommand):
             metavar='K',
             type=counting_number
         )
+
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         i = 1
+        if args.nseqs:
+            try:
+                nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
+            except AttributeError:
+                err("N must be formatted as '-12'")
+        else:
+            nseqs = 1
+
         for seq in gen.next():
             yield headtailtrunk(seq, args.first, args.last)
-            if i == args.nseqs:
+            if i == nseqs:
                 break
             i += 1
 
@@ -2228,42 +2209,6 @@ class Grep(Subcommand):
         for item in sgen(gen, matcher):
             yield item
 
-class Rename(Subcommand):
-    def _parse(self):
-        cmd_name = 'rename'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="Larry Wall's rename pythonized for headers"
-        )
-        parser.add_argument(
-            'pattern',
-            metavar='PATTERN',
-            help="regex pattern"
-        )
-        parser.add_argument(
-            'replacement',
-            metavar='REPLACEMENT',
-            nargs='?',
-            default='',
-            help="regex replacement (default='', i.e. delete PATTERN)"
-        )
-        parser.add_argument(
-            'headers',
-            metavar='HEADERS',
-            nargs='?',
-            default=None,
-            help="regex to select headers (if not supplied, select all)"
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        matcher = re.compile(args.headers) if args.headers else None
-        for seq in gen.next():
-            if not matcher or re.search(matcher, seq.header):
-                seq.header = re.sub(args.pattern, args.replacement, seq.header)
-            yield seq
-
 class Uniq(Subcommand):
     def _parse(self):
         cmd_name = 'uniq'
@@ -2360,14 +2305,13 @@ class Tail(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write last N sequences (default=1)"
+            help="Write last N sequences (default=1) OR all sequences from Nth sequence"
         )
         parser.add_argument(
-            '-n', '--nseqs',
-            help='print N sequences',
+            'nseqs',
+            help='-N print last N, +N print from Nth onwards',
+            nargs="?",
             metavar='N',
-            type=counting_number,
-            default=1
         )
         parser.add_argument(
             '-f', '--first',
@@ -2384,16 +2328,37 @@ class Tail(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collections import deque
-        try:
-            lastseqs = deque(maxlen=args.nseqs)
-        except ValueError:
-            err('--nseqs argument must be positive')
-        for seq in gen.next():
-            lastseqs.append(seq)
+        fromtop = False
+        if args.nseqs:
+            try:
+                m = re.match('([-+])(\d+)', args.nseqs)
+                if m.group(1) == "+":
+                    fromtop = True
+                nseqs = int(m.group(2))
+            except AttributeError:
+                err("N must be formatted as '[+-]12'")
+            if nseqs < 1:
+                err("N must be greater than 0")
+        else:
+            nseqs = 1
 
-        for s in lastseqs:
-            yield headtailtrunk(s, args.first, args.last)
+        if fromtop:
+            i = 1;
+            for seq in gen.next():
+                if i >= nseqs:
+                    yield headtailtrunk(seq, args.first, args.last)
+                i += 1
+        else:
+            from collections import deque
+            try:
+                lastseqs = deque(maxlen=nseqs)
+            except ValueError:
+                err('--nseqs argument must be positive')
+            for seq in gen.next():
+                lastseqs.append(seq)
+
+            for s in lastseqs:
+                yield headtailtrunk(s, args.first, args.last)
 
 
 # =======

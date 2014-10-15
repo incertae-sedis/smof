@@ -583,34 +583,6 @@ class TestClean(unittest.TestCase):
         self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
         self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
 
-class TestFasta2Csv(unittest.TestCase):
-    def setUp(self):
-        self.seq = [
-            '>a1', 'AAA',
-            '>b2', 'CCC'
-        ]
-        self.tsv = [
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-        self.csv = [
-            'a1,AAA',
-            'b2,CCC'
-        ]
-        self.headers = [
-            'seqid\tseq',
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
-
-    def test_delimiter(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
-
-    def test_header(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
-
 class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
         self.headers = [
@@ -788,19 +760,22 @@ class TestHeadandTail(unittest.TestCase):
     def setUp(self):
         self.seq=['>a','GATACA',
                   '>b','GALLIF',
-                  '>c','SPARTA']
+                  '>c','SPARTA',
+                  '>d','ATHENS']
 
     def test_defaults(self):
         self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
-        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
+        self.assertEqual(get_output(self.seq, ['head', '-2']), ['>a','GATACA','>b','GALLIF'])
 
     def test_n(self):
-        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
-        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
+        self.assertEqual(get_output(self.seq, ['tail']), ['>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '-2']), ['>c','SPARTA','>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '+2']),
+                                              ['>b','GALLIF','>c','SPARTA','>d','ATHENS'])
 
     def test_fl(self):
         self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
-        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
+        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'AT...S')
 
 class TestPerm(unittest.TestCase):
     def setUp(self):
@@ -835,20 +810,6 @@ class TestPerm(unittest.TestCase):
             self.seq,
             ['perm', '--seed', 123, '-w', 4, '-e', 3]),
             ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
-
-class TestRename(unittest.TestCase):
-    def setUp(self):
-        self.seq=[
-            '>freddy','A',
-            '>fred','A',
-            '>bob','A']
-
-    def test_replace(self):
-        self.assertEqual(get_output(self.seq, ['rename', 'fred', 'a']), ['>ady', 'A', '>a', 'A', '>bob', 'A'])
-        self.assertEqual(get_output(self.seq, ['rename', '[frb]', '']), ['>eddy', 'A', '>ed', 'A', '>o', 'A'])
-
-    def test_replace_where(self):
-        self.assertEqual(get_output(self.seq, ['rename', '$', '~', 'fred']), ['>freddy~', 'A', '>fred~', 'A', '>bob', 'A'])
 
 class TestReverse(unittest.TestCase):
     def setUp(self):
