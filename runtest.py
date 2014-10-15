@@ -583,34 +583,6 @@ class TestClean(unittest.TestCase):
         self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
         self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
 
-class TestFasta2Csv(unittest.TestCase):
-    def setUp(self):
-        self.seq = [
-            '>a1', 'AAA',
-            '>b2', 'CCC'
-        ]
-        self.tsv = [
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-        self.csv = [
-            'a1,AAA',
-            'b2,CCC'
-        ]
-        self.headers = [
-            'seqid\tseq',
-            'a1\tAAA',
-            'b2\tCCC'
-        ]
-    def test_default(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv']), self.tsv)
-
-    def test_delimiter(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-d', ',']), self.csv)
-
-    def test_header(self):
-        self.assertEqual(get_output(self.seq, ['fasta2csv', '-r']), self.headers)
-
 class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
         self.headers = [

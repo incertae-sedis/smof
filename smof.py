@@ -43,7 +43,7 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Fasta2csv, Grep,
+    subcommands = [Chksum, Clean, Grep,
                    Head, Perm, Rename, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
     for cmd in subcommands:
@@ -55,7 +55,7 @@ def parse(argv=None):
         parser.parser.print_help()
         sys.exit(0)
 
-    if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
+    if argv[0] in ['fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
 
     args = parser.parser.parse_args(argv)
@@ -1042,33 +1042,6 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.lower()
 
             yield seq
-
-class Fasta2csv(Subcommand):
-    def _parse(self):
-        cmd_name = 'fasta2csv'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="converts a fasta file to 2-column csv")
-        parser.add_argument(
-            '-d', '--delimiter',
-            help="set delimiter (TAB by default)",
-            metavar='CHAR',
-            default='\t')
-        parser.add_argument(
-            '-r', '--header',
-            help='write header (default=False)',
-            action='store_true',
-            default=False)
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        if(args.header):
-            yield 'seqid{}seq'.format(args.delimiter)
-
-        for seq in gen.next():
-            seqid = ParseHeader.firstword(seq.header)
-            yield '{}{}{}'.format(seqid, args.delimiter, seq.seq)
 
 class Perm(Subcommand):
     def _parse(self):
