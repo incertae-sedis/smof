@@ -1783,14 +1783,13 @@ class Head(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write first N sequences (default=1)"
+            help="Write first -N sequences (default=1)"
         )
         parser.add_argument(
-            '-n', '--nseqs',
-            help='print N sequences',
+            'nseqs',
+            help='print -N sequences (e.g. smof head -5)',
+            nargs="?",
             metavar='N',
-            type=counting_number,
-            default=1
         )
         parser.add_argument(
             '-f', '--first',
@@ -1804,13 +1803,22 @@ class Head(Subcommand):
             metavar='K',
             type=counting_number
         )
+
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         i = 1
+        if args.nseqs:
+            try:
+                nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
+            except AttributeError:
+                err("N must be formatted as '-12'")
+        else:
+            nseqs = 1
+
         for seq in gen.next():
             yield headtailtrunk(seq, args.first, args.last)
-            if i == args.nseqs:
+            if i == nseqs:
                 break
             i += 1
 

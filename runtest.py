@@ -764,7 +764,7 @@ class TestHeadandTail(unittest.TestCase):
 
     def test_defaults(self):
         self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
-        self.assertEqual(get_output(self.seq, ['head', '-n', '2']), ['>a','GATACA','>b','GALLIF'])
+        self.assertEqual(get_output(self.seq, ['head', '-2']), ['>a','GATACA','>b','GALLIF'])
 
     def test_n(self):
         self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
