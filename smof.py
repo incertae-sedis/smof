@@ -2305,14 +2305,13 @@ class Tail(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write last N sequences (default=1)"
+            help="Write last N sequences (default=1) OR all sequences from Nth sequence"
         )
         parser.add_argument(
-            '-n', '--nseqs',
-            help='print N sequences',
+            'nseqs',
+            help='-N print last N, +N print from Nth onwards',
+            nargs="?",
             metavar='N',
-            type=counting_number,
-            default=1
         )
         parser.add_argument(
             '-f', '--first',
@@ -2329,16 +2328,37 @@ class Tail(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        from collections import deque
-        try:
-            lastseqs = deque(maxlen=args.nseqs)
-        except ValueError:
-            err('--nseqs argument must be positive')
-        for seq in gen.next():
-            lastseqs.append(seq)
+        fromtop = False
+        if args.nseqs:
+            try:
+                m = re.match('([-+])(\d+)', args.nseqs)
+                if m.group(1) == "+":
+                    fromtop = True
+                nseqs = int(m.group(2))
+            except AttributeError:
+                err("N must be formatted as '[+-]12'")
+            if nseqs < 1:
+                err("N must be greater than 0")
+        else:
+            nseqs = 1
 
-        for s in lastseqs:
-            yield headtailtrunk(s, args.first, args.last)
+        if fromtop:
+            i = 1;
+            for seq in gen.next():
+                if i >= nseqs:
+                    yield headtailtrunk(seq, args.first, args.last)
+                i += 1
+        else:
+            from collections import deque
+            try:
+                lastseqs = deque(maxlen=nseqs)
+            except ValueError:
+                err('--nseqs argument must be positive')
+            for seq in gen.next():
+                lastseqs.append(seq)
+
+            for s in lastseqs:
+                yield headtailtrunk(s, args.first, args.last)
 
 
 # =======

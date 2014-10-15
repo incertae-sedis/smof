@@ -760,19 +760,22 @@ class TestHeadandTail(unittest.TestCase):
     def setUp(self):
         self.seq=['>a','GATACA',
                   '>b','GALLIF',
-                  '>c','SPARTA']
+                  '>c','SPARTA',
+                  '>d','ATHENS']
 
     def test_defaults(self):
         self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
         self.assertEqual(get_output(self.seq, ['head', '-2']), ['>a','GATACA','>b','GALLIF'])
 
     def test_n(self):
-        self.assertEqual(get_output(self.seq, ['tail']), ['>c','SPARTA'])
-        self.assertEqual(get_output(self.seq, ['tail', '-n', '2']), ['>b','GALLIF','>c','SPARTA'])
+        self.assertEqual(get_output(self.seq, ['tail']), ['>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '-2']), ['>c','SPARTA','>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '+2']),
+                                              ['>b','GALLIF','>c','SPARTA','>d','ATHENS'])
 
     def test_fl(self):
         self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
-        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'SP...A')
+        self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'AT...S')
 
 class TestPerm(unittest.TestCase):
     def setUp(self):
