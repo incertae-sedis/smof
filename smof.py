@@ -1743,15 +1743,23 @@ class Split(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help='split a multifasta file into k smaller files'
+            help='split a fasta file into smaller files'
         )
         parser.add_argument(
-            '-n', '--nfiles',
-            help='number of output files'
+            'N',
+            help='Number of output files or sequences per file',
+            type=counting_number,
+            default=2
+        )
+        parser.add_argument(
+            '-q', '--seqs',
+            help='split by maximum sequences per file',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
             '-p', '--prefix',
-            help='prefix for output files',
+            help='prefix for output files (default="xxx")',
             default='xxx'
         )
         parser.set_defaults(func=self.func)
@@ -1761,16 +1769,13 @@ class Split(Subcommand):
             yield s
 
     def write(self, args, gen, out=None):
-        k = int(args.nfiles)
         p = args.prefix
-        seqs = list(self.generator(args, gen))
-        for i in range(0, k):
-            begin = i * (len(seqs) // k + 1)
-            end = min(len(seqs), (i+1) * (len(seqs) // k + 1))
-            outfile = p + str(i) + '.fasta'
-            with open(outfile, 'w+') as fo:
-                for seq in (seqs[x] for x in range(begin, end)):
-                    fo.write(seq.get_pretty_string() + '\n')
+        N = args.N
+        for i, seq in enumerate(self.generator(args, gen)):
+            fnum = i // N if args.seqs else i % N
+            outfile = '%s%s.fasta' % (p, str(fnum))
+            with open(outfile, 'a') as fo:
+                fo.write(seq.get_pretty_string() + '\n')
 
 
 # ==============
