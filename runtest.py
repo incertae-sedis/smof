@@ -637,6 +637,10 @@ class TestHeaderGrep(unittest.TestCase):
         self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-oP', 'g..b\.']), ['glob.'])
     def test_only_matching_wrap(self):
         self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-w', 'a;([^.]+)', '-o', 'glob']), ['glob'])
+    def test_line_regexp(self):
+        self.assertEqual(get_output(self.headers, ['grep', '-x', 'gg']), [''])
+        self.assertEqual(get_output(self.headers, ['grep', '-x', 'gg sco 12']), ['>gg sco 12', 'A'])
+
 class TestSequenceGrep(unittest.TestCase):
     def setUp(self):
         self.seqs = [
@@ -734,6 +738,11 @@ class TestSequenceGrep(unittest.TestCase):
     def test_only_matching_wrap_reverse(self):
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD'])[1], 'AD')
         self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qbw', 'AAC(..)', '-o', 'CC'])[1], 'GG')
+
+    def test_line_regexp(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAA']), [''])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
+
 
 class TestGrepBadCombinations(unittest.TestCase):
     def setUp(self):
