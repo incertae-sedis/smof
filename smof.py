@@ -1963,12 +1963,21 @@ class Grep(Subcommand):
             metavar='STR',
             default='regex_match'
         )
+        parser.add_argument(
+            '--fastain',
+            help='Search for exact sequence matches against FASTA',
+            metavar="FASTA",
+            type=argparse.FileType('r')
+        )
         parser.set_defaults(func=self.func)
 
     def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
+
+        if args.fastain:
+            args.match_sequence = True
 
         if not args.match_sequence and (args.both_strands or args.ambiguous_nucl or args.reverse_only):
             err('If you want to search sequence, set -q flag')
@@ -2003,7 +2012,6 @@ class Grep(Subcommand):
         if args.gff:
             args.count = False
             args.count_matches = False
-
         # -A and -B take priority over -C
         args.before_context = args.before_context if args.before_context else args.context
         args.after_context = args.after_context if args.after_context else args.context
@@ -2093,6 +2101,8 @@ class Grep(Subcommand):
 
     def _get_pattern(self, args):
         pat = set()
+        if args.fastain:
+            pat.update((s.seq for s in FSeqGenerator(fh=args.fastain).next()))
         if args.file:
             pat.update([l.rstrip('\n') for l in args.file])
         if args.patterns:
@@ -2116,6 +2126,7 @@ class Grep(Subcommand):
         return(pat)
 
     def _makegen(self, args):
+
         if args.match_sequence:
             gettext = lambda x: x.seq
         else:
