@@ -1922,6 +1922,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-x', '--line-regexp',
+            help='select only those matches that match the whole text',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-b', '--both-strands',
             help='search both strands',
             action='store_true',
@@ -1976,6 +1982,9 @@ class Grep(Subcommand):
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
 
+        if args.line_regexp and (args.wrap):
+            err("--line_regexp is incompatible with --wrap")
+
         if args.fastain:
             args.match_sequence = True
 
@@ -2005,7 +2014,7 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if (args.gff or args.count_matches or args.only_matching) and args.color:
+        if (args.gff or args.count_matches or args.only_matching or args.line_regexp) and args.color:
             args.color = False
 
         # gff overides certain other options
@@ -2045,6 +2054,14 @@ class Grep(Subcommand):
                     return(True)
             return(False)
 
+        # Check if pattern matches entire text
+        def linematcher(text, strand='.'):
+            for p in pat:
+                m = re.match(p, text)
+                if m and m.end() == len(text):
+                    return(True)
+            return(False)
+
         # Find locations of matches to wrappers
         def gwrpmatcher(text, strand='.'):
             pos = []
@@ -2065,7 +2082,9 @@ class Grep(Subcommand):
                     pos.append(match)
             return(pos)
 
-        if args.gff or args.count_matches or args.color or args.only_matching:
+        if args.line_regexp:
+            matcher = linematcher
+        elif args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
