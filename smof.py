@@ -1928,6 +1928,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-X', '--exact',
+            help='select only exact matches to full text (very fast)',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-b', '--both-strands',
             help='search both strands',
             action='store_true',
@@ -2003,6 +2009,12 @@ class Grep(Subcommand):
         if args.only_matching and (args.gff or args.count or args.count_matches or args.invert_match):
             err("--only-matching is incompatible with --gff, --count, --count-matches, and --inver-match")
 
+        if (args.perl_regexp or args.ambiguous_nucl) and args.exact:
+            err("--exact works only with literal strings (incompatible with -P or -G")
+
+        if args.exact:
+            args.only_matching = False
+
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
@@ -2014,7 +2026,7 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if (args.gff or args.count_matches or args.only_matching or args.line_regexp) and args.color:
+        if args.gff or args.count_matches or args.only_matching or args.line_regexp or args.exact:
             args.color = False
 
         # gff overides certain other options
@@ -2062,6 +2074,9 @@ class Grep(Subcommand):
                     return(True)
             return(False)
 
+        def exactmatcher(text, strand='.'):
+            return(text in pat)
+
         # Find locations of matches to wrappers
         def gwrpmatcher(text, strand='.'):
             pos = []
@@ -2082,7 +2097,9 @@ class Grep(Subcommand):
                     pos.append(match)
             return(pos)
 
-        if args.line_regexp:
+        if args.exact:
+            matcher = exactmatcher
+        elif args.line_regexp:
             matcher = linematcher
         elif args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
@@ -2233,7 +2250,8 @@ class Grep(Subcommand):
         if args.wrap:
             wrapper = re.compile(args.wrap, flags=flags)
         else:
-            pat = set((re.compile(p, flags=flags) for p in pat))
+            if not args.exact:
+                pat = set((re.compile(p, flags=flags) for p in pat))
             wrapper = None
 
         matcher = self._create_matcher(args, pat, wrapper)
