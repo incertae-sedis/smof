@@ -642,7 +642,7 @@ class TestHeaderGrep(unittest.TestCase):
         self.assertEqual(get_output(self.headers, ['grep', '-x', 'gg sco 12']), ['>gg sco 12', 'A'])
     def test_exact(self):
         self.assertEqual(get_output(self.headers, ['grep', '-X', 'gg']), [''])
-        # self.assertEqual(get_output(self.headers, ['grep', '-X', 'gg sco 12']), ['>gg sco 12', 'A'])
+        self.assertEqual(get_output(self.headers, ['grep', '-X', 'gg sco 12']), ['>gg sco 12', 'A'])
 
 class TestSequenceGrep(unittest.TestCase):
     def setUp(self):

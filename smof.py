@@ -2156,7 +2156,7 @@ class Grep(Subcommand):
 
         # TODO searching for perfect matches would be faster without using
         # regex (just <str>.find(pat))
-        if not args.perl_regexp and not args.wrap:
+        if not (args.perl_regexp or args.wrap or args.exact):
             pat = [re.escape(p) for p in pat]
 
         return(pat)
