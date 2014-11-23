@@ -637,6 +637,13 @@ class TestHeaderGrep(unittest.TestCase):
         self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-oP', 'g..b\.']), ['glob.'])
     def test_only_matching_wrap(self):
         self.assertEqual(get_output(['>a;glob.', 'GACFADE'], ['grep', '-w', 'a;([^.]+)', '-o', 'glob']), ['glob'])
+    def test_line_regexp(self):
+        self.assertEqual(get_output(self.headers, ['grep', '-x', 'gg']), [''])
+        self.assertEqual(get_output(self.headers, ['grep', '-x', 'gg sco 12']), ['>gg sco 12', 'A'])
+    def test_exact(self):
+        self.assertEqual(get_output(self.headers, ['grep', '-X', 'gg']), [''])
+        self.assertEqual(get_output(self.headers, ['grep', '-X', 'gg sco 12']), ['>gg sco 12', 'A'])
+
 class TestSequenceGrep(unittest.TestCase):
     def setUp(self):
         self.seqs = [
@@ -735,6 +742,15 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD'])[1], 'AD')
         self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qbw', 'AAC(..)', '-o', 'CC'])[1], 'GG')
 
+    def test_line_regexp(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAA']), [''])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
+        self.assertEqual(get_output(self.seqs, ['grep', '-Pqx', 'GAA.*']), ['>b', 'GAACATAACAT'])
+    def test_exact(self):
+        self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAA']), [''])
+        self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
+
+
 class TestGrepBadCombinations(unittest.TestCase):
     def setUp(self):
         self.seq = ['>a', 'A']
@@ -754,6 +770,10 @@ class TestGrepBadCombinations(unittest.TestCase):
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-oc', 'a'])
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-om', 'a'])
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-ov', 'a'])
+    def test_exact_incompatible_options(self):
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-PX', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-GX', 'a'])
+
 
 
 class TestHeadandTail(unittest.TestCase):

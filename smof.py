@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.14.0"
+__version__ = "1.15.0"
 
 # ================
 # Argument Parsing
@@ -1922,6 +1922,18 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-x', '--line-regexp',
+            help='select only those matches that match the whole text',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-X', '--exact',
+            help='select only exact matches to full text (very fast)',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-b', '--both-strands',
             help='search both strands',
             action='store_true',
@@ -1963,12 +1975,24 @@ class Grep(Subcommand):
             metavar='STR',
             default='regex_match'
         )
+        parser.add_argument(
+            '--fastain',
+            help='Search for exact sequence matches against FASTA',
+            metavar="FASTA",
+            type=argparse.FileType('r')
+        )
         parser.set_defaults(func=self.func)
 
     def _process_arguments(self, args):
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
+
+        if args.line_regexp and (args.wrap):
+            err("--line_regexp is incompatible with --wrap")
+
+        if args.fastain:
+            args.match_sequence = True
 
         if not args.match_sequence and (args.both_strands or args.ambiguous_nucl or args.reverse_only):
             err('If you want to search sequence, set -q flag')
@@ -1985,6 +2009,12 @@ class Grep(Subcommand):
         if args.only_matching and (args.gff or args.count or args.count_matches or args.invert_match):
             err("--only-matching is incompatible with --gff, --count, --count-matches, and --inver-match")
 
+        if (args.perl_regexp or args.ambiguous_nucl) and args.exact:
+            err("--exact works only with literal strings (incompatible with -P or -G")
+
+        if args.exact:
+            args.only_matching = False
+
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
             args.match_sequence = True
@@ -1996,14 +2026,13 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if (args.gff or args.count_matches or args.only_matching) and args.color:
+        if args.gff or args.count_matches or args.only_matching or args.line_regexp or args.exact:
             args.color = False
 
         # gff overides certain other options
         if args.gff:
             args.count = False
             args.count_matches = False
-
         # -A and -B take priority over -C
         args.before_context = args.before_context if args.before_context else args.context
         args.after_context = args.after_context if args.after_context else args.context
@@ -2037,6 +2066,17 @@ class Grep(Subcommand):
                     return(True)
             return(False)
 
+        # Check if pattern matches entire text
+        def linematcher(text, strand='.'):
+            for p in pat:
+                m = re.match(p, text)
+                if m and m.end() == len(text):
+                    return(True)
+            return(False)
+
+        def exactmatcher(text, strand='.'):
+            return(text in pat)
+
         # Find locations of matches to wrappers
         def gwrpmatcher(text, strand='.'):
             pos = []
@@ -2057,7 +2097,11 @@ class Grep(Subcommand):
                     pos.append(match)
             return(pos)
 
-        if args.gff or args.count_matches or args.color or args.only_matching:
+        if args.exact:
+            matcher = exactmatcher
+        elif args.line_regexp:
+            matcher = linematcher
+        elif args.gff or args.count_matches or args.color or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
         else:
             matcher = swrpmatcher if wrapper else spatmatcher
@@ -2093,6 +2137,8 @@ class Grep(Subcommand):
 
     def _get_pattern(self, args):
         pat = set()
+        if args.fastain:
+            pat.update((s.seq for s in FSeqGenerator(fh=args.fastain).next()))
         if args.file:
             pat.update([l.rstrip('\n') for l in args.file])
         if args.patterns:
@@ -2110,12 +2156,13 @@ class Grep(Subcommand):
 
         # TODO searching for perfect matches would be faster without using
         # regex (just <str>.find(pat))
-        if not args.perl_regexp and not args.wrap:
+        if not (args.perl_regexp or args.wrap or args.exact):
             pat = [re.escape(p) for p in pat]
 
         return(pat)
 
     def _makegen(self, args):
+
         if args.match_sequence:
             gettext = lambda x: x.seq
         else:
@@ -2203,7 +2250,8 @@ class Grep(Subcommand):
         if args.wrap:
             wrapper = re.compile(args.wrap, flags=flags)
         else:
-            pat = set((re.compile(p, flags=flags) for p in pat))
+            if not args.exact:
+                pat = set((re.compile(p, flags=flags) for p in pat))
             wrapper = None
 
         matcher = self._create_matcher(args, pat, wrapper)
