@@ -554,6 +554,7 @@ class TestClean(unittest.TestCase):
     def setUp(self):
         self.seq = ['>a', ' gAtA cA-NY ']
         self.aaseq = ['>p', ' gAtA cA-NB ']
+        self.longseq = ['>l', 'A'*91]
 
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
@@ -582,6 +583,13 @@ class TestClean(unittest.TestCase):
         # Unambiguously illegal characters are not masked
         self.assertEqual(get_output(['>p', 'YOU]'], ['clean', '-t', 'p', '-r'])[1], 'YOX]')
         self.assertEqual(get_output(['>n', 'ATryjG*'], ['clean', '-t', 'n', '-r'])[1], 'ATNNjG*')
+
+    def test_wrap(self):
+        self.assertEqual(get_output(self.longseq, ['clean', '-w', '30'])[1], 'A'*30)
+        self.assertEqual(get_output(self.longseq, ['clean', '-w', '30'])[4], 'A')
+        # test no-wrap
+        self.assertEqual(get_output(self.longseq, ['clean', '-w', '0'])[1], 'A'*91)
+
 
 class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
