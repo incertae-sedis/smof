@@ -979,6 +979,12 @@ class Clean(Subcommand):
             action='store_true',
             default=False
         )
+        parser.add_argument(
+            '-w', '--column_width',
+            help='width of the sequence output (0 indicates no wrapping)',
+            type=positive_int,
+            default=80
+        )
         parser.set_defaults(func=self.func)
 
     def _process_args(self, args):
@@ -1042,6 +1048,12 @@ class Clean(Subcommand):
                 seq.seq = seq.seq.lower()
 
             yield seq
+
+    def write(self, args, gen, out=sys.stdout):
+        if args.column_width == 0:
+            args.column_width = int(1e12) # Approximation of infinity, i.e. no wrap
+        for seq in self.generator(args, gen):
+            seq.print(column_width=args.column_width, color=False, out=out)
 
 class Perm(Subcommand):
     def _parse(self):
