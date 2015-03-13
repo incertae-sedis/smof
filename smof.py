@@ -456,23 +456,23 @@ class FSeq:
         if suffix:
             self.header = self.header + suffix
 
-    def print(self, column_width=80, color=True, out=sys.stdout):
+    def print(self, col_width=80, color=True, out=sys.stdout):
         out.write('>')
         if self.colheader and color:
-            self.colheader.print(self.header, column_width, out=out)
+            self.colheader.print(self.header, col_width, out=out)
         else:
             out.write('%s\n' % self.header)
-        for i in range(0, len(self.seq), column_width):
+        for i in range(0, len(self.seq), col_width):
             if self.colseq and color:
-                self.colseq.print(self.seq, column_width, out=out)
+                self.colseq.print(self.seq, col_width, out=out)
                 break
             else:
-                out.write('%s\n' % self.seq[i:i + column_width])
+                out.write('%s\n' % self.seq[i:i + col_width])
 
-    def get_pretty_string(self, column_width=80):
+    def get_pretty_string(self, col_width=80):
         out = ['>' + self.header]
-        for i in range(0, len(self.seq), column_width):
-            out.append(self.seq[i:i + column_width])
+        for i in range(0, len(self.seq), col_width):
+            out.append(self.seq[i:i + col_width])
         outstr = '\n'.join(out)
         return(outstr)
 
@@ -876,7 +876,12 @@ class Chksum(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="calculate an md5 checksum for the input sequences"
+            help="calculate an md5 checksum for the input sequences",
+
+            description="""By default, `smof chksum` concantenates all headers
+            and sequences and calculates the md5sum for the resulting string.
+            This is identical to `tr -d '\\n>' < a.fa | md5sum`."""
+
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -943,7 +948,11 @@ class Clean(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="masks things (optionally), pretty prints")
+            help="cleans fasta files",
+            description="""Remove all space within the sequences and write them
+            in even columns (default width of 80 characters). Case and all
+            characters (except whitespace) are preserved by default."""
+        )
         parser.add_argument(
             '-t', '--type',
             metavar='n|p',
@@ -963,7 +972,7 @@ class Clean(Subcommand):
         )
         parser.add_argument(
             '-x', '--toseq',
-            help="removes all nonletter characters (gaps, stops, etc.)",
+            help="removes all non-letter characters (gaps, stops, etc.)",
             action='store_true',
             default=False
         )
@@ -980,8 +989,9 @@ class Clean(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-w', '--column_width',
+            '-w', '--col_width',
             help='width of the sequence output (0 indicates no wrapping)',
+            metavar="W",
             type=positive_int,
             default=80
         )
@@ -1050,10 +1060,10 @@ class Clean(Subcommand):
             yield seq
 
     def write(self, args, gen, out=sys.stdout):
-        if args.column_width == 0:
-            args.column_width = int(1e12) # Approximation of infinity, i.e. no wrap
+        if args.col_width == 0:
+            args.col_width = int(1e12) # Approximation of infinity, i.e. no wrap
         for seq in self.generator(args, gen):
-            seq.print(column_width=args.column_width, color=False, out=out)
+            seq.print(col_width=args.col_width, color=False, out=out)
 
 class Perm(Subcommand):
     def _parse(self):
@@ -1061,7 +1071,12 @@ class Perm(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="randomly order sequence"
+            help="randomly order sequence",
+            description="""Randomly order letters in each sequence. The
+            --word-size option allows random ordering of words of the given
+            size. The --start-offset and --end-offset options are useful if,
+            for example, you want to rearrange the letters within a coding
+            sequence but want to preserve the start and stop codons."""
         )
         parser.add_argument(
             '-w', '--word-size',
@@ -1119,7 +1134,11 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="reverse each sequence (NOT reverse complement)")
+            help="reverse each sequence (NOT reverse complement)",
+            description="""Reverse the letters in each sequence. The complement
+            is NOT taken. If you want to take the reverse complement of a
+            sequence, use a dedicated tool, like EMBOSS transeq."""
+        )
         parser.add_argument(
             '-S', '--preserve-color',
             help='Preserve incoming color',
@@ -1147,7 +1166,21 @@ class Sniff(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="extract info about the sequence"
+            help="extract info about the sequence",
+            description=("""Identifies the sequence type and aids in
+                         diagnostics. Ambiguous characters include RYSWKMDBHV
+                         for nucleotides and BJZ for proteins. Illegal
+                         characters include any character that is neither
+                         standard, ambiguous, a gap [_-.], or a stop [*]. The
+                         nucleotide features entry is comprised of four flags
+                         which will all equal 1 for a proper nucleotide coding
+                         sequence. For example, a sequence will be counted as
+                         1111 if 1) start with a start codon (ATG), 2) ends
+                         with a stop codon (TAG, TAA, or TGA), 3) has a length
+                         that is a multiple of three, and 4) has no internal
+                         stop codon. If a sequence lacks a start codon, but
+                         otherwise loogs like a coding sequence, it will have
+                         the value 0111.""")
         )
         parser.set_defaults(func=self.func)
 
@@ -1222,7 +1255,17 @@ class Stat(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="calculate sequence statistics")
+            help="calculate sequence statistics",
+
+            description="""The default action is to count the lengths of all
+            sequences and output summary statistics including: 1) the number of
+            sequences, 2) the number of characters, 3) the five-number summary
+            of sequence lengths (minimum, 25th quantile, median, 75th quantile,
+            and maximum), 4) the mean and standard deviation of lengths, and 5)
+            the N50 (if you don't know what that is, you don't need to
+            know)."""
+
+        )
         parser.add_argument(
             '-d', '--delimiter',
             help='output delimiter'
@@ -1475,20 +1518,72 @@ class Stat(Subcommand):
         for item in g:
             yield(item)
 
+class Split(Subcommand):
+    def _parse(self):
+        cmd_name = 'split'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help='split a fasta file into smaller files',
+            description="""Breaks a multiple sequence fasta file into several
+            smaller files. It requires one positional parameter: the number of
+            output files."""
+        )
+        parser.add_argument(
+            'N',
+            help='Number of output files or sequences per file',
+            type=counting_number,
+            default=2
+        )
+        parser.add_argument(
+            '-q', '--seqs',
+            help='split by maximum sequences per file',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-p', '--prefix',
+            help='prefix for output files (default="xxx")',
+            default='xxx'
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        for s in gen.next():
+            yield s
+
+    def write(self, args, gen, out=None):
+        p = args.prefix
+        N = args.N
+        for i, seq in enumerate(self.generator(args, gen)):
+            fnum = i // N if args.seqs else i % N
+            outfile = '%s%s.fasta' % (p, str(fnum))
+            with open(outfile, 'a') as fo:
+                fo.write(seq.get_pretty_string() + '\n')
+
 class Subseq(Subcommand):
     def _parse(self):
         cmd_name = 'subseq'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="extract subsequence from each entry (revcomp if a<b)"
+            help="extract subsequence from each entry (revcomp if a<b)",
+            description="""The current default action is unfortunately
+            excruciating death. The simplest usage is `smof subseq -b START
+            STOP`, where START and STOP are two integers. If START is greater
+            than STOP, and if the sequence appears to be nucleic, `subseq` will
+            write the reverse complement. Subseq can also read start and stop
+            positions from a GFF file, where column 1 in the GFF is checked
+            against the sequence id (the first word in the fasta header). In
+            addition to sequence subsetting, `subseq` can color the matched
+            regions."""
         )
         parser.add_argument(
-            '-c', '--color',
-            help='color subsequence (do not extract)',
-            choices=Colors.COLORS.keys(),
-            metavar='STR',
-            default=None
+            '-b', '--bounds',
+            metavar='N',
+            help="from and to values (indexed from 1)",
+            nargs=2,
+            type=counting_number
         )
         parser.add_argument(
             '-f', '--gff',
@@ -1503,11 +1598,11 @@ class Subseq(Subcommand):
             default=False
         )
         parser.add_argument(
-            '-b', '--bounds',
-            metavar='N',
-            help="from and to values (indexed from 1)",
-            nargs=2,
-            type=counting_number
+            '-c', '--color',
+            help='color subsequence (do not extract)',
+            choices=Colors.COLORS.keys(),
+            metavar='STR',
+            default=None
         )
         parser.add_argument(
             '-Y', '--force-color',
@@ -1658,10 +1753,14 @@ class Sample(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="randomly select entries from fasta file")
+            help="randomly select entries from fasta file",
+            description="""Randomly sample entries. `sample` reads the entire
+            file into memory, so should not be used for extremely large
+            files."""
+        )
         parser.add_argument(
             'n',
-            help="sample size",
+            help="sample size (default=%(default)s)",
             type=counting_number,
             nargs='?',
             default=1)
@@ -1688,7 +1787,11 @@ class Sort(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="sort sequences")
+            help="sort sequences",
+            description="""Sorts the entries in a fasta file. By default, it
+            sorts by the header strings. `sort` reads the entire file into
+            memory, so should not be used for extremely large files."""
+        )
         parser.add_argument(
             '-x', '--regex',
             metavar='REG',
@@ -1759,46 +1862,6 @@ class Sort(Subcommand):
         for s in seqs:
             yield s
 
-class Split(Subcommand):
-    def _parse(self):
-        cmd_name = 'split'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help='split a fasta file into smaller files'
-        )
-        parser.add_argument(
-            'N',
-            help='Number of output files or sequences per file',
-            type=counting_number,
-            default=2
-        )
-        parser.add_argument(
-            '-q', '--seqs',
-            help='split by maximum sequences per file',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-p', '--prefix',
-            help='prefix for output files (default="xxx")',
-            default='xxx'
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        for s in gen.next():
-            yield s
-
-    def write(self, args, gen, out=None):
-        p = args.prefix
-        N = args.N
-        for i, seq in enumerate(self.generator(args, gen)):
-            fnum = i // N if args.seqs else i % N
-            outfile = '%s%s.fasta' % (p, str(fnum))
-            with open(outfile, 'a') as fo:
-                fo.write(seq.get_pretty_string() + '\n')
-
 
 # ==============
 # UNIX EMULATORS
@@ -1810,7 +1873,11 @@ class Head(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write first -N sequences (default=1)"
+            help="writes the first sequences in a file",
+            description="""`smof head` is modeled after GNU tail and follows
+            the same basic conventions except it is entry-based rather than
+            line-based. By default, `smof head` outputs ONE sequence (rather
+            than the 10 line default for `head`)"""
         )
         parser.add_argument(
             'nseqs',
@@ -1855,7 +1922,18 @@ class Grep(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="roughly emulates the UNIX grep command"
+            help="roughly emulates the UNIX grep command",
+            description="""Smof grep is based on GNU grep but operates on fasta
+            entries. It allows you to extract entries where either the header
+            or the sequence match the search term. For sequence searches, it
+            can produce GFF formatted output, which specifies the location of
+            each match. The --wrap option limits search space to expressions
+            captured by a Perl regular expression. This, coupled with the
+            --file option, allows thousands of sequences to be rapidly
+            extracted based on terms from a file. Smof grep can also take a
+            fasta file as a search term input (--fastain) and return sequences
+            containing exact matches to the sequences in the search fasta
+            file. See the documentation for examples."""
         )
         parser.add_argument(
             'patterns',
@@ -2290,7 +2368,11 @@ class Uniq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="prints entries if header/sequence pair is unique"
+            help="prints entries if header/sequence pair is unique",
+            description="""Emulates the GNU uniq command. Two entries are
+            considered equivalent only if their sequences AND headers are
+            exactly equal. Newlines are ignored but all comparisons are
+            case-sensitive."""
         )
         parser.add_argument(
             '-c', '--count',
@@ -2341,7 +2423,9 @@ class Wc(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="roughly emulates the UNIX wc command"
+            help="roughly emulates the UNIX wc command",
+            description="""Outputs the total number of entries and the total
+            sequence length (TAB delimited)."""
         )
         parser.add_argument(
             '-m', '--chars',
@@ -2380,7 +2464,11 @@ class Tail(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="Write last N sequences (default=1) OR all sequences from Nth sequence"
+            help="writes the last sequences in a file",
+            description="""`smof tail` is modeled after GNU tail and follows
+            the same basic conventions except it is entry-based rather than
+            line-based. `smof tail` will output ONE sequence (rather than the
+            10 line default for `tail`)"""
         )
         parser.add_argument(
             'nseqs',
