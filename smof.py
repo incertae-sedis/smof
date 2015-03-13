@@ -929,7 +929,7 @@ class Chksum(Subcommand):
             h = seq.header.encode('ascii')
             # Write <header>\t<sequence hash> for each sequence
             if(args.each_sequence):
-                yield '{}\t{}'.format(h.decode(), md5(s).hexdigest())
+                yield '{}\t{}'.format(ParseHeader.firstword(seq.header), md5(s).hexdigest())
             else:
                 fun(s,h)
 
