@@ -1698,6 +1698,11 @@ class Sort(Subcommand):
             action='store_true',
             default=False)
         parser.add_argument(
+            '-R', '--random-sort',
+            help="reverse sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
             '-n', '--numeric',
             help="numeric sort",
             action='store_true',
@@ -1737,6 +1742,10 @@ class Sort(Subcommand):
                     err("No match for regex '{}'".format(args.regex))
                 except IndexError:
                     err("Nothing was captured in regex '{}'".format(args.regex))
+        elif args.random_sort:
+            import random
+            def sortterm(x):
+                return(random.uniform(0,1))
         elif args.length:
             def sortterm(x):
                 return(len(x.seq))
