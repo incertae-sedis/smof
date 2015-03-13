@@ -887,19 +887,19 @@ class Chksum(Subcommand):
         method = parser.add_mutually_exclusive_group(required=False)
         method.add_argument(
             '-q', '--each-sequence',
-            help='calculate md5sum for each sequence, write as TAB delimited list',
+            help='calculate md5sum for each sequence (TAB delimited)',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-s', '--all-sequences',
-            help='calculate single md5sum for all sequences',
+            help='calculate one md5sum for all concatenated sequences',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-d', '--all-headers',
-            help='calculate single md5sum for all headers',
+            help='calculate one md5sum for all concatenated headers',
             action='store_true',
             default=False
         )
