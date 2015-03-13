@@ -1691,6 +1691,7 @@ class Sort(Subcommand):
             help="sort sequences")
         parser.add_argument(
             '-x', '--regex',
+            metavar='REG',
             help="sort by single regex capture")
         parser.add_argument(
             '-r', '--reverse',
@@ -1703,12 +1704,12 @@ class Sort(Subcommand):
             action='store_true',
             default=False)
         parser.add_argument(
-            '-n', '--numeric',
+            '-n', '--numeric-sort',
             help="numeric sort",
             action='store_true',
             default=False)
         parser.add_argument(
-            '-l', '--length',
+            '-l', '--length-sort',
             help='sort by sequence length',
             action='store_true',
             default=False)
@@ -1717,11 +1718,11 @@ class Sort(Subcommand):
     def generator(self, args, gen):
         seqs = [s for s in gen.next()]
 
-        if args.numeric and not args.regex:
+        if args.numeric_sort and not args.regex:
             err('--numeric does nothing unless with --regex')
 
         # Set type of order determining variable
-        if args.numeric:
+        if args.numeric_sort:
             def typer(x):
                 try:
                     return(float(x))
@@ -1746,7 +1747,7 @@ class Sort(Subcommand):
             import random
             def sortterm(x):
                 return(random.uniform(0,1))
-        elif args.length:
+        elif args.length_sort:
             def sortterm(x):
                 return(len(x.seq))
         else:
