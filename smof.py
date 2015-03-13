@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.16.0"
+__version__ = "1.17.0"
 
 # ================
 # Argument Parsing
@@ -887,19 +887,19 @@ class Chksum(Subcommand):
         method = parser.add_mutually_exclusive_group(required=False)
         method.add_argument(
             '-q', '--each-sequence',
-            help='calculate md5sum for each sequence, write as TAB delimited list',
+            help='calculate md5sum for each sequence (TAB delimited)',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-s', '--all-sequences',
-            help='calculate single md5sum for all sequences',
+            help='calculate one md5sum for all concatenated sequences',
             action='store_true',
             default=False
         )
         method.add_argument(
             '-d', '--all-headers',
-            help='calculate single md5sum for all headers',
+            help='calculate one md5sum for all concatenated headers',
             action='store_true',
             default=False
         )
@@ -929,7 +929,7 @@ class Chksum(Subcommand):
             h = seq.header.encode('ascii')
             # Write <header>\t<sequence hash> for each sequence
             if(args.each_sequence):
-                yield '{}\t{}'.format(h.decode(), md5(s).hexdigest())
+                yield '{}\t{}'.format(ParseHeader.firstword(seq.header), md5(s).hexdigest())
             else:
                 fun(s,h)
 
@@ -1691,6 +1691,7 @@ class Sort(Subcommand):
             help="sort sequences")
         parser.add_argument(
             '-x', '--regex',
+            metavar='REG',
             help="sort by single regex capture")
         parser.add_argument(
             '-r', '--reverse',
@@ -1698,12 +1699,17 @@ class Sort(Subcommand):
             action='store_true',
             default=False)
         parser.add_argument(
-            '-n', '--numeric',
+            '-R', '--random-sort',
+            help="reverse sort",
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-n', '--numeric-sort',
             help="numeric sort",
             action='store_true',
             default=False)
         parser.add_argument(
-            '-l', '--length',
+            '-l', '--length-sort',
             help='sort by sequence length',
             action='store_true',
             default=False)
@@ -1712,11 +1718,11 @@ class Sort(Subcommand):
     def generator(self, args, gen):
         seqs = [s for s in gen.next()]
 
-        if args.numeric and not args.regex:
+        if args.numeric_sort and not args.regex:
             err('--numeric does nothing unless with --regex')
 
         # Set type of order determining variable
-        if args.numeric:
+        if args.numeric_sort:
             def typer(x):
                 try:
                     return(float(x))
@@ -1737,7 +1743,11 @@ class Sort(Subcommand):
                     err("No match for regex '{}'".format(args.regex))
                 except IndexError:
                     err("Nothing was captured in regex '{}'".format(args.regex))
-        elif args.length:
+        elif args.random_sort:
+            import random
+            def sortterm(x):
+                return(random.uniform(0,1))
+        elif args.length_sort:
             def sortterm(x):
                 return(len(x.seq))
         else:
