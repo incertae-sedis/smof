@@ -1074,7 +1074,11 @@ class Filter(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="extracts sequences meeting the given conditions"
+            help="extracts sequences meeting the given conditions",
+            description="""Prints every entry by default. You may add one or
+            more criteria to filter the results (e.g. `smof filter -s 200 -l
+            100 -c 'GC > .5'` will print only sequences between 100 and 200
+            resides in length and greater than 50% GC content)."""
         )
         parser.add_argument(
             '-s', '--shorter-than',
