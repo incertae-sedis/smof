@@ -1109,6 +1109,8 @@ class Filter(Subcommand):
             legal_signs = ('<', '<=', '>=', '>', '==', '=')
             if not sign in legal_signs:
                 err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=')")
+            if sign == '=':
+                sign = '=='
             try:
                 per = float(per)
             except ValueError:
