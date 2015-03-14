@@ -1338,7 +1338,8 @@ class Stat(Subcommand):
         )
         parser.add_argument(
             '-d', '--delimiter',
-            help='output delimiter'
+            help='output delimiter',
+            default="\t"
         )
         parser.add_argument(
             '-q', '--byseq',
@@ -1550,34 +1551,39 @@ class Stat(Subcommand):
             yield '\n'.join(lines)
 
     def _byseq(self, args, gen):
+        from itertools import chain
         seqlist = []
         charset = set()
         if args.length and not (args.counts or args.proportion):
-            delimiter = args.delimiter if args.delimiter else '\t'
             for seq in gen.next():
                 seqid = ParseHeader.firstword(seq.header)
-                yield("{}{}{}".format(seqid, delimiter, len(seq.seq)))
+                yield("{}{}{}".format(seqid, args.delimiter, len(seq.seq)))
         else:
             for seq in gen.next():
                 seqstat = SeqStat(seq)
                 seqlist.append(seqstat)
                 charset.update(seqstat.counts)
 
-            delimiter = args.delimiter if args.delimiter else ','
-            joiner = lambda s,d: '{}'.format(d).join([str(x) for x in s])
-
             ignorecase = not args.case_sensitive
             kwargs = {'masked':args.count_lower,
                     'length':args.length,
                     'ignorecase':ignorecase}
 
-            yield joiner(SeqStat.getheader(charset, **kwargs), delimiter)
+            out = SeqStat.getheader(charset, **kwargs)
+            yield args.delimiter.join(out)
 
+            count_offset = args.length + args.count_lower + 1
             for q in seqlist:
                 line = q.aslist(charset=charset,
                                 header_fun=ParseHeader.firstword,
                                 **kwargs)
-                yield(joiner(line, delimiter))
+                if args.counts:
+                    out = [str(x) for x in line]
+                elif args.proportion:
+                    total = sum(line[count_offset:])
+                    props = [c / total for c in line[count_offset:]]
+                    out = [str(x) for x in chain(line[0:count_offset], props)]
+                yield args.delimiter.join(out)
 
     def generator(self, args, gen):
         args = self._process_args(args)
