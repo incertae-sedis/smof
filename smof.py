@@ -1106,9 +1106,9 @@ class Filter(Subcommand):
                 ch, sign, per = args.composition.split()
             except:
                 err('The argument for --composition must be three space separated values, e.g. "GC > .5"')
-            legal_signs = ('<', '<=', '>=', '>', '==', '=')
+            legal_signs = ('<', '<=', '>=', '>', '==', '=', '!=')
             if not sign in legal_signs:
-                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=')")
+                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=', '!=')")
             if sign == '=':
                 sign = '=='
             try:
