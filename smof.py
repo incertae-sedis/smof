@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.17.0"
+__version__ = "1.18.0"
 
 # ================
 # Argument Parsing
@@ -43,9 +43,9 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Grep,
+    subcommands = [Chksum, Clean, Filter, Grep,
                    Head, Perm, Reverse, Sample, Sniff,
-                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc, Winnow]
+                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc]
     for cmd in subcommands:
         cmd(parser)
 
@@ -57,6 +57,9 @@ def parse(argv=None):
 
     if argv[0] in ['rename', 'fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
+
+    if argv[0] == 'winnow':
+        err('`winnow` is deprecated, use `filter`')
 
     args = parser.parser.parse_args(argv)
 
@@ -1065,6 +1068,69 @@ class Clean(Subcommand):
         for seq in self.generator(args, gen):
             seq.print(col_width=args.col_width, color=False, out=out)
 
+class Filter(Subcommand):
+    def _parse(self):
+        cmd_name = 'filter'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="extracts sequences meeting the given conditions"
+        )
+        parser.add_argument(
+            '-s', '--shorter-than',
+            help="keep only if length is less than or equal to LEN",
+            type=counting_number,
+            metavar='LEN'
+        )
+        parser.add_argument(
+            '-l', '--longer-than',
+            help="keep only if length is greater than or equal to LEN",
+            type=counting_number,
+            metavar='LEN'
+        )
+        parser.add_argument(
+            '-c', '--composition',
+            metavar='EXPR',
+            help="keep only if composition meets the condition (e.g. 'GC > .5')"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        tests = []
+        if args.shorter_than:
+            tests.append(lambda s, v=args.shorter_than: len(s) <= v)
+        if args.longer_than:
+            tests.append(lambda s, v=args.longer_than: len(s) >= v)
+        if args.composition:
+            try:
+                ch, sign, per = args.composition.split()
+            except:
+                err('The argument for --composition must be three space separated values, e.g. "GC > .5"')
+            legal_signs = ('<', '<=', '>=', '>', '==', '=', '!=')
+            if not sign in legal_signs:
+                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=', '!=')")
+            if sign == '=':
+                sign = '=='
+            try:
+                per = float(per)
+            except ValueError:
+                err("Third value must be a float")
+            if not 0 <= per <= 1:
+                err("Third value must be between 0 and 1")
+            ch = set(str(ch))
+
+            def evaluate(s):
+                c = Counter(s)
+                p = sum([c[x] for x in ch]) / len(s)
+                return(eval('p {} {}'.format(sign, per)))
+
+            tests.append(evaluate)
+
+        for seq in gen.next():
+            accept = all([x(seq.seq) for x in tests])
+            if accept:
+                yield seq
+
 class Perm(Subcommand):
     def _parse(self):
         cmd_name = 'perm'
@@ -1674,73 +1740,6 @@ class Subseq(Subcommand):
 
         for item in sgen(args, gen):
             yield item
-
-class Winnow(Subcommand):
-    def _parse(self):
-        cmd_name = 'winnow'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="remove sequences which meet given conditions"
-        )
-        parser.add_argument(
-            '-c', '--contain',
-            metavar='STR',
-            help="remove if contains any of these characters"
-        )
-        parser.add_argument(
-            '-s', '--shorter-than',
-            help="remove if len(seq) < INT",
-            type=counting_number,
-            metavar='INT'
-        )
-        parser.add_argument(
-            '-v', '--invert',
-            help="invert selection (i.e. keep when condition holds)",
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
-            '-p', '--composition',
-            metavar='EXPR',
-            help="composition (e.g. -p 'GC < 0.5')"
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        tests = []
-        if args.contain:
-            tests.append(lambda s, v=args.contain: bool(set(v) & set(s)))
-        if args.shorter_than:
-            tests.append(lambda s, v=args.shorter_than: len(s) < v)
-        if args.composition:
-            try:
-                ch,sign,per = args.composition.split()
-            except ValueError:
-                err('Composition argument have 3 values')
-            legal_signs = ('<', '<=', '>=', '>', '==')
-            if not sign in legal_signs:
-                err("Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==')")
-            try:
-                per = float(per)
-            except ValueError:
-                err("Third value must be a float")
-            if not 0 <= per <= 1:
-                err("Third value must be between 0 and 1")
-            ch = set(str(ch))
-
-            def evaluate(s):
-                c = Counter(s)
-                p = sum([c[x] for x in ch]) / len(s)
-                return(eval('p {} {}'.format(sign, per)))
-
-            tests.append(evaluate)
-
-
-        for seq in gen.next():
-            reject = [x(seq.seq) for x in tests]
-            if (any(reject) and args.invert) or (not any(reject) and not args.invert):
-                yield seq
 
 
 # ==============

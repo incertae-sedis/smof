@@ -590,6 +590,37 @@ class TestClean(unittest.TestCase):
         # test no-wrap
         self.assertEqual(get_output(self.longseq, ['clean', '-w', '0'])[1], 'A'*91)
 
+class TestFilter(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            '>a', 'ASDFX',
+            '>b', 'ASDF',
+            '>c', 'ASD'
+        ]
+
+    def test_shorter_than(self):
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 5])[0::2], ['>a', '>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 4])[0::2], ['>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 3])[0::2], ['>c'])
+
+    def test_longer_than(self):
+        self.assertEqual(get_output(self.seq, ['filter', '-l', 3])[0::2], ['>a', '>b', '>c'])
+        self.assertEqual(get_output(self.seq, ['filter', '-l', 4])[0::2], ['>a', '>b'])
+        self.assertEqual(get_output(self.seq, ['filter', '-l', 5])[0::2], ['>a'])
+
+    def test_composition(self):
+        comp = [
+            '>a', 'AAAAG.....',
+            '>b', 'AG........',
+            '>c', 'AAX.......'
+        ]
+        self.assertEqual(get_output(comp, ['filter', '-c', 'X == 0'])[0::2], ['>a', '>b'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'X = 0'])[0::2], ['>a', '>b'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'X != 0'])[0::2], ['>c'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'AG > .3'])[0::2], ['>a'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'AG < .3'])[0::2], ['>b', '>c'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'AG >= .5'])[0::2], ['>a'])
+        self.assertEqual(get_output(comp, ['filter', '-c', 'AG <= .5'])[0::2], ['>a', '>b', '>c'])
 
 class TestHeaderGrep(unittest.TestCase):
     def setUp(self):
@@ -758,7 +789,6 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAA']), [''])
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
 
-
 class TestGrepBadCombinations(unittest.TestCase):
     def setUp(self):
         self.seq = ['>a', 'A']
@@ -781,8 +811,6 @@ class TestGrepBadCombinations(unittest.TestCase):
     def test_exact_incompatible_options(self):
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-PX', 'a'])
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-GX', 'a'])
-
-
 
 class TestHeadandTail(unittest.TestCase):
     def setUp(self):
@@ -989,42 +1017,6 @@ class TestWc(unittest.TestCase):
 
     def test_nchars(self):
         self.assertEqual(get_output(self.seq, ['wc', '-m']), ['7'])
-
-class TestWinnow(unittest.TestCase):
-    def setUp(self):
-        self.seq = [
-            '>a', 'ASDFX',
-            '>b', 'ASDF',
-            '>c', 'ASD'
-        ]
-
-    def test_contain(self):
-        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'X'])[0::2], ['>b', '>c'])
-        self.assertEqual(get_output(self.seq, ['winnow', '-c', 'XF'])[0::2], ['>c'])
-
-    def test_not_contain(self):
-        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'X'])[0::2], ['>a'])
-        self.assertEqual(get_output(self.seq, ['winnow', '-vc', 'XF'])[0::2], ['>a', '>b'])
-
-    def test_shorter_than(self):
-        self.assertEqual(get_output(self.seq, ['winnow', '-s', 3])[0::2], ['>a', '>b', '>c'])
-        self.assertEqual(get_output(self.seq, ['winnow', '-s', 4])[0::2], ['>a', '>b'])
-        self.assertEqual(get_output(self.seq, ['winnow', '-s', 5])[0::2], ['>a'])
-
-    def test_longer_than(self):
-        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 3])[0::2], [''])
-        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 4])[0::2], ['>c'])
-        self.assertEqual(get_output(self.seq, ['winnow', '-vs', 5])[0::2], ['>b', '>c'])
-
-    def test_composition(self):
-        comp = [
-            '>a', 'AAAAG.....',
-            '>b', 'AG........'
-        ]
-        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 1'])[0::2], [''])
-        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG <= 0.5'])[0::2], [''])
-        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.5'])[0::2], ['>a'])
-        self.assertEqual(get_output(comp, ['winnow', '-p', 'AG < 0.2'])[0::2], ['>a', '>b'])
 
 
 if __name__ == '__main__':
