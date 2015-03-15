@@ -1,0 +1,8 @@
+*.pdf
+*.faa
+*.fasta
+*.fa
+*.fna
+*.gff
+*.gff3
+__pycache__
