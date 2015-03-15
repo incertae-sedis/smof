@@ -525,7 +525,7 @@ def get_output(seq, argv):
     args.func(args, gen, out=out)
     return(out.getvalue().strip().split("\n"))
 
-class TestChksum(unittest.TestCase):
+class TestMd5sum(unittest.TestCase):
     def setUp(self):
         self.seqs = [
             '>asdf', 'ASDF',
@@ -533,21 +533,21 @@ class TestChksum(unittest.TestCase):
         ]
     def test_default(self):
         self.assertEqual(
-            get_output(self.seqs, ['chksum']),
+            get_output(self.seqs, ['md5sum']),
             ['28fd532b933aaa89d2188b98241a8b46'])
     def test_eachseq(self):
         self.assertEqual(
-            get_output(self.seqs, ['chksum', '-q']),
+            get_output(self.seqs, ['md5sum', '-q']),
                 ['asdf\t6d87a19f011653459575ceb722db3b69',
                  'qwer\t6e9758614cca89162b2d19922de103bb']
             )
     def test_headers(self):
         self.assertEqual(
-            get_output(self.seqs, ['chksum', '-d']),
+            get_output(self.seqs, ['md5sum', '-d']),
             ['c69874b898abb180ac71bd99bc16f8fb'])
     def test_seqs(self):
         self.assertEqual(
-            get_output(self.seqs, ['chksum', '-s']),
+            get_output(self.seqs, ['md5sum', '-s']),
             ['ed9b124094bc93e7f611da252d06f628'])
 
 class TestClean(unittest.TestCase):
