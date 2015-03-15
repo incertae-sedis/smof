@@ -1,12 +1,12 @@
 Major things
 ============
-    * reimplement in C
     * allow input from files not just STDIN
+      * Let grep take only one pattern
+      * Add filename handling to grep (-l, -L, -h (as -s) options).
+    * reimplement in C or Haskell
     * make a comp function that compares two or more fasta files
+    * handle fasta indexing (this requires intput from named files, not STDIN)
 
 Minor things
 ============
     * add color subcommand (color sequence by letter, optionally amino acid class)
-    * rewrite split so it doesn't read everything into memory
-    * better help for subseq (and everything else)
-    * make Unique useful
