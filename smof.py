@@ -43,7 +43,7 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Chksum, Clean, Filter, Grep,
+    subcommands = [Clean, Filter, Grep, Md5sum,
                    Head, Perm, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc]
     for cmd in subcommands:
@@ -60,6 +60,10 @@ def parse(argv=None):
 
     if argv[0] == 'winnow':
         err('`winnow` is deprecated, use `filter`')
+
+    if argv[0] == 'chksum':
+        err('`winnow` is deprecated, use `md5sum`')
+
 
     args = parser.parser.parse_args(argv)
 
@@ -873,78 +877,6 @@ class Subcommand:
             else:
                 out.write('%s\n' % output)
 
-class Chksum(Subcommand):
-    def _parse(self):
-        cmd_name = 'chksum'
-        parser = self.subparsers.add_parser(
-            cmd_name,
-            usage=self.usage.format(cmd_name),
-            help="calculate an md5 checksum for the input sequences",
-
-            description="""By default, `smof chksum` concantenates all headers
-            and sequences and calculates the md5sum for the resulting string.
-            This is identical to `tr -d '\\n>' < a.fa | md5sum`."""
-
-        )
-        parser.add_argument(
-            '-i', '--ignore-case',
-            help='convert all to uppercase, before hashing',
-            action='store_true',
-            default=False
-        )
-        method = parser.add_mutually_exclusive_group(required=False)
-        method.add_argument(
-            '-q', '--each-sequence',
-            help='calculate md5sum for each sequence (TAB delimited)',
-            action='store_true',
-            default=False
-        )
-        method.add_argument(
-            '-s', '--all-sequences',
-            help='calculate one md5sum for all concatenated sequences',
-            action='store_true',
-            default=False
-        )
-        method.add_argument(
-            '-d', '--all-headers',
-            help='calculate one md5sum for all concatenated headers',
-            action='store_true',
-            default=False
-        )
-        parser.set_defaults(func=self.func)
-
-    def generator(self, args, gen):
-        md5hash = md5()
-        # Hash the sequences only (in input order)
-        if(args.all_sequences):
-            fun = lambda s,h: md5hash.update(s)
-        # Hash the headers only (in input order)
-        elif(args.all_headers):
-            fun = lambda s,h: md5hash.update(h)
-        # DEFAULT: Hash headers and sequences (concatenated)
-        # Equivalent to:
-        # $ tr -d '\n>' < myfile.fa | md5sum
-        else:
-            fun = lambda s,h: md5hash.update(h+s)
-
-        for seq in gen.next():
-            if args.ignore_case:
-                if args.all_headers or args.whole_file :
-                    seq.header_upper()
-                if not args.all_headers:
-                    seq.seq_upper()
-            s = seq.seq.encode('ascii')
-            h = seq.header.encode('ascii')
-            # Write <header>\t<sequence hash> for each sequence
-            if(args.each_sequence):
-                yield '{}\t{}'.format(ParseHeader.firstword(seq.header), md5(s).hexdigest())
-            else:
-                fun(s,h)
-
-        # Print output hash for cumulative options
-        if not args.each_sequence:
-            yield md5hash.hexdigest()
-
 class Clean(Subcommand):
     def _parse(self):
         cmd_name = 'clean'
@@ -1134,6 +1066,78 @@ class Filter(Subcommand):
             accept = all([x(seq.seq) for x in tests])
             if accept:
                 yield seq
+
+class Md5sum(Subcommand):
+    def _parse(self):
+        cmd_name = 'md5sum'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="calculate an md5 checksum for the input sequences",
+
+            description="""By default, `smof md5sum` concantenates all headers
+            and sequences and calculates the md5sum for the resulting string.
+            This is identical to `tr -d '\\n>' < a.fa | md5sum`."""
+
+        )
+        parser.add_argument(
+            '-i', '--ignore-case',
+            help='convert all to uppercase, before hashing',
+            action='store_true',
+            default=False
+        )
+        method = parser.add_mutually_exclusive_group(required=False)
+        method.add_argument(
+            '-q', '--each-sequence',
+            help='calculate md5sum for each sequence (TAB delimited)',
+            action='store_true',
+            default=False
+        )
+        method.add_argument(
+            '-s', '--all-sequences',
+            help='calculate one md5sum for all concatenated sequences',
+            action='store_true',
+            default=False
+        )
+        method.add_argument(
+            '-d', '--all-headers',
+            help='calculate one md5sum for all concatenated headers',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        md5hash = md5()
+        # Hash the sequences only (in input order)
+        if(args.all_sequences):
+            fun = lambda s,h: md5hash.update(s)
+        # Hash the headers only (in input order)
+        elif(args.all_headers):
+            fun = lambda s,h: md5hash.update(h)
+        # DEFAULT: Hash headers and sequences (concatenated)
+        # Equivalent to:
+        # $ tr -d '\n>' < myfile.fa | md5sum
+        else:
+            fun = lambda s,h: md5hash.update(h+s)
+
+        for seq in gen.next():
+            if args.ignore_case:
+                if args.all_headers or args.whole_file :
+                    seq.header_upper()
+                if not args.all_headers:
+                    seq.seq_upper()
+            s = seq.seq.encode('ascii')
+            h = seq.header.encode('ascii')
+            # Write <header>\t<sequence hash> for each sequence
+            if(args.each_sequence):
+                yield '{}\t{}'.format(ParseHeader.firstword(seq.header), md5(s).hexdigest())
+            else:
+                fun(s,h)
+
+        # Print output hash for cumulative options
+        if not args.each_sequence:
+            yield md5hash.hexdigest()
 
 class Perm(Subcommand):
     def _parse(self):
