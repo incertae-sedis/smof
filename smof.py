@@ -44,7 +44,7 @@ def parse(argv=None):
     parser = Parser()
 
     subcommands = [Clean, Filter, Grep, Md5sum,
-                   Head, Perm, Reverse, Sample, Sniff,
+                   Head, Permute, Reverse, Sample, Sniff,
                    Sort, Split, Stat, Subseq, Tail, Uniq, Wc]
     for cmd in subcommands:
         cmd(parser)
@@ -63,6 +63,9 @@ def parse(argv=None):
 
     if argv[0] == 'chksum':
         err('`winnow` is deprecated, use `md5sum`')
+
+    if argv[0] == 'perm':
+        err('`perm` is deprecated, use `permute`')
 
 
     args = parser.parser.parse_args(argv)
@@ -1139,9 +1142,9 @@ class Md5sum(Subcommand):
         if not args.each_sequence:
             yield md5hash.hexdigest()
 
-class Perm(Subcommand):
+class Permute(Subcommand):
     def _parse(self):
-        cmd_name = 'perm'
+        cmd_name = 'permute'
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),

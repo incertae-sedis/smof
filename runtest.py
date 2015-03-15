@@ -833,38 +833,38 @@ class TestHeadandTail(unittest.TestCase):
         self.assertEqual(get_output(self.seq, ['head', '-f', 2, '-l', 1])[1], 'GA...A')
         self.assertEqual(get_output(self.seq, ['tail', '-f', 2, '-l', 1])[1], 'AT...S')
 
-class TestPerm(unittest.TestCase):
+class TestPermute(unittest.TestCase):
     def setUp(self):
         self.seq = ['>a', 'WHEREISMYTARDIS']
 
     def test_default(self):
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 42]),
+            ['permute', '--seed', 42]),
             ['>a|PERMUTATION:start=0;end=0;word_size=1', 'MTISSADYHEIERWR'])
 
     def test_word_size(self):
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 42, '-w', 3]),
+            ['permute', '--seed', 42, '-w', 3]),
             ['>a|PERMUTATION:start=0;end=0;word_size=3', 'TARREISMYDISWHE'])
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 42, '-w', 5]),
+            ['permute', '--seed', 42, '-w', 5]),
             ['>a|PERMUTATION:start=0;end=0;word_size=5', 'ARDISISMYTWHERE'])
 
     def test_offsets(self):
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 42, '-w', 4, '-s', 3]),
+            ['permute', '--seed', 42, '-w', 4, '-s', 3]),
             ['>a|PERMUTATION:start=3;end=0;word_size=4', 'WHERDISMYTAREIS'])
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 123, '-w', 4, '-s', 5]),
+            ['permute', '--seed', 123, '-w', 4, '-s', 5]),
             ['>a|PERMUTATION:start=5;end=0;word_size=4', 'WHEREISTARDISMY'])
         self.assertEqual(get_output(
             self.seq,
-            ['perm', '--seed', 123, '-w', 4, '-e', 3]),
+            ['permute', '--seed', 123, '-w', 4, '-e', 3]),
             ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
 
 class TestReverse(unittest.TestCase):
