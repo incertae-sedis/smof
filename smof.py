@@ -10,7 +10,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.19.0"
+__version__ = "1.19.1"
 
 # ================
 # Argument Parsing
@@ -1126,10 +1126,8 @@ class Md5sum(Subcommand):
 
         for seq in gen.next():
             if args.ignore_case:
-                if args.all_headers or args.whole_file :
-                    seq.header_upper()
-                if not args.all_headers:
-                    seq.seq_upper()
+                seq.header_upper()
+                seq.seq_upper()
             s = seq.seq.encode('ascii')
             h = seq.header.encode('ascii')
             # Write <header>\t<sequence hash> for each sequence
@@ -1818,11 +1816,6 @@ class Sort(Subcommand):
             action='store_true',
             default=False)
         parser.add_argument(
-            '-R', '--random-sort',
-            help="reverse sort",
-            action='store_true',
-            default=False)
-        parser.add_argument(
             '-n', '--numeric-sort',
             help="numeric sort",
             action='store_true',
@@ -1830,6 +1823,11 @@ class Sort(Subcommand):
         parser.add_argument(
             '-l', '--length-sort',
             help='sort by sequence length',
+            action='store_true',
+            default=False)
+        parser.add_argument(
+            '-R', '--random-sort',
+            help="randomly sort sequences",
             action='store_true',
             default=False)
         parser.set_defaults(func=self.func)

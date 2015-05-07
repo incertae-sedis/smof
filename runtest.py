@@ -786,7 +786,9 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
         self.assertEqual(get_output(self.seqs, ['grep', '-Pqx', 'GAA.*']), ['>b', 'GAACATAACAT'])
     def test_exact(self):
+        # Partial exact matches return nothing
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAA']), [''])
+        # Full exact matches return everything
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
 
 class TestGrepBadCombinations(unittest.TestCase):
