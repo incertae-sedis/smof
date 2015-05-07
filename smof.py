@@ -1,4 +1,4 @@
-a!/usr/bin/env python3
+#!/usr/bin/env python3
 
 import argparse
 import math
@@ -1126,10 +1126,8 @@ class Md5sum(Subcommand):
 
         for seq in gen.next():
             if args.ignore_case:
-                if args.all_headers or args.whole_file :
-                    seq.header_upper()
-                if not args.all_headers:
-                    seq.seq_upper()
+                seq.header_upper()
+                seq.seq_upper()
             s = seq.seq.encode('ascii')
             h = seq.header.encode('ascii')
             # Write <header>\t<sequence hash> for each sequence
