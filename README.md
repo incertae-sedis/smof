@@ -55,7 +55,7 @@ smof grep -qC3 --gff FFQQ < at.faa
 
 Count occurences (on both strands) of a DNA pattern using IUPAC extended
 nucleotide alphabet.
-``` bash
+```bash
 $ smof grep -qrG YYNCTATAWAWASM < myfile.fna
 692
 ```
@@ -73,33 +73,71 @@ chr3    smof-1.19.0   regex_match   823   1152  .  +  .  .
 chr3    smof-1.19.0   regex_match   1230  1568  .  +  .  .
 ```
 
+A particularly powerful function of `smof grep` is the ability to read a whole
+file of patterns and match them against a regex capture. This allows O(n),
+rather than O(mn) as in GNU grep, extraction of entries containing a particular
+pattern. For example if your headers are formatted like
+'locus|xxx|taxon|yyy|gi|zzz' and you have a file of thousands of gi numbers,
+you can easily extract all the sequences in the FASTA file matching one of
+these gi numbers with the following command:
+
+```bash
+$ smof grep -w 'gi\|(\d+)' -f gi_numbers.txt < seq.fa
+```
+
 ## `smof md5sum`
+
+This tool is useful if you want a checksum for a FASTA file that is independent
+of format (e.g. column width).
 
 ## `smof head` and `tail`
 
+These functions mimic their GNU counterparts but on the entry, rather than
+line, level. For example `smof head` prints the first entry in a file and `smof
+-5` prints the first 5. Similarly for `smof tail`. 
+
 ## `smof sort`
 
-## `smof split`
+`smof sort` can be used to simply sort sequences alphabetically by header. It
+can also sort by sequence length. One useful feature with no homolog in GNU
+sort is the ability to sort by regex capture. For example, if the FASTA headers
+are formated like 'locus|xxx|taxon|yyy|gi|zzz', you can sort them numerically
+by taxon with the command `smof sort -nx 'taxon\|(\d+)'`.
 
 ## `smof sample`
 
+`smof sample` allows extraction of a random sample of entries. With no
+arguments, it reads the entire file into memory and outputs a random one.
+
+## `smof split`
+
+This command allows easily splitting of a large file into many smaller files.
+
 ## `smof uniq`
 
+This is currently a pretty useless command.
+
 ## `smof wc`
+
+Outputs the number of characters and entries in the fasta file.
 
 String manipulation commands
 ============================
 
 ## `smof permute`
 
+Permutes the letters of a sequence
+
 ## `smof reverse`
+
+Reverses a sequence (does NOT take the reverse complement)
 
 ## `smof subseq`
 
 Get the sequences with headers matching 'chr3', get the subsequence 357,668
 
 ``` bash
-$ cat myfile.fna | smof grep chr3 | smof subseq 357 668 
+$ cat myfile.fna | smof grep chr3 | smof subseq -b 357 668 
 >chr3
 atggtcctttctcttgtttcttctctgtgttgttgagattagtttgtttaggtttgatagcgttgattttggcctgcgtt
 tggtgactcatatggtttgattggagtttgtttctgggttttatggttttggttgaagcgacatttttttgtggaatatg
@@ -107,17 +145,50 @@ gtttttgcaaaatattttgttccggatgagtaatatctacggtgctgctgtgagaattatgctattgttttgcaggtcct
 gttcttaatctttcatcgcttttgtgcttattgtctccttgtcgtttatgttgagtggtgtttgggctttag
 ```
 
-If you want to do extract many sequences from a fasta file using a gff file as
-a guide (or other gff/bed manipulations), consider using a specialized tools
-such as 'bedtools'.
+If the start is higher than the end, and the sequence appears to be a DNA
+sequence, then smof will take the reverse complement.
+
+`smof subseq` can also read from a gff file. However, if you want to do extract
+many sequences from a fasta file using a gff file as a guide (or other gff/bed
+manipulations), consider using a specialized tools such as 'bedtools'.
+
 
 Biological sequence tools
 =========================
 
-## clean
+## `smof clean`
 
-## filter
+This command can be used to tidy a sequence. You can change the column width,
+remove gaps and stops, change sequence to letters, etc.
 
-## sniff 
+## `smof filter`
 
-## stat
+Output only sequence that meet a set of conditions.
+
+If you want to only keep sequences that are longer than 100 letters
+
+```bash
+smof filter -l 100 < myfile.fa
+```
+
+Or shorter than 100 letters
+
+```bash
+smof filter -s 100 < myfile.fa
+```
+
+Or that have greater than 60% AFILMVW content (hydrophobic amino acids)
+
+```bash
+smof filter -c 'AFILMVW > .6' < myfile.fa
+```
+
+## `smof sniff`
+
+This command runs a number of checks on a FASTA file and is useful in
+diagnosing problems. For details, run `smof sniff -h`.
+
+## `smof stat`
+
+Just run `smof stat -h`. This thing is awesome and can do all sorts of crazy
+shit.
