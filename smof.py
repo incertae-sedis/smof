@@ -1716,9 +1716,11 @@ class Subseq(Subcommand):
         for line in args.gff:
             row = line.split('\t')
             try:
-                subseqs[row[0]].append({'start':int(row[3]),
-                                        'end':int(row[4]),
-                                        'strand':row[6]})
+                a, b = int(row[3]), int(row[4])
+                if row[6] == '-':
+                    subseqs[row[0]].append({'start':max(a, b), 'end':min(a,b)})
+                else:
+                    subseqs[row[0]].append({'start':a, 'end':b})
             except IndexError:
                 err('Improper gff3 file')
             except ValueError:
