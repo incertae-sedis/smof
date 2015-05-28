@@ -2628,15 +2628,19 @@ class Tail(Subcommand):
     def generator(self, args, gen):
         fromtop = False
         if args.nseqs:
-            try:
-                m = re.match('([-+])(\d+)', args.nseqs)
-                if m.group(1) == "+":
-                    fromtop = True
-                nseqs = int(m.group(2))
-            except AttributeError:
-                err("N must be formatted as '[+-]12'")
-            if nseqs < 1:
-                err("N must be greater than 0")
+            if os.path.isfile(args.nseqs):
+               args.fh = [args.nseqs] + args.fh
+               nseqs = 1
+            else:
+                try:
+                    m = re.match('([-+])(\d+)', args.nseqs)
+                    if m.group(1) == "+":
+                        fromtop = True
+                    nseqs = int(m.group(2))
+                except AttributeError:
+                    err("N must be formatted as '[+-]12'")
+                if nseqs < 1:
+                    err("N must be greater than 0")
         else:
             nseqs = 1
 
