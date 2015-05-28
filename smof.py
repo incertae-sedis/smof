@@ -6,6 +6,7 @@ import re
 import sys
 import string
 import copy
+from itertools import chain
 from collections import Counter
 from collections import defaultdict
 from hashlib import md5
@@ -408,12 +409,13 @@ class FSeq:
     revtrans = str.maketrans('acgtACGT', 'tgcaTGCA')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
-    def __init__(self, header, seq, handle_color=False, purge_color=False):
+    def __init__(self, header, seq, filename=None, handle_color=False, purge_color=False):
         self.seq = seq
         self.header = header
         self.colseq = None
         self.colheader = None
         self.handle_color = handle_color
+        self.filename = filename
         if purge_color or handle_color:
             self._process_color(handle_color)
 
@@ -524,36 +526,48 @@ class FSeq:
             return(newseq)
 
 class FSeqGenerator:
-    def __init__(self, fh=sys.stdin):
+    def __init__(self, args):
         '''
         fh can be any iterable object
         '''
-        self.fh = fh
+        if not args.fh:
+            args.fh = [sys.stdin]
+        self.fh = args.fh
+
 
     def next(self, *args, **kwargs):
         seq_list = []
         header = ''
-        for line in self.fh:
-            line = line.strip()
-            if not line or line[0] == '#':
-                continue
-            if ">" == line[0]:
+        for fastafile in self.fh:
+            # If there are multiple input files, store the filename
+            # If there is only one, e.g. STDIN, don't store a name
+            filename = None if len(self.fh) == 1 else fastafile
+            try:
+                f = open(fastafile, 'r')
+            except TypeError:
+                f = fastafile
+            for line in f:
+                line = line.strip()
+                if not line or line[0] == '#':
+                    continue
+                if ">" == line[0]:
+                    if seq_list:
+                        yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
+                    elif header:
+                        # If no sequence but there is a header ...
+                        err("Illegally empty sequence")
+                    seq_list = []
+                    header = line[1:]
+                elif header:
+                    seq_list.append(line)
+                else:
+                    err("First fasta line must begin with '>'")
+            if header:
                 if seq_list:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-                elif header:
-                    # If no sequence but there is a header ...
+                else:
                     err("Illegally empty sequence")
-                seq_list = []
-                header = line[1:]
-            elif header:
-                seq_list.append(line)
-            else:
-                err("First fasta line must begin with '>'")
-        if header:
-            if seq_list:
-                yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-            else:
-                err("Illegally empty sequence")
+            f.close()
 
 class Maps:
     DNA_AMB = {
@@ -892,6 +906,12 @@ class Clean(Subcommand):
             characters (except whitespace) are preserved by default."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-t', '--type',
             metavar='n|p',
             help='sequence type'
@@ -1016,6 +1036,12 @@ class Filter(Subcommand):
             resides in length and greater than 50% GC content)."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-s', '--shorter-than',
             help="keep only if length is less than or equal to LEN",
             type=counting_number,
@@ -1082,6 +1108,12 @@ class Md5sum(Subcommand):
             and sequences and calculates the md5sum for the resulting string.
             This is identical to `tr -d '\\n>' < a.fa | md5sum`."""
 
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -1154,6 +1186,12 @@ class Permute(Subcommand):
             sequence but want to preserve the start and stop codons."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-w', '--word-size',
             help='size of each word (default=1)',
             type=counting_number,
@@ -1215,6 +1253,12 @@ class Reverse(Subcommand):
             sequence, use a dedicated tool, like EMBOSS transeq."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-S', '--preserve-color',
             help='Preserve incoming color',
             action='store_true',
@@ -1256,6 +1300,12 @@ class Sniff(Subcommand):
                          stop codon. If a sequence lacks a start codon, but
                          otherwise loogs like a coding sequence, it will have
                          the value 0111.""")
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.set_defaults(func=self.func)
 
@@ -1340,6 +1390,12 @@ class Stat(Subcommand):
             the N50 (if you don't know what that is, you don't need to
             know)."""
 
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-d', '--delimiter',
@@ -1617,6 +1673,12 @@ class Split(Subcommand):
             default=2
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-q', '--seqs',
             help='split by maximum sequences per file',
             action='store_true',
@@ -1658,6 +1720,12 @@ class Subseq(Subcommand):
             against the sequence id (the first word in the fasta header). In
             addition to sequence subsetting, `subseq` can color the matched
             regions."""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-b', '--bounds',
@@ -1781,6 +1849,12 @@ class Sample(Subcommand):
             nargs='?',
             default=1)
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '--seed',
             help='set random seed (for reproducibility/debugging)',
             type=counting_number
@@ -1807,6 +1881,12 @@ class Sort(Subcommand):
             description="""Sorts the entries in a fasta file. By default, it
             sorts by the header strings. `sort` reads the entire file into
             memory, so should not be used for extremely large files."""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-x', '--regex',
@@ -1902,6 +1982,12 @@ class Head(Subcommand):
             metavar='N',
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
@@ -1956,6 +2042,12 @@ class Grep(Subcommand):
             metavar='PATTERN',
             help='pattern to match',
             nargs='?'
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-q', '--match-sequence',
@@ -2391,6 +2483,12 @@ class Uniq(Subcommand):
             case-sensitive."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-c', '--count',
             help='writes (count|header) in tab-delimited format',
             action='store_true',
@@ -2444,6 +2542,12 @@ class Wc(Subcommand):
             sequence length (TAB delimited)."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-m', '--chars',
             help='writes the summed length of all sequences',
             action='store_true',
@@ -2491,6 +2595,12 @@ class Tail(Subcommand):
             help='-N print last N, +N print from Nth onwards',
             nargs="?",
             metavar='N',
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-f', '--first',
@@ -2545,6 +2655,6 @@ class Tail(Subcommand):
 # =======
 
 if __name__ == '__main__':
-    gen = FSeqGenerator()
     args = parse()
+    gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)
