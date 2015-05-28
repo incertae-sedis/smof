@@ -1843,10 +1843,9 @@ class Sample(Subcommand):
             files."""
         )
         parser.add_argument(
-            'n',
+            '-n', '--number',
             help="sample size (default=%(default)s)",
             type=counting_number,
-            nargs='?',
             default=1)
         parser.add_argument(
             'fh',
@@ -1867,7 +1866,7 @@ class Sample(Subcommand):
         if args.seed:
             random.seed(args.seed)
         seqs = [s for s in gen.next()]
-        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
+        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.number))
         for i in sample_indices:
             yield seqs[i]
 
