@@ -1952,10 +1952,10 @@ class Grep(Subcommand):
             file. See the documentation for examples."""
         )
         parser.add_argument(
-            'patterns',
-            metavar='PATTERNS',
-            help='patterns to match',
-            nargs='*'
+            'pattern',
+            metavar='PATTERN',
+            help='pattern to match',
+            nargs='?'
         )
         parser.add_argument(
             '-q', '--match-sequence',
@@ -1972,11 +1972,11 @@ class Grep(Subcommand):
         parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
-            help='a regular expression to capture PATTERNS'
+            help='a regular expression to capture patterns'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
-            help='treat PATTERNS as perl regular expressions',
+            help='treat patterns as perl regular expressions',
             action='store_true',
             default=False
         )
@@ -2000,7 +2000,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-o', '--only-matching',
-            help="show only the part that matches PATTERN",
+            help="show only the part that matches",
             action='store_true',
             default=False
         )
@@ -2114,7 +2114,7 @@ class Grep(Subcommand):
             err('If you want to search sequence, set -q flag')
 
         if args.wrap and args.perl_regexp:
-            err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
+            err("Patterns found in --wrap captures must be literal (-P and -w incompatible)")
 
         if args.ambiguous_nucl:
             args.perl_regexp = True
@@ -2257,8 +2257,8 @@ class Grep(Subcommand):
             pat.update((s.seq for s in FSeqGenerator(fh=args.fastain).next()))
         if args.file:
             pat.update([l.rstrip('\n') for l in args.file])
-        if args.patterns:
-            pat.update(args.patterns)
+        if args.pattern:
+            pat.update([args.pattern])
 
         if args.ambiguous_nucl:
             apat = set()
