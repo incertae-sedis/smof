@@ -1669,10 +1669,9 @@ class Split(Subcommand):
             output files."""
         )
         parser.add_argument(
-            'N',
+            '-n', '--number',
             help='Number of output files or sequences per file',
-            type=counting_number,
-            default=2
+            type=counting_number
         )
         parser.add_argument(
             'fh',
@@ -1699,7 +1698,7 @@ class Split(Subcommand):
 
     def write(self, args, gen, out=None):
         p = args.prefix
-        N = args.N
+        N = args.number
         for i, seq in enumerate(self.generator(args, gen)):
             fnum = i // N if args.seqs else i % N
             outfile = '%s%s.fasta' % (p, str(fnum))
