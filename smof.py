@@ -6,6 +6,7 @@ import re
 import sys
 import string
 import copy
+import os
 from itertools import chain
 from collections import Counter
 from collections import defaultdict
@@ -530,18 +531,19 @@ class FSeqGenerator:
         '''
         fh can be any iterable object
         '''
-        if not args.fh:
-            args.fh = [sys.stdin]
-        self.fh = args.fh
-
+        self.args = args
 
     def next(self, *args, **kwargs):
+        if not self.args.fh:
+            fh = [sys.stdin]
+        else:
+            fh = self.args.fh
         seq_list = []
         header = ''
-        for fastafile in self.fh:
+        for fastafile in fh:
             # If there are multiple input files, store the filename
             # If there is only one, e.g. STDIN, don't store a name
-            filename = None if len(self.fh) == 1 else fastafile
+            filename = None if len(fh) == 1 else fastafile
             try:
                 f = open(fastafile, 'r')
             except TypeError:
@@ -2004,10 +2006,18 @@ class Head(Subcommand):
     def generator(self, args, gen):
         i = 1
         if args.nseqs:
-            try:
-                nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
-            except AttributeError:
-                err("N must be formatted as '-12'")
+            # This resolve cases where there is a positional filename and no
+            # nseqs given.
+            # If the first positional argument is a readable filename, treat
+            # it as input. Otherwise, try to interpret it as a number
+            if os.path.isfile(args.nseqs):
+               args.fh = [args.nseqs] + args.fh
+               nseqs = 1
+            else:
+                try:
+                    nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
+                except AttributeError:
+                    err("N must be formatted as '-12'")
         else:
             nseqs = 1
 
