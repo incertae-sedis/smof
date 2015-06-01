@@ -6,11 +6,13 @@ import re
 import sys
 import string
 import copy
+import os
+from itertools import chain
 from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "1.20.0"
+__version__ = "2.0.0"
 
 # ================
 # Argument Parsing
@@ -18,56 +20,69 @@ __version__ = "1.20.0"
 
 class Parser:
     def __init__(self):
-        self.parser = self._build_base_parser()
-        self.subparsers = self._build_subparsers()
-        self.usage = '<fastafile> | smof {} <options>'
-
-    def _build_base_parser(self):
-        parser = argparse.ArgumentParser(
+        self.parser = argparse.ArgumentParser(
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
             description='Tools for studying and manipulating fasta files')
-        parser.add_argument(
+        self.parser.add_argument(
             '-v', '--version',
             action='version',
             version='%(prog)s {}'.format(__version__))
-        return(parser)
-
-    def _build_subparsers(self):
-        subparsers = self.parser.add_subparsers(
+        self.subparsers = self.parser.add_subparsers(
             metavar='[ for help on each: smof <subcommand> -h ]',
             title='subcommands')
-        return(subparsers)
+        self.usage = '<fastafile> | smof {} <options>'
 
 def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Clean, Filter, Grep, Md5sum,
-                   Head, Permute, Reverse, Sample, Sniff,
-                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc]
+    # A list of valid subcommands, each of which is a class (defined below)
+    subcommands = [
+        Clean,
+        Filter,
+        Grep,
+        Md5sum,
+        Head,
+        Permute,
+        Reverse,
+        Sample,
+        Sniff,
+        Sort,
+        Split,
+        Stat,
+        Subseq,
+        Tail,
+        Uniq,
+        Wc
+    ]
+    # add a subparser to parser for each subcommand
     for cmd in subcommands:
-        cmd(parser)
+       cmd(parser)
 
+    # the argv variable will be defined only for testing purposes
+    # when it is not defined, take arguments from the terminal
     argv = argv if argv else sys.argv[1:]
 
+    # if no argument is provided, print help
     if not argv:
         parser.parser.print_help()
         sys.exit(0)
 
-    if argv[0] in ['rename', 'fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
+    # handle attempted access to deprecated subcommands
+    if argv[0] in ['rename', 'fasta2csv']:
+        err("{} is deprecated".format(argv[0]))
+    if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
-
     if argv[0] == 'winnow':
-        err('`winnow` is deprecated, use `filter`')
-
+        err('`winnow` is deprecated, use `smof filter`')
     if argv[0] == 'chksum':
-        err('`winnow` is deprecated, use `md5sum`')
-
+        err('`winnow` is deprecated, use `smof md5sum`')
     if argv[0] == 'perm':
-        err('`perm` is deprecated, use `permute`')
+        err('`perm` is deprecated, use `smof permute`')
 
-
+    # parse arguments, the default function that will ultimately be run is
+    # selected according to tthe user-chosen subcommand
     args = parser.parser.parse_args(argv)
 
     return(args)
@@ -408,12 +423,13 @@ class FSeq:
     revtrans = str.maketrans('acgtACGT', 'tgcaTGCA')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
-    def __init__(self, header, seq, handle_color=False, purge_color=False):
+    def __init__(self, header, seq, filename=None, handle_color=False, purge_color=False):
         self.seq = seq
         self.header = header
         self.colseq = None
         self.colheader = None
         self.handle_color = handle_color
+        self.filename = filename
         if purge_color or handle_color:
             self._process_color(handle_color)
 
@@ -524,36 +540,57 @@ class FSeq:
             return(newseq)
 
 class FSeqGenerator:
-    def __init__(self, fh=sys.stdin):
-        '''
-        fh can be any iterable object
-        '''
-        self.fh = fh
+    def __init__(self, args):
+        self.args = args
 
     def next(self, *args, **kwargs):
+        # If no input is given,
+        # and if smof is not reading user input from stdin,
+        # assume piped input is from STDIN
+        if not self.args.fh and not sys.stdin.isatty:
+            fh = [sys.stdin]
+        elif self.args.fh:
+            fh = self.args.fh
+        else:
+            err('no input detected')
+
         seq_list = []
         header = ''
-        for line in self.fh:
-            line = line.strip()
-            if not line or line[0] == '#':
-                continue
-            if ">" == line[0]:
+        for fastafile in fh:
+            # If there are multiple input files, store the filename
+            # If there is only one, e.g. STDIN, don't store a name
+            filename = None if len(fh) == 1 else fastafile
+            try:
+                f = open(fastafile, 'r')
+            except TypeError:
+                f = fastafile
+
+            for line in f:
+                line = line.strip()
+                if not line or line[0] == '#':
+                    continue
+                if ">" == line[0]:
+                    if seq_list:
+                        yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
+                    elif header:
+                        # If no sequence but there is a header ...
+                        err("Illegally empty sequence")
+                    seq_list = []
+                    header = line[1:]
+                elif header:
+                    seq_list.append(line)
+                else:
+                    err("First fasta line must begin with '>'")
+            if header:
                 if seq_list:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-                elif header:
-                    # If no sequence but there is a header ...
+                else:
                     err("Illegally empty sequence")
-                seq_list = []
-                header = line[1:]
-            elif header:
-                seq_list.append(line)
-            else:
-                err("First fasta line must begin with '>'")
-        if header:
-            if seq_list:
-                yield FSeq(header, ''.join(seq_list), *args, **kwargs)
-            else:
-                err("Illegally empty sequence")
+
+            try:
+                f.close()
+            except AttributeError:
+                pass
 
 class Maps:
     DNA_AMB = {
@@ -704,19 +741,6 @@ class StatFun:
 # =================
 # UTILITY FUNCTIONS
 # =================
-
-def csvrowGenerator(filename):
-    import csv
-    try:
-        f = open(filename, 'r')
-        dialect = csv.Sniffer().sniff(f.read(1024))
-        f.seek(0)
-        reader = csv.reader(f, dialect)
-    except IOError as e:
-        print(e, file=sys.stderr)
-        sys.exit(0)
-    for row in reader:
-        yield row
 
 def counter_caser(counter, lower=False):
     '''
@@ -892,6 +916,12 @@ class Clean(Subcommand):
             characters (except whitespace) are preserved by default."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-t', '--type',
             metavar='n|p',
             help='sequence type'
@@ -1016,6 +1046,12 @@ class Filter(Subcommand):
             resides in length and greater than 50% GC content)."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-s', '--shorter-than',
             help="keep only if length is less than or equal to LEN",
             type=counting_number,
@@ -1082,6 +1118,12 @@ class Md5sum(Subcommand):
             and sequences and calculates the md5sum for the resulting string.
             This is identical to `tr -d '\\n>' < a.fa | md5sum`."""
 
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-i', '--ignore-case',
@@ -1154,6 +1196,12 @@ class Permute(Subcommand):
             sequence but want to preserve the start and stop codons."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-w', '--word-size',
             help='size of each word (default=1)',
             type=counting_number,
@@ -1215,6 +1263,12 @@ class Reverse(Subcommand):
             sequence, use a dedicated tool, like EMBOSS transeq."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-S', '--preserve-color',
             help='Preserve incoming color',
             action='store_true',
@@ -1256,6 +1310,12 @@ class Sniff(Subcommand):
                          stop codon. If a sequence lacks a start codon, but
                          otherwise loogs like a coding sequence, it will have
                          the value 0111.""")
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.set_defaults(func=self.func)
 
@@ -1340,6 +1400,12 @@ class Stat(Subcommand):
             the N50 (if you don't know what that is, you don't need to
             know)."""
 
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-d', '--delimiter',
@@ -1611,10 +1677,15 @@ class Split(Subcommand):
             output files."""
         )
         parser.add_argument(
-            'N',
+            '-n', '--number',
             help='Number of output files or sequences per file',
-            type=counting_number,
-            default=2
+            type=counting_number
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-q', '--seqs',
@@ -1635,7 +1706,7 @@ class Split(Subcommand):
 
     def write(self, args, gen, out=None):
         p = args.prefix
-        N = args.N
+        N = args.number
         for i, seq in enumerate(self.generator(args, gen)):
             fnum = i // N if args.seqs else i % N
             outfile = '%s%s.fasta' % (p, str(fnum))
@@ -1658,6 +1729,12 @@ class Subseq(Subcommand):
             against the sequence id (the first word in the fasta header). In
             addition to sequence subsetting, `subseq` can color the matched
             regions."""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-b', '--bounds',
@@ -1775,11 +1852,16 @@ class Sample(Subcommand):
             files."""
         )
         parser.add_argument(
-            'n',
+            '-n', '--number',
             help="sample size (default=%(default)s)",
             type=counting_number,
-            nargs='?',
             default=1)
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
         parser.add_argument(
             '--seed',
             help='set random seed (for reproducibility/debugging)',
@@ -1793,7 +1875,7 @@ class Sample(Subcommand):
         if args.seed:
             random.seed(args.seed)
         seqs = [s for s in gen.next()]
-        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.n))
+        sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.number))
         for i in sample_indices:
             yield seqs[i]
 
@@ -1807,6 +1889,12 @@ class Sort(Subcommand):
             description="""Sorts the entries in a fasta file. By default, it
             sorts by the header strings. `sort` reads the entire file into
             memory, so should not be used for extremely large files."""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-x', '--regex',
@@ -1902,6 +1990,12 @@ class Head(Subcommand):
             metavar='N',
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
@@ -1919,10 +2013,18 @@ class Head(Subcommand):
     def generator(self, args, gen):
         i = 1
         if args.nseqs:
-            try:
-                nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
-            except AttributeError:
-                err("N must be formatted as '-12'")
+            # This resolve cases where there is a positional filename and no
+            # nseqs given.
+            # If the first positional argument is a readable filename, treat
+            # it as input. Otherwise, try to interpret it as a number
+            if os.path.isfile(args.nseqs):
+               args.fh = [args.nseqs] + args.fh
+               nseqs = 1
+            else:
+                try:
+                    nseqs = int(re.match('-(\d+)', args.nseqs).group(1))
+                except AttributeError:
+                    err("N must be formatted as '-12'")
         else:
             nseqs = 1
 
@@ -1952,10 +2054,16 @@ class Grep(Subcommand):
             file. See the documentation for examples."""
         )
         parser.add_argument(
-            'patterns',
-            metavar='PATTERNS',
-            help='patterns to match',
-            nargs='*'
+            'pattern',
+            metavar='PATTERN',
+            help='pattern to match',
+            nargs='?'
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
         )
         parser.add_argument(
             '-q', '--match-sequence',
@@ -1972,11 +2080,11 @@ class Grep(Subcommand):
         parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
-            help='a regular expression to capture PATTERNS'
+            help='a regular expression to capture patterns'
         )
         parser.add_argument(
             '-P', '--perl-regexp',
-            help='treat PATTERNS as perl regular expressions',
+            help='treat patterns as perl regular expressions',
             action='store_true',
             default=False
         )
@@ -2000,7 +2108,7 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-o', '--only-matching',
-            help="show only the part that matches PATTERN",
+            help="show only the part that matches",
             action='store_true',
             default=False
         )
@@ -2114,7 +2222,7 @@ class Grep(Subcommand):
             err('If you want to search sequence, set -q flag')
 
         if args.wrap and args.perl_regexp:
-            err("PATTERNS found in --wrap captures must be literal (-P and -w incompatible)")
+            err("Patterns found in --wrap captures must be literal (-P and -w incompatible)")
 
         if args.ambiguous_nucl:
             args.perl_regexp = True
@@ -2257,8 +2365,8 @@ class Grep(Subcommand):
             pat.update((s.seq for s in FSeqGenerator(fh=args.fastain).next()))
         if args.file:
             pat.update([l.rstrip('\n') for l in args.file])
-        if args.patterns:
-            pat.update(args.patterns)
+        if args.pattern:
+            pat.update([args.pattern])
 
         if args.ambiguous_nucl:
             apat = set()
@@ -2391,6 +2499,12 @@ class Uniq(Subcommand):
             case-sensitive."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-c', '--count',
             help='writes (count|header) in tab-delimited format',
             action='store_true',
@@ -2444,6 +2558,12 @@ class Wc(Subcommand):
             sequence length (TAB delimited)."""
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-m', '--chars',
             help='writes the summed length of all sequences',
             action='store_true',
@@ -2493,6 +2613,12 @@ class Tail(Subcommand):
             metavar='N',
         )
         parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
             '-f', '--first',
             help='print first K letters of each sequence',
             metavar='K',
@@ -2509,15 +2635,19 @@ class Tail(Subcommand):
     def generator(self, args, gen):
         fromtop = False
         if args.nseqs:
-            try:
-                m = re.match('([-+])(\d+)', args.nseqs)
-                if m.group(1) == "+":
-                    fromtop = True
-                nseqs = int(m.group(2))
-            except AttributeError:
-                err("N must be formatted as '[+-]12'")
-            if nseqs < 1:
-                err("N must be greater than 0")
+            if os.path.isfile(args.nseqs):
+               args.fh = [args.nseqs] + args.fh
+               nseqs = 1
+            else:
+                try:
+                    m = re.match('([-+])(\d+)', args.nseqs)
+                    if m.group(1) == "+":
+                        fromtop = True
+                    nseqs = int(m.group(2))
+                except AttributeError:
+                    err("N must be formatted as '[+-]12'")
+                if nseqs < 1:
+                    err("N must be greater than 0")
         else:
             nseqs = 1
 
@@ -2545,6 +2675,6 @@ class Tail(Subcommand):
 # =======
 
 if __name__ == '__main__':
-    gen = FSeqGenerator()
     args = parse()
+    gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)

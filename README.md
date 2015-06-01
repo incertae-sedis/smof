@@ -12,13 +12,25 @@ Detailed instructions on how to use each command in `smof` is available via the
 To list subcommands
 
 ``` bash
-$ smof -h
+smof -h
 ```
 
 Get help on a specific subcommand
 
 ``` bash
-$ smof grep -h
+smof grep -h
+```
+
+Installation
+============
+
+Currently smof has only been tested in a UNIX environment.
+
+``` bash
+git clone https://github.com/zbwrnz/smof
+cd smof
+./runtest.py
+ln -s smof.py /usr/local/bin/smof
 ```
 
 UNIX-like commands
@@ -56,8 +68,8 @@ smof grep -qC3 --gff FFQQ < at.faa
 Count occurences (on both strands) of a DNA pattern using IUPAC extended
 nucleotide alphabet.
 ```bash
-$ smof grep -qrG YYNCTATAWAWASM < myfile.fna
-692
+smof grep -qrG YYNCTATAWAWASM < myfile.fna
+  692
 ```
 
 Find non-overlapping open reading frames of length greater than 100 codons.
@@ -67,10 +79,10 @@ set of longest possible ORFs. If you want to identify ORFs, you should use a
 specialized program. That said:
 
 ``` bash
-$ smof grep -qPr --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' < myfile.fna
-chr3    smof-1.19.0   regex_match   357   668   .  +  .  .
-chr3    smof-1.19.0   regex_match   823   1152  .  +  .  .
-chr3    smof-1.19.0   regex_match   1230  1568  .  +  .  .
+smof grep -qPr --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' < myfile.fna
+  chr3    smof-1.19.0   regex_match   357   668   .  +  .  .
+  chr3    smof-1.19.0   regex_match   823   1152  .  +  .  .
+  chr3    smof-1.19.0   regex_match   1230  1568  .  +  .  .
 ```
 
 A particularly powerful function of `smof grep` is the ability to read a whole
@@ -82,7 +94,7 @@ you can easily extract all the sequences in the FASTA file matching one of
 these gi numbers with the following command:
 
 ```bash
-$ smof grep -w 'gi\|(\d+)' -f gi_numbers.txt < seq.fa
+smof grep -w 'gi\|(\d+)' -f gi_numbers.txt < seq.fa
 ```
 
 ## `smof md5sum`
@@ -137,12 +149,12 @@ Reverses a sequence (does NOT take the reverse complement)
 Get the sequences with headers matching 'chr3', get the subsequence 357,668
 
 ``` bash
-$ cat myfile.fna | smof grep chr3 | smof subseq -b 357 668 
->chr3
-atggtcctttctcttgtttcttctctgtgttgttgagattagtttgtttaggtttgatagcgttgattttggcctgcgtt
-tggtgactcatatggtttgattggagtttgtttctgggttttatggttttggttgaagcgacatttttttgtggaatatg
-gtttttgcaaaatattttgttccggatgagtaatatctacggtgctgctgtgagaattatgctattgttttgcaggtcct
-gttcttaatctttcatcgcttttgtgcttattgtctccttgtcgtttatgttgagtggtgtttgggctttag
+cat myfile.fna | smof grep chr3 | smof subseq -b 357 668 
+  >chr3
+  atggtcctttctcttgtttcttctctgtgttgttgagattagtttgtttaggtttgatagcgttgattttggcctgcgtt
+  tggtgactcatatggtttgattggagtttgtttctgggttttatggttttggttgaagcgacatttttttgtggaatatg
+  gtttttgcaaaatattttgttccggatgagtaatatctacggtgctgctgtgagaattatgctattgttttgcaggtcct
+  gttcttaatctttcatcgcttttgtgcttattgtctccttgtcgtttatgttgagtggtgtttgggctttag
 ```
 
 If the start is higher than the end, and the sequence appears to be a DNA
