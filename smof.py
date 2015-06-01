@@ -547,12 +547,10 @@ class FSeqGenerator:
         # If no input is given,
         # and if smof is not reading user input from stdin,
         # assume piped input is from STDIN
-        if not self.args.fh and not sys.stdin.isatty:
+        if not self.args.fh:
             fh = [sys.stdin]
-        elif self.args.fh:
-            fh = self.args.fh
         else:
-            err('no input detected')
+            fh = self.args.fh
 
         seq_list = []
         header = ''

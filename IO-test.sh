@@ -34,5 +34,5 @@ diff <(tail -2 grep-test.fa) <(../smof.py tail grep-test.fa) > /dev/null
 echo $?
 
 echo -n 'Testing multiple file input ... '
-diff <(grep -q 'a' a.fa b.fa c.fa) <(cat a.fa b.fa c.fa | grep -q 'a') > /dev/null
+diff <( ../smof.py grep -q 'a' a.fa b.fa c.fa) <(cat a.fa b.fa c.fa | ../smof.py grep -q 'a') > /dev/null
 echo $?
