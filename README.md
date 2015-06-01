@@ -46,29 +46,29 @@ FASTA headers OR the fasta sequence.
 Extract the entry with the id AT5G49640
 
 ``` bash
-smof grep AT1G10960 < at.faa
+smof grep AT1G10960 at.faa
 ```
 
 Extract entries containing the sequence 'FFQQ'
 
 ```bash
-smof grep -q FFQQ < at.faa
+smof grep -q FFQQ at.faa
 ```
 
 Extract only the FFQQ motif and the 3 amino acids flanking it.
 ```bash
-smof grep -qoC3 FFQQ < at.faa
+smof grep -qoC3 FFQQ at.faa
 ```
 
 Write the output in gff format
 ```bash
-smof grep -qC3 --gff FFQQ < at.faa
+smof grep -qC3 --gff FFQQ at.faa
 ```
 
 Count occurences (on both strands) of a DNA pattern using IUPAC extended
 nucleotide alphabet.
 ```bash
-smof grep -qrG YYNCTATAWAWASM < myfile.fna
+smof grep -qrG YYNCTATAWAWASM myfile.fna
   692
 ```
 
@@ -79,7 +79,7 @@ set of longest possible ORFs. If you want to identify ORFs, you should use a
 specialized program. That said:
 
 ``` bash
-smof grep -qPr --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' < myfile.fna
+smof grep -qPr --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' myfile.fna
   chr3    smof-1.19.0   regex_match   357   668   .  +  .  .
   chr3    smof-1.19.0   regex_match   823   1152  .  +  .  .
   chr3    smof-1.19.0   regex_match   1230  1568  .  +  .  .
@@ -94,7 +94,7 @@ you can easily extract all the sequences in the FASTA file matching one of
 these gi numbers with the following command:
 
 ```bash
-smof grep -w 'gi\|(\d+)' -f gi_numbers.txt < seq.fa
+smof grep -w 'gi\|(\d+)' -f gi_numbers.txt seq.fa
 ```
 
 ## `smof md5sum`
@@ -180,19 +180,19 @@ Output only sequence that meet a set of conditions.
 If you want to only keep sequences that are longer than 100 letters
 
 ```bash
-smof filter -l 100 < myfile.fa
+smof filter -l 100 myfile.fa
 ```
 
 Or shorter than 100 letters
 
 ```bash
-smof filter -s 100 < myfile.fa
+smof filter -s 100 myfile.fa
 ```
 
 Or that have greater than 60% AFILMVW content (hydrophobic amino acids)
 
 ```bash
-smof filter -c 'AFILMVW > .6' < myfile.fa
+smof filter -c 'AFILMVW > .6' myfile.fa
 ```
 
 ## `smof sniff`
