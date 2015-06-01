@@ -26,9 +26,13 @@ diff <(tr -d '>\n' < md5sum.fa | md5sum | awk '{print $1}') \
 echo $?
 
 echo -n 'Testing head ... '
-diff <(head -2 grep-test.fa) <(../smof.py head grep-test.fa)
+diff <(head -2 grep-test.fa) <(../smof.py head grep-test.fa) > /dev/null
 echo $?
 
 echo -n 'Testing tail ... '
-diff <(tail -2 grep-test.fa) <(../smof.py tail grep-test.fa)
+diff <(tail -2 grep-test.fa) <(../smof.py tail grep-test.fa) > /dev/null
+echo $?
+
+echo -n 'Testing multiple file input ... '
+diff <(grep -q 'a' a.fa b.fa c.fa) <(cat a.fa b.fa c.fa | grep -q 'a') > /dev/null
 echo $?
