@@ -7,6 +7,19 @@ import sys
 from collections import Counter
 from io import StringIO
 
+class dummy:
+    def __init__(self, fh):
+        self.fh=[fh]
+
+def get_output(seq, argv):
+    argv = [str(s) for s in argv]
+    out = StringIO()
+    args = smof.parse(argv)
+    args.fh = [seq]
+    gen = smof.FSeqGenerator(args)
+    args.func(args, gen, out=out)
+    return(out.getvalue().strip().split("\n"))
+
 
 class TestFSeq(unittest.TestCase):
     def test_subseq(self):
@@ -464,7 +477,8 @@ class TestFSeqGenerator(unittest.TestCase):
         self.no_sequence = []
 
     def cmp_seqs(self, fh, exp_seqs):
-        g = smof.FSeqGenerator(fh)
+        seq = dummy(fh)
+        g = smof.FSeqGenerator(seq)
         obs_seqs = [s for s in g.next()]
         for obs, exp in zip(obs_seqs, exp_seqs):
             if (obs.header != exp.header) or (obs.seq != exp.seq):
@@ -473,8 +487,9 @@ class TestFSeqGenerator(unittest.TestCase):
         return(True)
 
     def is_valid(self, fh):
+        seq = dummy(fh)
         try:
-            g = smof.FSeqGenerator(fh)
+            g = smof.FSeqGenerator(seq)
             out = [s for s in g.next()]
             return(True)
         except BaseException:
@@ -516,14 +531,6 @@ class TestFSeqGenerator(unittest.TestCase):
     def test_no_sequence(self):
         self.assertTrue(self.is_valid(self.no_sequence))
 
-
-def get_output(seq, argv):
-    argv = [str(s) for s in argv]
-    out = StringIO()
-    gen = smof.FSeqGenerator(seq)
-    args = smof.parse(argv)
-    args.func(args, gen, out=out)
-    return(out.getvalue().strip().split("\n"))
 
 class TestMd5sum(unittest.TestCase):
     def setUp(self):
@@ -893,8 +900,8 @@ class TestSample(unittest.TestCase):
 
     def test_default(self):
         self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5']), ['>5', 'A'])
-        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '2']), ['>5', 'A', '>3', 'A'])
-        self.assertEqual(get_output(self.seqs, ['sample', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '--seed', '5', '-n', '2']), ['>5', 'A', '>3', 'A'])
+        self.assertEqual(get_output(self.seqs, ['sample', '-n', '2', '--seed', '123']), ['>1', 'A', '>3', 'A'])
 
 class TestSort(unittest.TestCase):
     def setUp(self):
