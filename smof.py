@@ -57,17 +57,20 @@ def parse(argv=None):
         parser.parser.print_help()
         sys.exit(0)
 
-    if argv[0] in ['rename', 'fasta2csv', 'idsearch', 'retrieve', 'search', 'rmfields']:
+    if argv[0] in ['rename', 'fasta2csv']:
+        err("{} is deprecated".format(argv[0]))
+
+    if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
 
     if argv[0] == 'winnow':
-        err('`winnow` is deprecated, use `filter`')
+        err('`winnow` is deprecated, use `smof filter`')
 
     if argv[0] == 'chksum':
-        err('`winnow` is deprecated, use `md5sum`')
+        err('`winnow` is deprecated, use `smof md5sum`')
 
     if argv[0] == 'perm':
-        err('`perm` is deprecated, use `permute`')
+        err('`perm` is deprecated, use `smof permute`')
 
 
     args = parser.parser.parse_args(argv)
