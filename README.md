@@ -1,7 +1,37 @@
 smof
 ====
 
-A collection FASTA sequence functions with convenient command-line interface
+UNIX-style FASTA tools
+
+
+Installation
+============
+
+Currently smof has only been tested in a UNIX environment. To install run the
+following in a terminal window
+
+``` bash
+git clone https://github.com/zbwrnz/smof
+cd smof
+./runtest.py
+./IO-test.sh
+sudo ln -s $PWD/smof.py /usr/local/bin/smof
+```
+
+You may, of course, link the smof executable to whatever location you want so
+long as the destination directory is in PATH.
+
+If you do not have git installed on your machine, you may download the ZIP file
+and run
+
+``` bash
+unzip smof-master.zip
+cd smof-master
+./runtest.py
+./IO-test.sh
+sudo ln -s $PWD/smof.py /usr/local/bin/smof
+```
+
 
 Getting Help
 ============
@@ -21,17 +51,6 @@ Get help on a specific subcommand
 smof grep -h
 ```
 
-Installation
-============
-
-Currently smof has only been tested in a UNIX environment.
-
-``` bash
-git clone https://github.com/zbwrnz/smof
-cd smof
-./runtest.py
-ln -s smof.py /usr/local/bin/smof
-```
 
 UNIX-like commands
 ==================
@@ -62,14 +81,14 @@ smof grep -qoC3 FFQQ at.faa
 
 Write the output in gff format
 ```bash
-smof grep -qC3 --gff FFQQ at.faa
+smof grep -qoC3 --gff FFQQ at.faa
 ```
 
-Count occurences (on both strands) of a DNA pattern using IUPAC extended
+Count occurrences (on both strands) of a DNA pattern using IUPAC extended
 nucleotide alphabet.
 ```bash
-smof grep -qrG YYNCTATAWAWASM myfile.fna
-  692
+smof grep -qmbG YYNCTATAWAWASM myfile.fna
+   1388
 ```
 
 Find non-overlapping open reading frames of length greater than 100 codons.
@@ -79,10 +98,10 @@ set of longest possible ORFs. If you want to identify ORFs, you should use a
 specialized program. That said:
 
 ``` bash
-smof grep -qPr --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' myfile.fna
-  chr3    smof-1.19.0   regex_match   357   668   .  +  .  .
-  chr3    smof-1.19.0   regex_match   823   1152  .  +  .  .
-  chr3    smof-1.19.0   regex_match   1230  1568  .  +  .  .
+smof grep -qPb --gff 'ATG(.{3}){99,}?(TAA|TGA|TAG)' myfile.fna
+  chr3    smof-2.0.1   regex_match   357   668   .  +  .  .
+  chr3    smof-2.0.1   regex_match   823   1152  .  +  .  .
+  chr3    smof-2.0.1   regex_match   1230  1568  .  +  .  .
 ```
 
 A particularly powerful function of `smof grep` is the ability to read a whole
@@ -90,7 +109,7 @@ file of patterns and match them against a regex capture. This allows O(n),
 rather than O(mn) as in GNU grep, extraction of entries containing a particular
 pattern. For example if your headers are formatted like
 'locus|xxx|taxon|yyy|gi|zzz' and you have a file of thousands of gi numbers,
-you can easily extract all the sequences in the FASTA file matching one of
+you can quickly extract all the sequences in the FASTA file matching one of
 these gi numbers with the following command:
 
 ```bash
@@ -100,7 +119,7 @@ smof grep -w 'gi\|(\d+)' -f gi_numbers.txt seq.fa
 ## `smof md5sum`
 
 This tool is useful if you want a checksum for a FASTA file that is independent
-of format (e.g. column width).
+of format (e.g. column width or case).
 
 ## `smof head` and `tail`
 
@@ -133,6 +152,7 @@ This is currently a pretty useless command.
 
 Outputs the number of characters and entries in the fasta file.
 
+
 String manipulation commands
 ============================
 
@@ -146,7 +166,7 @@ Reverses a sequence (does NOT take the reverse complement)
 
 ## `smof subseq`
 
-Get the sequences with headers matching 'chr3', get the subsequence 357,668
+From sequences with headers matching 'chr3', extract a subsequence from 357 to 668.
 
 ``` bash
 cat myfile.fna | smof grep chr3 | smof subseq -b 357 668 
@@ -160,9 +180,9 @@ cat myfile.fna | smof grep chr3 | smof subseq -b 357 668
 If the start is higher than the end, and the sequence appears to be a DNA
 sequence, then smof will take the reverse complement.
 
-`smof subseq` can also read from a gff file. However, if you want to do extract
+`smof subseq` can also read from a gff file. However, if you want to extract
 many sequences from a fasta file using a gff file as a guide (or other gff/bed
-manipulations), consider using a specialized tools such as 'bedtools'.
+manipulations), consider using a specialized tools such as `bedtools`.
 
 
 Biological sequence tools
@@ -171,7 +191,9 @@ Biological sequence tools
 ## `smof clean`
 
 This command can be used to tidy a sequence. You can change the column width,
-remove gaps and stops, change sequence to letters, etc.
+remove gaps and stops, convert all letters to one case and/or change irregular
+characters to unknowns. By default, it removes whitespace in a sequence and
+makes uniform, 80-character columns.
 
 ## `smof filter`
 
@@ -202,5 +224,30 @@ diagnosing problems. For details, run `smof sniff -h`.
 
 ## `smof stat`
 
-Just run `smof stat -h`. This thing is awesome and can do all sorts of crazy
-shit.
+The default operation outputs number of sequences and summary statistics
+concerning the sequence lengths.
+
+```bash
+smof stat arabidopsis.faa
+   nseq:      35386
+   nchars:    14518241
+   5sum:      17 207 350 520 5394
+   mean(sd):  410 (305)
+   N50:       512
+```
+
+'5sum' refers to the five number summary of the sequence lengths (minimum, 25%
+quantile, median, 75% quantile, and maximum).
+
+Statistics can also be calculated on a sequence-by-sequence level, which by
+default outputs the sequence names (the first word of the header) and the
+sequence length, e.g.
+
+```bash
+smof stat -q arabidopsis.faa | head -3
+   ATCG00500.1   489
+   ATCG00510.1   38
+   ATCG00280.1   474
+```
+
+There are many other options. Run `smof stat -h` for descriptions.
