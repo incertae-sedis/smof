@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.0.2"
+__version__ = "2.1.0"
 
 # ================
 # Argument Parsing
@@ -547,16 +547,14 @@ class FSeqGenerator:
         # If no input is given,
         # and if smof is not reading user input from stdin,
         # assume piped input is from STDIN
-        if not self.args.fh and not sys.stdin.isatty:
+        if not self.args.fh:
             fh = [sys.stdin]
-        elif self.args.fh:
-            fh = self.args.fh
         else:
-            err('no input detected')
+            fh = self.args.fh
 
-        seq_list = []
-        header = ''
         for fastafile in fh:
+            seq_list = []
+            header = ''
             # If there are multiple input files, store the filename
             # If there is only one, e.g. STDIN, don't store a name
             filename = None if len(fh) == 1 else fastafile
@@ -2017,7 +2015,7 @@ class Head(Subcommand):
             # nseqs given.
             # If the first positional argument is a readable filename, treat
             # it as input. Otherwise, try to interpret it as a number
-            if os.path.isfile(args.nseqs):
+            if os.access(args.nseqs, os.R_OK):
                args.fh = [args.nseqs] + args.fh
                nseqs = 1
             else:
@@ -2208,6 +2206,12 @@ class Grep(Subcommand):
         parser.set_defaults(func=self.func)
 
     def _process_arguments(self, args):
+        # If the pattern is readable, it is probably meant to be an input, not
+        # a pattern
+        if args.pattern and os.access(args.pattern, os.R_OK):
+            args.fh = [args.pattern] + args.fh
+            args.pattern = None
+
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
@@ -2635,7 +2639,7 @@ class Tail(Subcommand):
     def generator(self, args, gen):
         fromtop = False
         if args.nseqs:
-            if os.path.isfile(args.nseqs):
+            if os.access(args.nseqs, os.R_OK):
                args.fh = [args.nseqs] + args.fh
                nseqs = 1
             else:
