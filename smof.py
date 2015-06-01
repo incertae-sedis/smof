@@ -564,6 +564,7 @@ class FSeqGenerator:
                 f = open(fastafile, 'r')
             except TypeError:
                 f = fastafile
+
             for line in f:
                 line = line.strip()
                 if not line or line[0] == '#':
@@ -585,6 +586,7 @@ class FSeqGenerator:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
                 else:
                     err("Illegally empty sequence")
+
             try:
                 f.close()
             except AttributeError:
@@ -739,19 +741,6 @@ class StatFun:
 # =================
 # UTILITY FUNCTIONS
 # =================
-
-def csvrowGenerator(filename):
-    import csv
-    try:
-        f = open(filename, 'r')
-        dialect = csv.Sniffer().sniff(f.read(1024))
-        f.seek(0)
-        reader = csv.reader(f, dialect)
-    except IOError as e:
-        print(e, file=sys.stderr)
-        sys.exit(0)
-    for row in reader:
-        yield row
 
 def counter_caser(counter, lower=False):
     '''
