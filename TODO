@@ -6,7 +6,6 @@ Major things
 
 Minor things
 ============
-    * write installation and use section in README
     * implement in-to-out test shellscripts
     * deconvolute the coloring scheme
     * add color subcommand (color sequence by letter, optionally amino acid class)
