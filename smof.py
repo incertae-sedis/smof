@@ -2015,7 +2015,7 @@ class Head(Subcommand):
             # nseqs given.
             # If the first positional argument is a readable filename, treat
             # it as input. Otherwise, try to interpret it as a number
-            if os.path.isfile(args.nseqs):
+            if os.access(args.nseqs, os.R_OK):
                args.fh = [args.nseqs] + args.fh
                nseqs = 1
             else:
@@ -2206,6 +2206,12 @@ class Grep(Subcommand):
         parser.set_defaults(func=self.func)
 
     def _process_arguments(self, args):
+        # If the pattern is readable, it is probably meant to be an input, not
+        # a pattern
+        if args.pattern and os.access(args.pattern, os.R_OK):
+            args.fh = [args.pattern] + args.fh
+            args.pattern = None
+
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             err('--count-matches argument is incompatible with --invert-matches')
@@ -2633,7 +2639,7 @@ class Tail(Subcommand):
     def generator(self, args, gen):
         fromtop = False
         if args.nseqs:
-            if os.path.isfile(args.nseqs):
+            if os.access(args.nseqs, os.R_OK):
                args.fh = [args.nseqs] + args.fh
                nseqs = 1
             else:
