@@ -37,34 +37,52 @@ def parse(argv=None):
 
     parser = Parser()
 
-    subcommands = [Clean, Filter, Grep, Md5sum,
-                   Head, Permute, Reverse, Sample, Sniff,
-                   Sort, Split, Stat, Subseq, Tail, Uniq, Wc]
+    # A list of valid subcommands, each of which is a class (defined below)
+    subcommands = [
+        Clean,
+        Filter,
+        Grep,
+        Md5sum,
+        Head,
+        Permute,
+        Reverse,
+        Sample,
+        Sniff,
+        Sort,
+        Split,
+        Stat,
+        Subseq,
+        Tail,
+        Uniq,
+        Wc
+    ]
+    # add a subparser to parser for each subcommand
     for cmd in subcommands:
-        cmd(parser)
+       cmd(parser)
 
+    # the argv variable will be defined only for testing purposes
+    # when it is not defined, take arguments from the terminal
     argv = argv if argv else sys.argv[1:]
 
+    # if no argument is provided, print help
     if not argv:
         parser.parser.print_help()
         sys.exit(0)
 
+    # handle attempted access to deprecated subcommands
     if argv[0] in ['rename', 'fasta2csv']:
         err("{} is deprecated".format(argv[0]))
-
     if argv[0] in ['idsearch', 'retrieve', 'search', 'rmfields']:
         err("{} is deprecated, use 'smof grep'".format(argv[0]))
-
     if argv[0] == 'winnow':
         err('`winnow` is deprecated, use `smof filter`')
-
     if argv[0] == 'chksum':
         err('`winnow` is deprecated, use `smof md5sum`')
-
     if argv[0] == 'perm':
         err('`perm` is deprecated, use `smof permute`')
 
-
+    # parse arguments, the default function that will ultimately be run is
+    # selected according to tthe user-chosen subcommand
     args = parser.parser.parse_args(argv)
 
     return(args)
