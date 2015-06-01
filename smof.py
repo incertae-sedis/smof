@@ -585,8 +585,10 @@ class FSeqGenerator:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
                 else:
                     err("Illegally empty sequence")
-
-            f.close()
+            try:
+                f.close()
+            except AttributeError:
+                pass
 
 class Maps:
     DNA_AMB = {
