@@ -1,12 +1,13 @@
 Major things
 ============
-    * allow input from files not just STDIN
-      * Let grep take only one pattern
-      * Add filename handling to grep (-l, -L, -h (as -s) options).
     * reimplement in C or Haskell
     * make a comp function that compares two or more fasta files
-    * handle fasta indexing (this requires intput from named files, not STDIN)
+    * handle fasta indexing (this requires input from named files, not STDIN)
 
 Minor things
 ============
+    * write installation and use section in README
+    * implement in-to-out test shellscripts
+    * deconvolute the coloring scheme
     * add color subcommand (color sequence by letter, optionally amino acid class)
+    * add filename handling to grep (-l, -L, -h (as -s) options).
