@@ -20,26 +20,18 @@ __version__ = "1.9.0"
 
 class Parser:
     def __init__(self):
-        self.parser = self._build_base_parser()
-        self.subparsers = self._build_subparsers()
-        self.usage = '<fastafile> | smof {} <options>'
-
-    def _build_base_parser(self):
-        parser = argparse.ArgumentParser(
+        self.parser = argparse.ArgumentParser(
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
             description='Tools for studying and manipulating fasta files')
-        parser.add_argument(
+        self.parser.add_argument(
             '-v', '--version',
             action='version',
             version='%(prog)s {}'.format(__version__))
-        return(parser)
-
-    def _build_subparsers(self):
-        subparsers = self.parser.add_subparsers(
+        self.subparsers = self.parser.add_subparsers(
             metavar='[ for help on each: smof <subcommand> -h ]',
             title='subcommands')
-        return(subparsers)
+        self.usage = '<fastafile> | smof {} <options>'
 
 def parse(argv=None):
 
