@@ -6,7 +6,6 @@ Major things
 
 Minor things
 ============
-    * implement in-to-out test shellscripts
     * deconvolute the coloring scheme
     * add color subcommand (color sequence by letter, optionally amino acid class)
     * add filename handling to grep (-l, -L, -h (as -s) options).
