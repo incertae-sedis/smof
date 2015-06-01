@@ -552,9 +552,9 @@ class FSeqGenerator:
         else:
             fh = self.args.fh
 
-        seq_list = []
-        header = ''
         for fastafile in fh:
+            seq_list = []
+            header = ''
             # If there are multiple input files, store the filename
             # If there is only one, e.g. STDIN, don't store a name
             filename = None if len(fh) == 1 else fastafile
