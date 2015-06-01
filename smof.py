@@ -541,16 +541,19 @@ class FSeq:
 
 class FSeqGenerator:
     def __init__(self, args):
-        '''
-        fh can be any iterable object
-        '''
         self.args = args
 
     def next(self, *args, **kwargs):
-        if not self.args.fh:
+        # If no input is given,
+        # and if smof is not reading user input from stdin,
+        # assume piped input is from STDIN
+        if not self.args.fh and not sys.stdin.isatty:
             fh = [sys.stdin]
-        else:
+        elif self.args.fh:
             fh = self.args.fh
+        else:
+            err('no input detected')
+
         seq_list = []
         header = ''
         for fastafile in fh:
@@ -582,6 +585,7 @@ class FSeqGenerator:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
                 else:
                     err("Illegally empty sequence")
+
             f.close()
 
 class Maps:
