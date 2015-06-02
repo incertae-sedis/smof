@@ -1680,7 +1680,8 @@ class Split(Subcommand):
         parser.add_argument(
             '-n', '--number',
             help='Number of output files or sequences per file',
-            type=counting_number
+            type=counting_number,
+            default=2
         )
         parser.add_argument(
             'fh',
