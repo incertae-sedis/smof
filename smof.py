@@ -1310,7 +1310,7 @@ class Sniff(Subcommand):
                          with a stop codon (TAG, TAA, or TGA), 3) has a length
                          that is a multiple of three, and 4) has no internal
                          stop codon. If a sequence lacks a start codon, but
-                         otherwise loogs like a coding sequence, it will have
+                         otherwise looks like a coding sequence, it will have
                          the value 0111.""")
         )
         parser.add_argument(
