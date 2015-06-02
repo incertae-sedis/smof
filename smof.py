@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 # ================
 # Argument Parsing
@@ -1310,7 +1310,7 @@ class Sniff(Subcommand):
                          with a stop codon (TAG, TAA, or TGA), 3) has a length
                          that is a multiple of three, and 4) has no internal
                          stop codon. If a sequence lacks a start codon, but
-                         otherwise loogs like a coding sequence, it will have
+                         otherwise looks like a coding sequence, it will have
                          the value 0111.""")
         )
         parser.add_argument(
@@ -1675,13 +1675,13 @@ class Split(Subcommand):
             usage=self.usage.format(cmd_name),
             help='split a fasta file into smaller files',
             description="""Breaks a multiple sequence fasta file into several
-            smaller files. It requires one positional parameter: the number of
-            output files."""
+            smaller files."""
         )
         parser.add_argument(
             '-n', '--number',
             help='Number of output files or sequences per file',
-            type=counting_number
+            type=counting_number,
+            default=2
         )
         parser.add_argument(
             'fh',
@@ -1709,9 +1709,13 @@ class Split(Subcommand):
     def write(self, args, gen, out=None):
         p = args.prefix
         N = args.number
+        used = set()
         for i, seq in enumerate(self.generator(args, gen)):
             fnum = i // N if args.seqs else i % N
             outfile = '%s%s.fasta' % (p, str(fnum))
+            if not outfile in used and os.path.isfile(outfile):
+                err('Split refuses to overwrite "%s"' % outfile)
+            used.add(outfile)
             with open(outfile, 'a') as fo:
                 fo.write(seq.get_pretty_string() + '\n')
 
