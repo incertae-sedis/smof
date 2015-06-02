@@ -1709,9 +1709,13 @@ class Split(Subcommand):
     def write(self, args, gen, out=None):
         p = args.prefix
         N = args.number
+        used = set()
         for i, seq in enumerate(self.generator(args, gen)):
             fnum = i // N if args.seqs else i % N
             outfile = '%s%s.fasta' % (p, str(fnum))
+            if not outfile in used and os.path.isfile(outfile):
+                err('Split refuses to overwrite "%s"' % outfile)
+            used.add(outfile)
             with open(outfile, 'a') as fo:
                 fo.write(seq.get_pretty_string() + '\n')
 
