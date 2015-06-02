@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 # ================
 # Argument Parsing
@@ -257,7 +257,6 @@ class ColorString:
         out.write(self.bgcolor if colored else '')
         out.write("\n")
 
-
     def colormatch(self, pattern, col=None):
         col = self.default if not col else col
         s = ''.join([x[1] for x in self.seq])
@@ -485,7 +484,7 @@ class FSeq:
     def print(self, col_width=80, color=True, out=sys.stdout):
         out.write('>')
         if self.colheader and color:
-            self.colheader.print(self.header, col_width, out=out)
+            self.colheader.print(self.header, colwidth=None, out=out)
         else:
             out.write('%s\n' % self.header)
         for i in range(0, len(self.seq), col_width):
