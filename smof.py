@@ -547,10 +547,15 @@ class FSeqGenerator:
         # If no input is given,
         # and if smof is not reading user input from stdin,
         # assume piped input is from STDIN
-        if not self.args.fh:
-            fh = [sys.stdin]
-        else:
-            fh = self.args.fh
+        try:
+            if not self.args.fh:
+                fh = [sys.stdin]
+            else:
+                fh = self.args.fh
+        # If args does not have a .fh argument, then try treating args itself
+        # as the input
+        except AttributeError:
+            fh = [self.args]
 
         for fastafile in fh:
             seq_list = []
@@ -2200,8 +2205,7 @@ class Grep(Subcommand):
         parser.add_argument(
             '--fastain',
             help='Search for exact sequence matches against FASTA',
-            metavar="FASTA",
-            type=argparse.FileType('r')
+            metavar="FASTA"
         )
         parser.set_defaults(func=self.func)
 
@@ -2366,7 +2370,7 @@ class Grep(Subcommand):
     def _get_pattern(self, args):
         pat = set()
         if args.fastain:
-            pat.update((s.seq for s in FSeqGenerator(fh=args.fastain).next()))
+            pat.update((s.seq for s in FSeqGenerator(args.fastain).next()))
         if args.file:
             pat.update([l.rstrip('\n') for l in args.file])
         if args.pattern:

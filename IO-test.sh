@@ -36,3 +36,7 @@ echo $?
 echo -n 'Testing multiple file input ... '
 diff <( ../smof.py grep -q 'a' a.fa b.fa c.fa) <(cat a.fa b.fa c.fa | ../smof.py grep -q 'a') > /dev/null
 echo $?
+
+echo -n 'Testing --fastain option ... '
+diff <(head -2 grep-test.fa) <(../smof.py grep --fastain b.fa grep-test.fa) > /dev/null
+echo $?
