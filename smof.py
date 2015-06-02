@@ -1675,8 +1675,7 @@ class Split(Subcommand):
             usage=self.usage.format(cmd_name),
             help='split a fasta file into smaller files',
             description="""Breaks a multiple sequence fasta file into several
-            smaller files. It requires one positional parameter: the number of
-            output files."""
+            smaller files."""
         )
         parser.add_argument(
             '-n', '--number',
