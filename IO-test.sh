@@ -20,10 +20,12 @@ diff grep-test_-q_DF.fa \
      <(../smof.py grep -q DF grep-test.fa) > /dev/null
 echo $?
 
-echo -n 'Testing md5sum ... '
-diff <(tr -d '>\n' < md5sum.fa | md5sum | awk '{print $1}') \
-     <(../smof.py md5sum md5sum.fa)
-echo $?
+[[ md5sum ]] && {
+    echo -n 'Testing md5sum ... '
+    diff <(tr -d '>\n' < md5sum.fa | md5sum | awk '{print $1}') \
+         <(../smof.py md5sum md5sum.fa)
+    echo $?
+}
 
 echo -n 'Testing head ... '
 diff <(head -2 grep-test.fa) <(../smof.py head grep-test.fa) > /dev/null
