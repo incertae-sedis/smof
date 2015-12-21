@@ -2282,6 +2282,34 @@ class Grep(Subcommand):
 
     def _create_matcher(self, args, pat, wrapper):
 
+        if args.gapped:
+            # TODO - Make linear. This function works, but is dog-ugly and slow
+            # as hell. It will is fine when there are few matches and few gaps.
+            def _gapped_pos_mapper(matches, text, gapped_text):
+                '''
+                Maps from positions on an ungapped sequence to positions on a
+                gapped sequence. For example, it can convert the ATA match to
+                'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
+                '''
+                gaps = list(re.finditer('-+', gapped_text))
+                if not gaps:
+                    return matches
+                for g in gaps:
+                    g0 = g.span()[0]
+                    g1 = g.span()[1]
+                    glen = g1 - g0
+                    for m in matches:
+                        if m['pos'][0] >= g0:
+                            m['pos'][0] += glen
+                            m['pos'][1] += glen
+                    for m in matches:
+                        if m['pos'][0] < g0 and m['pos'][1] > g0:
+                           m['pos'][1] += glen
+                return matches
+            pos_mapper = _gapped_pos_mapper
+        else:
+            pos_mapper = lambda matches, text, gapped_text: matches
+
         has_context = args.before_context or args.after_context
         if has_context:
             def contexter(start, stop, seqlength):
@@ -2294,48 +2322,50 @@ class Grep(Subcommand):
 
 
         # Check existence for matches to wrapper captures
-        def swrpmatcher(text, strand='.'):
+        def swrpmatcher(text, strand='.', gapped_text=None):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
             return(False)
 
         # Check existence of matches
-        def spatmatcher(text, strand='.'):
+        def spatmatcher(text, strand='.', gapped_text=None):
             for p in pat:
                 if re.search(p, text):
                     return(True)
             return(False)
 
         # Check if pattern matches entire text
-        def linematcher(text, strand='.'):
+        def linematcher(text, strand='.', gapped_text=None):
             for p in pat:
                 m = re.match(p, text)
                 if m and m.end() == len(text):
                     return(True)
             return(False)
 
-        def exactmatcher(text, strand='.'):
+        def exactmatcher(text, strand='.', gapped_text=None):
             return(text in pat)
 
         # Find locations of matches to wrappers
-        def gwrpmatcher(text, strand='.'):
+        def gwrpmatcher(text, strand='.', gapped_text=None):
             pos = []
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     start, end = contexter(m.start(1), m.end(1), len(text))
                     match = {'pos':(start, end), 'strand':strand}
                     pos.append(match)
+            pos = pos_mapper(matches=pos, text=text, gapped_text=gapped_text)
             return(pos)
 
         # Find locations of matches
-        def gpatmatcher(text, strand='.'):
+        def gpatmatcher(text, strand='.', gapped_text=None):
             pos = []
             for p in pat:
                 for m in re.finditer(p, text):
                     start, end = contexter(m.start(), m.end(), len(text))
                     match = {'pos':[start, end], 'strand':strand}
                     pos.append(match)
+            pos = pos_mapper(matches=pos, text=text, gapped_text=gapped_text)
             return(pos)
 
         if args.exact:
@@ -2350,27 +2380,36 @@ class Grep(Subcommand):
         if args.reverse_only or args.both_strands:
             if matcher.__name__ in ('swrmatcher', 'spatmatcher'):
                 if args.reverse_only:
-                    def rmatcher(text):
-                        match = matcher(text, "-")
+                    def rmatcher(text, gapped_text=None):
+                        match = matcher(text, strand="-", gapped_text=gapped_text)
                         return(match)
                 else:
-                    def rmatcher(text):
-                        match = matcher(text, strand="+") + matcher(FSeq.getrevcomp(text), strand="-")
+                    def rmatcher(text, gapped_text=None):
+                        match = matcher(text, strand="+", gapped_text=gapped_text) + \
+                                matcher(FSeq.getrevcomp(text),
+                                        strand="-",
+                                        gapped_text=FSeq.getrevcomp(gapped_text))
                         return(match)
             else:
-                def rev(matcher, text):
+                def rev(matcher, text, gapped_text=None):
                     rmatch = []
-                    for d in matcher(FSeq.getrevcomp(text), strand='-'):
-                        d['pos'] = (len(text) - d['pos'][1], len(text) - d['pos'][0])
+                    for d in matcher(FSeq.getrevcomp(text),
+                                     strand='-',
+                                     gapped_text=FSeq.getrevcomp(gapped_text)):
+                        if args.gapped:
+                            text_length = len(gapped_text)
+                        else:
+                            text_length = len(text)
+                        d['pos'] = (text_length - d['pos'][1], text_length - d['pos'][0])
                         rmatch.append(d)
                     return(rmatch)
                 if args.reverse_only:
-                    def rmatcher(text):
-                        return(rev(matcher, text))
+                    def rmatcher(text, gapped_text=None):
+                        return(rev(matcher, text, gapped_text=gapped_text))
                 else:
-                    def rmatcher(text):
-                        fmatch = matcher(text)
-                        rmatch = rev(matcher, text)
+                    def rmatcher(text, gapped_text=None):
+                        fmatch = matcher(text, gapped_text=gapped_text)
+                        rmatch = rev(matcher, text, gapped_text=gapped_text)
                         return(fmatch + rmatch)
             return(rmatcher)
         else:
@@ -2412,34 +2451,6 @@ class Grep(Subcommand):
         else:
             gettext = lambda x: x.header
 
-        if args.gapped:
-            # TODO - Make linear. This function works, but is dog-ugly and slow
-            # as hell. It will is fine when there are few matches and few gaps.
-            def _gapped_pos_mapper(matches, text, seq):
-                '''
-                Maps from positions on an ungapped sequence to positions on a
-                gapped sequence. For example, it can convert the ATA match to
-                'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
-                '''
-                gaps = list(re.finditer('-+', seq.seq))
-                if not gaps:
-                    return matches
-                for g in gaps:
-                    g0 = g.span()[0]
-                    g1 = g.span()[1]
-                    glen = g1 - g0
-                    for m in matches:
-                        if m['pos'][0] >= g0:
-                            m['pos'][0] += glen
-                            m['pos'][1] += glen
-                    for m in matches:
-                        if m['pos'][0] < g0 and m['pos'][1] > g0:
-                           m['pos'][1] += glen
-                return matches
-            pos_mapper = _gapped_pos_mapper
-        else:
-            pos_mapper = lambda x,y,z: x
-
         has_context = bool(args.before_context or args.after_context)
 
         if args.gff:
@@ -2459,8 +2470,7 @@ class Grep(Subcommand):
                 for seq in gen.next():
                     row[0] = ParseHeader.firstword(seq.header)
                     text = gettext(seq)
-                    matches = list(matcher(text))
-                    matches = pos_mapper(matches, text, seq)
+                    matches = list(matcher(text, gapped_text=seq.seq))
                     for m in matches:
                         row[3] = m['pos'][0] + 1
                         row[4] = m['pos'][1]
@@ -2490,8 +2500,7 @@ class Grep(Subcommand):
             def sgen(gen, matcher):
                 for seq in gen.next():
                     text = gettext(seq)
-                    matches = matcher(text)
-                    matches = pos_mapper(matches, text, seq)
+                    matches = matcher(text, gapped_text=seq.seq)
                     if args.gapped:
                         text = seq.seq
                     for m in matches:
@@ -2507,8 +2516,7 @@ class Grep(Subcommand):
             def sgen(gen, matcher):
                 for seq in gen.next(handle_color=args.preserve_color):
                     text = gettext(seq)
-                    matches = matcher(text)
-                    matches = pos_mapper(matches, text, seq)
+                    matches = matcher(text, gapped_text=seq.seq)
                     if (matches and not args.invert_match) or (not matches and args.invert_match):
                         if args.color:
                             for pos in [m['pos'] for m in matches]:
