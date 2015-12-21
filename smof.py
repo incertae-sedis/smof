@@ -2164,6 +2164,12 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-g', '--gapped',
+            help='match across gaps when searching aligned sequences',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-b', '--both-strands',
             help='search both strands',
             action='store_true',
@@ -2328,7 +2334,7 @@ class Grep(Subcommand):
             for p in pat:
                 for m in re.finditer(p, text):
                     start, end = contexter(m.start(), m.end(), len(text))
-                    match = {'pos':(start, end), 'strand':strand}
+                    match = {'pos':[start, end], 'strand':strand}
                     pos.append(match)
             return(pos)
 
@@ -2399,9 +2405,40 @@ class Grep(Subcommand):
     def _makegen(self, args):
 
         if args.match_sequence:
-            gettext = lambda x: x.seq
+            if args.gapped:
+                gettext = lambda x: ''.join(re.split('-+', x.seq))
+            else:
+                gettext = lambda x: x.seq
         else:
             gettext = lambda x: x.header
+
+        if args.gapped:
+            # TODO - Make linear. This function works, but is dog-ugly and slow
+            # as hell. It will is fine when there are few matches and few gaps.
+            def _gapped_pos_mapper(matches, text, seq):
+                '''
+                Maps from positions on an ungapped sequence to positions on a
+                gapped sequence. For example, it can convert the ATA match to
+                'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
+                '''
+                gaps = list(re.finditer('-+', seq.seq))
+                if not gaps:
+                    return matches
+                for g in gaps:
+                    g0 = g.span()[0]
+                    g1 = g.span()[1]
+                    glen = g1 - g0
+                    for m in matches:
+                        if m['pos'][0] >= g0:
+                            m['pos'][0] += glen
+                            m['pos'][1] += glen
+                    for m in matches:
+                        if m['pos'][0] < g0 and m['pos'][1] > g0:
+                           m['pos'][1] += glen
+                return matches
+            pos_mapper = _gapped_pos_mapper
+        else:
+            pos_mapper = lambda x,y,z: x
 
         has_context = bool(args.before_context or args.after_context)
 
@@ -2421,7 +2458,10 @@ class Grep(Subcommand):
                       ]
                 for seq in gen.next():
                     row[0] = ParseHeader.firstword(seq.header)
-                    for m in matcher(seq.seq):
+                    text = gettext(seq)
+                    matches = list(matcher(text))
+                    matches = pos_mapper(matches, text, seq)
+                    for m in matches:
                         row[3] = m['pos'][0] + 1
                         row[4] = m['pos'][1]
                         row[6] = m['strand']
@@ -2450,12 +2490,15 @@ class Grep(Subcommand):
             def sgen(gen, matcher):
                 for seq in gen.next():
                     text = gettext(seq)
-                    m = matcher(text)
-                    for d in m:
-                        match = text[d['pos'][0]:d['pos'][1]]
+                    matches = matcher(text)
+                    matches = pos_mapper(matches, text, seq)
+                    if args.gapped:
+                        text = seq.seq
+                    for m in matches:
+                        match = text[m['pos'][0]:m['pos'][1]]
                         if args.match_sequence:
                             header = ParseHeader.firstword(seq.header) + \
-                                     "|SUBSEQ(%d..%d)" % (d['pos'][0], d['pos'][1])
+                                     "|SUBSEQ(%d..%d)" % (m['pos'][0], m['pos'][1])
                             yield FSeq(header, match)
                         else:
                             yield match
@@ -2464,10 +2507,11 @@ class Grep(Subcommand):
             def sgen(gen, matcher):
                 for seq in gen.next(handle_color=args.preserve_color):
                     text = gettext(seq)
-                    m = matcher(text)
-                    if (m and not args.invert_match) or (not m and args.invert_match):
+                    matches = matcher(text)
+                    matches = pos_mapper(matches, text, seq)
+                    if (matches and not args.invert_match) or (not matches and args.invert_match):
                         if args.color:
-                            for pos in [d['pos'] for d in m]:
+                            for pos in [m['pos'] for m in matches]:
                                 if args.match_sequence:
                                     seq.color_seq(*pos, col=Colors.BOLD_RED)
                                 else:
