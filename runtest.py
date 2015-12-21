@@ -788,6 +788,18 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(['>a', 'GACFADE'], ['grep', '-qw', 'CF(..)', '-o', 'AD'])[1], 'AD')
         self.assertEqual(get_output(['>a', 'GAAGGGTTA'], ['grep', '-qbw', 'AAC(..)', '-o', 'CC'])[1], 'GG')
 
+    def test_gapped_search(self):
+        self.assertEqual(get_output(['>a', 'GA-CFADE'], ['grep', '-qgy', 'AC'])[1], 'GA-CFADE')
+
+    def test_gapped_search_only(self):
+        self.assertEqual(get_output(['>a', 'GA-CFADE'], ['grep', '-qgyo', 'AC'])[1], 'A-C')
+        self.assertEqual(get_output(['>a', '--GA--C-F-ADE'], ['grep', '-qgyo', 'ACF'])[1], 'A--C-F')
+        self.assertEqual(get_output(['>a', 'G--ACF-ADE'], ['grep', '-qgyo', 'ACF'])[1], 'ACF')
+
+    def test_gapped_search_only_revcom(self):
+        self.assertEqual(get_output(['>a', 'GATA-CA'], ['grep', '-qyorg', 'GTA'])[1], 'TA-C')
+        self.assertEqual(get_output(['>a', 'GATA-CA'], ['grep', '-qyobg', 'GTA'])[1], 'TA-C')
+
     def test_line_regexp(self):
         self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAA']), [''])
         self.assertEqual(get_output(self.seqs, ['grep', '-qx', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
