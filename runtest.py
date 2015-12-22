@@ -4,6 +4,8 @@ import smof
 import unittest
 import argparse
 import sys
+import tempfile
+import os
 from collections import Counter
 from io import StringIO
 
@@ -809,6 +811,15 @@ class TestSequenceGrep(unittest.TestCase):
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAA']), [''])
         # Full exact matches return everything
         self.assertEqual(get_output(self.seqs, ['grep', '-qX', 'GAACATAACAT']), ['>b', 'GAACATAACAT'])
+
+    def test_fastain(self):
+        f = tempfile.NamedTemporaryFile(delete=False)
+        f.write(b'>a\nGAT')
+        f.close()
+        self.assertEqual(get_output(self.seqs, ['grep', '-y', '--fastain', f.name]), ['>a', 'AAGATACA'])
+        self.assertEqual(get_output(self.seqs, ['grep', '-yo', '--fastain', f.name])[1], 'GAT')
+        self.assertEqual(get_output(self.seqs, ['grep', '--gff', '--fastain', f.name])[0].split('\t')[3:5], ['3', '5'])
+        os.unlink(f.name)
 
 class TestGrepBadCombinations(unittest.TestCase):
     def setUp(self):
