@@ -2418,9 +2418,11 @@ class Grep(Subcommand):
     def _get_pattern(self, args):
         pat = set()
         if args.fastain:
+            # read patterns from a fasta file
             pat.update((s.seq for s in FSeqGenerator(args.fastain).next()))
         if args.file:
-            pat.update([l.rstrip('\n') for l in args.file])
+            # read patterns from a file (stripping whitespace from the end)
+            pat.update([l.rstrip('\n\t\r ') for l in args.file])
         if args.pattern:
             pat.update([args.pattern])
 
@@ -2439,7 +2441,17 @@ class Grep(Subcommand):
         if not (args.perl_regexp or args.wrap or args.exact):
             pat = [re.escape(p) for p in pat]
 
-        return(pat)
+        flags = re.IGNORECASE if not args.case_sensitive else 0
+
+        if args.wrap:
+            wrapper = re.compile(args.wrap, flags=flags)
+        else:
+            wrapper = None
+
+        if not (args.wrap or args.exact):
+            pat = set((re.compile(p, flags=flags) for p in pat))
+
+        return((pat, wrapper))
 
     def _makegen(self, args):
 
@@ -2530,16 +2542,7 @@ class Grep(Subcommand):
     def generator(self, args, gen):
         args = self._process_arguments(args)
 
-        pat = self._get_pattern(args)
-
-        flags = re.IGNORECASE if not args.case_sensitive else 0
-
-        if args.wrap:
-            wrapper = re.compile(args.wrap, flags=flags)
-        else:
-            if not args.exact:
-                pat = set((re.compile(p, flags=flags) for p in pat))
-            wrapper = None
+        pat, wrapper = self._get_pattern(args)
 
         matcher = self._create_matcher(args, pat, wrapper)
 
