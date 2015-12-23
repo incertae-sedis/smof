@@ -42,9 +42,11 @@ diff <(head -2 grep-test.fa) <(../smof.py grep --fastain b.fa grep-test.fa) > /d
 echo $?
 
 echo -n 'Testing subseq coloring ... '
-diff subseq_colored.fa \
-     <(../smof.py subseq -b 1 5 -c blue -Y subseq.fa |
-       ../smof.py subseq -b 7 7 -Yc green |
-       ../smof.py subseq -b 2 3 -c red -Y |
-       ../smof.py subseq -b 15 100 -c magenta -Y) > /dev/null
+diff subseq-colored.fa \
+    <(../smof.py subseq -b 1 5 -c blue -Y subseq.fa |
+      ../smof.py subseq -b 7 7 -Yc green |
+      ../smof.py subseq -b 2 3 -c red -Y |
+      ../smof.py subseq -b 15 100 -c magenta -Y |
+      ../smof.py subseq -b 10 20 -c green -Y |
+      ../smof.py subseq -b 14 16 -c red) > /dev/null
 echo $?
