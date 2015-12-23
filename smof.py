@@ -2295,23 +2295,23 @@ class Grep(Subcommand):
         def context(func):
             has_context = args.before_context or args.after_context
             if has_context:
-                def inner(seq, **kwargs):
+                def inner(seq, **kw):
                     text = gettext(seq)
                     matches = []
-                    for m in func(text, **kwargs):
+                    for m in func(text, **kw):
                         m['pos'][0] = max(0, m['pos'][0] - args.before_context)
                         m['pos'][1] = min(len(text), m['pos'][1] + args.after_context)
                         matches.append(m)
                     return matches
             else:
-                def inner(seq, **kwargs):
+                def inner(seq, **kw):
                     text = gettext(seq)
-                    return func(text, **kwargs)
+                    return func(text, **kw)
             return inner
 
         # Check existence for matches to wrapper captures
         @context
-        def swrpmatcher(text, strand="."):
+        def swrpmatcher(text, **kw):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
                     return(True)
@@ -2319,7 +2319,7 @@ class Grep(Subcommand):
 
         # Check existence of matches
         @context
-        def spatmatcher(text, strand="."):
+        def spatmatcher(text, **kw):
             for p in pat:
                 if re.search(p, text):
                     return(True)
@@ -2327,7 +2327,7 @@ class Grep(Subcommand):
 
         # Check if pattern matches entire text
         @context
-        def linematcher(text, strand="."):
+        def linematcher(text, **kw):
             for p in pat:
                 m = re.match(p, text)
                 if m and m.end() == len(text):
@@ -2335,7 +2335,7 @@ class Grep(Subcommand):
             return(False)
 
         @context
-        def exactmatcher(text, strand="."):
+        def exactmatcher(text, **kw):
             return(text in pat)
 
         @context
@@ -2374,18 +2374,18 @@ class Grep(Subcommand):
             matcher = swrpmatcher if wrapper else spatmatcher
 
         # Prepare gapped or ungapped search function
-        def search_function(matcher, **kwargs):
+        def search_function(matcher, **kw):
             if not args.gapped or not by_position:
-                def inner(seq, **kwargs):
-                    return matcher(seq, **kwargs)
+                def inner(seq, **kw):   # ungapped
+                    return matcher(seq, **kw)
             else:
-                def inner(seq, **kwargs):
+                def inner(seq, **kw):   # gapped
                     '''
                     Maps from positions on an ungapped sequence to positions on a
                     gapped sequence. For example, it can convert the ATA match to
                     'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
                     '''
-                    matches = matcher(seq, **kwargs)
+                    matches = matcher(seq, **kw)
                     gaps = list(re.finditer('-+', seq.seq))
                     if not gaps:
                         return matches
@@ -2398,7 +2398,7 @@ class Grep(Subcommand):
                                 m['pos'][0] += glen
                                 m['pos'][1] += glen
                         for m in matches:
-                            if m['pos'][0] < g0 and m['pos'][1] > g0:
+                            if (m['pos'][0] < g0) and (m['pos'][1] > g0):
                                 m['pos'][1] += glen
                     return matches
             return inner
