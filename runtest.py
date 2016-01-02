@@ -23,14 +23,34 @@ def get_output(seq, argv):
     return(out.getvalue().strip().split("\n"))
 
 
+class TestParseHeader(unittest.TestCase):
+    def test_firstword(self):
+        self.assertEqual(smof.ParseHeader.firstword('abc xyz'), 'abc')
+    def test_description_present(self):
+        self.assertEqual(smof.ParseHeader.description('abc xyz'), 'xyz')
+    def test_description_absent(self):
+        self.assertEqual(smof.ParseHeader.description('abc'), '')
+    def test_add_suffix_with_desc(self):
+        self.assertEqual(smof.ParseHeader.add_suffix('abc', 's'), 'abc|s')
+    def test_add_suffix_without_desc(self):
+        self.assertEqual(smof.ParseHeader.add_suffix('abc xyz', 's'), 'abc|s xyz')
+    def test_subseq_with_desc(self):
+        self.assertEqual(smof.ParseHeader.subseq('abc', 1, 10), 'abc|subseq(1..10)')
+    def test_subseq_without_desc(self):
+        self.assertEqual(smof.ParseHeader.subseq('abc xyz', 1, 10), 'abc|subseq(1..10) xyz')
+    def test_permute_with_desc(self):
+        self.assertEqual(smof.ParseHeader.permute('abc', 1, 2, 3), 'abc|permutation:start=1;end=2;word_size=3')
+    def test_permute_without_desc(self):
+        self.assertEqual(smof.ParseHeader.permute('abc xyz', 1, 2, 3), 'abc|permutation:start=1;end=2;word_size=3 xyz')
+
 class TestFSeq(unittest.TestCase):
     def test_subseq(self):
-        header = 'seq1'
+        header = 'seq1 description'
         seq = 'AcGGNttt'
         seqobj = smof.FSeq(header, seq)
         sq = seqobj.subseq(1, 5)
         self.assertEqual(sq.seq, 'cGGN')
-        self.assertEqual(sq.header, 'seq1|SUBSEQ(2..5)')
+        self.assertEqual(sq.header, 'seq1|subseq(2..5) description')
 
     def test_getrevcomp_fromStringInput(self):
         seq = 'ACGTT'
@@ -50,7 +70,7 @@ class TestFSeq(unittest.TestCase):
         seqobj = smof.FSeq(header,seq)
         seqobj.ungap()
         self.assertEqual(seqobj.seq, 'ACGT')
-        self.assertEqual(seqobj.header, 'seq1|UNGAPPED')
+        self.assertEqual(seqobj.header, 'seq1|ungapped')
 
     def test_reverse(self):
         header = 'seq1'
@@ -58,7 +78,7 @@ class TestFSeq(unittest.TestCase):
         seqobj = smof.FSeq(header,seq)
         seqobj.reverse()
         self.assertEqual(seqobj.seq, 'TTGCA')
-        self.assertEqual(seqobj.header, 'seq1|REVERSE')
+        self.assertEqual(seqobj.header, 'seq1|reverse')
 
 class TestStatFun(unittest.TestCase):
     def test_N50(self):
@@ -873,31 +893,31 @@ class TestPermute(unittest.TestCase):
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 42]),
-            ['>a|PERMUTATION:start=0;end=0;word_size=1', 'MTISSADYHEIERWR'])
+            ['>a|permutation:start=0;end=0;word_size=1', 'MTISSADYHEIERWR'])
 
     def test_word_size(self):
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 42, '-w', 3]),
-            ['>a|PERMUTATION:start=0;end=0;word_size=3', 'TARREISMYDISWHE'])
+            ['>a|permutation:start=0;end=0;word_size=3', 'TARREISMYDISWHE'])
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 42, '-w', 5]),
-            ['>a|PERMUTATION:start=0;end=0;word_size=5', 'ARDISISMYTWHERE'])
+            ['>a|permutation:start=0;end=0;word_size=5', 'ARDISISMYTWHERE'])
 
     def test_offsets(self):
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 42, '-w', 4, '-s', 3]),
-            ['>a|PERMUTATION:start=3;end=0;word_size=4', 'WHERDISMYTAREIS'])
+            ['>a|permutation:start=3;end=0;word_size=4', 'WHERDISMYTAREIS'])
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 123, '-w', 4, '-s', 5]),
-            ['>a|PERMUTATION:start=5;end=0;word_size=4', 'WHEREISTARDISMY'])
+            ['>a|permutation:start=5;end=0;word_size=4', 'WHEREISTARDISMY'])
         self.assertEqual(get_output(
             self.seq,
             ['permute', '--seed', 123, '-w', 4, '-e', 3]),
-            ['>a|PERMUTATION:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
+            ['>a|permutation:start=0;end=3;word_size=4', 'YTAREISMWHERDIS'])
 
 class TestReverse(unittest.TestCase):
     def setUp(self):
@@ -906,8 +926,8 @@ class TestReverse(unittest.TestCase):
             '>b2', 'MILLER'
         ]
         self.reverse = [
-            '>a1|REVERSE', 'DEVIL',
-            '>b2|REVERSE', 'RELLIM'
+            '>a1|reverse', 'DEVIL',
+            '>b2|reverse', 'RELLIM'
         ]
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
