@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.4.3"
+__version__ = "2.5.1"
 
 # ================
 # Argument Parsing
@@ -455,17 +455,6 @@ class FSeq:
     def _clear_color(self, text):
         return(re.sub(Colors.pat, '', text))
 
-    def subseq(self, a, b):
-        header_suffix = '|SUBSEQ({}..{})'.format(a + 1, b)
-        header = ParseHeader.firstword(self.header) + header_suffix
-        sub = FSeq(header, self.seq[a:b])
-        if self.colheader:
-            # TODO implement header color preservation
-            pass
-        if self.colseq:
-            sub.colseq.seq = self.colseq.seq[a:b]
-        return(sub)
-
     def color_seq(self, *args, **kwargs):
         if not self.colseq:
             self._process_color()
@@ -476,10 +465,9 @@ class FSeq:
             self._process_color()
         self.colheader.colorpos(*args, **kwargs)
 
-    def ungap(self, suffix='|UNGAPPED'):
+    def ungap(self):
         self.seq = self.seq.translate(FSeq.ungapper)
-        if suffix:
-            self.header = self.header + suffix
+        self.header = ParseHeader.add_suffix(self.header, 'ungapped')
 
     def print(self, col_width=80, color=True, out=sys.stdout):
         out.write('>')
@@ -507,20 +495,19 @@ class FSeq:
     def header_upper(self):
         self.header = self.header.upper()
 
-    def subseq(self, a, b, suffix=None):
-        suffix = suffix if suffix else '|SUBSEQ({}..{})'.format(a+1,b)
-        header = ParseHeader.firstword(self.header) + suffix
+    def subseq(self, a, b):
+        header = ParseHeader.subseq(self.header, a+1, b)
         newseq = FSeq(header, self.seq[a:b])
         if self.colseq:
             newseq.colseq = self.colseq.copy()
             newseq.colseq.subseq(a, b)
         return(newseq)
 
-    def reverse(self, suffix='|REVERSE'):
+    def reverse(self):
         self.seq = self.seq[::-1]
         if self.handle_color:
             self.colseq.reverse(len(self.seq))
-        self.header += suffix
+        self.header = ParseHeader.add_suffix(self.header, 'reverse')
 
     @classmethod
     def getrevcomp(cls, seq):
@@ -612,6 +599,23 @@ class Maps:
 class ParseHeader:
     def firstword(h):
         return(re.sub('^(\S+).*', '\\1', h))
+
+    def description(h):
+        return(re.sub('^\S+\s*', '', h))
+
+    def add_suffix(h, suffix):
+        return(re.sub('^(\S+)(.*)', '\\1|%s\\2' % suffix, h))
+
+    def subseq(h, a, b):
+        header = "%s|subseq(%d..%d) %s" % (ParseHeader.firstword(h), a, b, ParseHeader.description(h))
+        return(header.strip())
+
+    def permute(h, start, end, wordsize):
+        header = '%s|permutation:start=%d;end=%d;word_size=%d %s' % (
+            ParseHeader.firstword(h),
+            start, end, wordsize,
+            ParseHeader.description(h))
+        return(header.strip())
 
     def ncbi_format(h, fields):
         raise NotImplemented
@@ -900,11 +904,20 @@ class Subcommand:
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
-            if(isinstance(output, FSeq)):
-                color = sys.stdout.isatty() or self.force_color
-                output.print(color=color, out=out)
-            else:
-                out.write('%s\n' % output)
+            try:
+                if(isinstance(output, FSeq)):
+                    color = sys.stdout.isatty() or self.force_color
+                    output.print(color=color, out=out)
+                else:
+                    out.write('%s\n' % output)
+            # BrokenPipeErrors occur when we attempt to send data to a pipe
+            # that has been closed. For example:
+            # $ smof sort seq.faa | smof head
+            # `smof head` prints and closes after receiving the first sequence,
+            # so `smof sort` fails. The correct behavior in this case, is for
+            # `smof head` to class as well.
+            except BrokenPipeError:
+                sys.exit(0)
 
 class Clean(Subcommand):
     def _parse(self):
@@ -1033,7 +1046,10 @@ class Clean(Subcommand):
         if args.col_width == 0:
             args.col_width = int(1e12) # Approximation of infinity, i.e. no wrap
         for seq in self.generator(args, gen):
-            seq.print(col_width=args.col_width, color=False, out=out)
+            try:
+                seq.print(col_width=args.col_width, color=False, out=out)
+            except BrokenPipeError:
+                sys.exit(0)
 
 class Filter(Subcommand):
     def _parse(self):
@@ -1249,8 +1265,7 @@ class Permute(Subcommand):
             words.append(rseq[(M - M % w):M])
             random.shuffle(words)
             out = ''.join(prefix + ''.join(words) + suffix)
-            header='{}|PERMUTATION:start={};end={};word_size={}'.format(
-                ParseHeader.firstword(seq.header), start, end, w)
+            header = ParseHeader.permute(seq.header, start, end, w)
             yield FSeq(header, out)
 
 class Reverse(Subcommand):
@@ -2529,8 +2544,11 @@ class Grep(Subcommand):
                     for m in matches:
                         match = text[m['pos'][0]:m['pos'][1]]
                         if args.match_sequence:
-                            header = ParseHeader.firstword(seq.header) + \
-                                     "|SUBSEQ(%d..%d)" % (m['pos'][0], m['pos'][1])
+                            header = "%s|subseq(%d..%d) %s" % (
+                                ParseHeader.firstword(seq.header),
+                                m['pos'][0],
+                                m['pos'][1],
+                                ParseHeader.description(seq.header))
                             yield FSeq(header, match)
                         else:
                             yield match
