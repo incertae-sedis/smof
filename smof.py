@@ -900,11 +900,20 @@ class Subcommand:
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
-            if(isinstance(output, FSeq)):
-                color = sys.stdout.isatty() or self.force_color
-                output.print(color=color, out=out)
-            else:
-                out.write('%s\n' % output)
+            try:
+                if(isinstance(output, FSeq)):
+                    color = sys.stdout.isatty() or self.force_color
+                    output.print(color=color, out=out)
+                else:
+                    out.write('%s\n' % output)
+            # BrokenPipeErrors occur when we attempt to send data to a pipe
+            # that has been closed. For example:
+            # $ smof sort seq.faa | smof head
+            # `smof head` prints and closes after receiving the first sequence,
+            # so `smof sort` fails. The correct behavior in this case, is for
+            # `smof head` to class as well.
+            except BrokenPipeError:
+                sys.exit(0)
 
 class Clean(Subcommand):
     def _parse(self):
@@ -1033,7 +1042,10 @@ class Clean(Subcommand):
         if args.col_width == 0:
             args.col_width = int(1e12) # Approximation of infinity, i.e. no wrap
         for seq in self.generator(args, gen):
-            seq.print(col_width=args.col_width, color=False, out=out)
+            try:
+                seq.print(col_width=args.col_width, color=False, out=out)
+            except BrokenPipeError:
+                sys.exit(0)
 
 class Filter(Subcommand):
     def _parse(self):
