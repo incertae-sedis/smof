@@ -64,6 +64,25 @@ class TestFSeq(unittest.TestCase):
         self.assertEqual(rc.seq, 'AACGT')
         self.assertEqual(rc.header, 'seq1|REVCOM')
 
+    def test_getrevcomp_extended_alphabet(self):
+        # test uracil and unknown
+        f = 'ACGTUNacgtun'
+        r = 'naacgtNAACGT'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+
+        # W = [AT] <--> S = [GC]
+        # M = [AC] <--> K = [GT]
+        # R = [AG] <--> Y = [CT]
+        f = 'wmrWMRskySKY'
+        r = 'RMWrmwYKSyks'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+        
+        # B = [GTC] <--> V = [ACG]
+        # D = [AGT] <--> H = [ACT]
+        f = 'BDVHbdvh'
+        r = 'dbhvDBHV'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+
     def test_ungap(self):
         header = 'seq1'
         seq = 'A.C-G_T'

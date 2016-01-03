@@ -419,7 +419,14 @@ class FileStat:
 
 class FSeq:
     # The translator for taking reverse complements
-    revtrans = str.maketrans('acgtACGT', 'tgcaTGCA')
+    # Extended alphabet:
+    # W = [AT]  <--> S = [GC]
+    # M = [AC]  <--> K = [GT]
+    # R = [AG]  <--> Y = [CT]
+    # B = [GTC] <--> V = [ACG]
+    # D = [AGT] <--> H = [ACT]
+    # N <--> N
+    revtrans = str.maketrans('acgtuwsmkrybvdhnACGTUWSMKRYBVDHN', 'tgcaaswkmyrvbhdnTGCAASWKMYRVBHDN')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
     def __init__(self, header, seq, filename=None, handle_color=False, purge_color=False):
