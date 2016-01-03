@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.6.1"
+__version__ = "2.7.0"
 
 # ================
 # Argument Parsing
