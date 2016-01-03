@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.5.1"
+__version__ = "2.6.1"
 
 # ================
 # Argument Parsing
@@ -204,7 +204,7 @@ class ColorString:
             if newcind and not newcind[-1][1]:
                 newcind[-1][1] = len(thing)
         else:
-            err('ColorString can only append strings, Fseq, or ColorString objects')
+            err('ColorString can only append strings, FSeq, or ColorString objects')
         self.cind += [[b + len(self.cind), e + len(self.cind), c] for b,e,c in newcind]
 
     def subseq(self, a, b):
@@ -419,7 +419,14 @@ class FileStat:
 
 class FSeq:
     # The translator for taking reverse complements
-    revtrans = str.maketrans('acgtACGT', 'tgcaTGCA')
+    # Extended alphabet:
+    # W = [AT]  <--> S = [GC]
+    # M = [AC]  <--> K = [GT]
+    # R = [AG]  <--> Y = [CT]
+    # B = [GTC] <--> V = [ACG]
+    # D = [AGT] <--> H = [ACT]
+    # N <--> N
+    revtrans = str.maketrans('acgtuwsmkrybvdhnACGTUWSMKRYBVDHN', 'tgcaaswkmyrvbhdnTGCAASWKMYRVBHDN')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
     def __init__(self, header, seq, filename=None, handle_color=False, purge_color=False):
@@ -511,12 +518,12 @@ class FSeq:
 
     @classmethod
     def getrevcomp(cls, seq):
-        trans = lambda s: s.translate(FSeq.revtrans)
+        trans = lambda s: s[::-1].translate(FSeq.revtrans)
         if isinstance(seq, str):
-            return(trans(seq[::-1]))
+            return(trans(seq))
         elif isinstance(seq, FSeq):
-            newheader = ParseHeader.firstword(seq.header) + '|REVCOM'
-            newseq = FSeq(newheader, trans(seq.seq[::-1]))
+            newheader = ParseHeader.add_suffix(seq.header, 'revcom')
+            newseq = FSeq(newheader, trans(seq.seq))
             if seq.colseq:
                 newseq.colseq = seq.colseq
                 newseq.colseq.reverse(len(seq.seq))
@@ -1274,16 +1281,28 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="reverse each sequence (NOT reverse complement)",
+            help="reverse each sequence (by default NOT reverse complement)",
             description="""Reverse the letters in each sequence. The complement
-            is NOT taken. If you want to take the reverse complement of a
-            sequence, use a dedicated tool, like EMBOSS transeq."""
+            is NOT taken unless the -c flag is set. The extended nucleotide
+            alphabet is supported."""
         )
         parser.add_argument(
             'fh',
             help='input fasta sequence (default = stdin)',
             metavar='INPUT',
             nargs="*"
+        )
+        parser.add_argument(
+            '-c', '--complement',
+            help='take the reverse complement of the sequence',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-V', '--no-validate',
+            help='do not check whether the sequence is DNA before reverse complement',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
             '-S', '--preserve-color',
@@ -1302,9 +1321,25 @@ class Reverse(Subcommand):
     def generator(self, args, gen):
         ''' Reverse each sequence '''
         self.force_color = args.force_color
+        if args.complement:
+            f = lambda s: FSeq.getrevcomp(s)
+        else:
+            def f(s):
+                s.reverse()
+                return s
+
+        if args.complement and not args.no_validate:
+            def func(s):
+                if guess_type(s) == 'dna':
+                    return f(s)
+                else:
+                    msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
+                    err(msg % ParseHeader.firstword(s.header))
+        else:
+            func = f
+
         for seq in gen.next(handle_color=args.preserve_color):
-            seq.reverse()
-            yield seq
+            yield func(seq)
 
 class Sniff(Subcommand):
     def _parse(self):

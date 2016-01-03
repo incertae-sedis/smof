@@ -62,7 +62,26 @@ class TestFSeq(unittest.TestCase):
         seqobj = smof.FSeq(header,seq)
         rc = smof.FSeq.getrevcomp(seqobj)
         self.assertEqual(rc.seq, 'AACGT')
-        self.assertEqual(rc.header, 'seq1|REVCOM')
+        self.assertEqual(rc.header, 'seq1|revcom')
+
+    def test_getrevcomp_extended_alphabet(self):
+        # test uracil and unknown
+        f = 'ACGTUNacgtun'
+        r = 'naacgtNAACGT'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+
+        # W = [AT] <--> S = [GC]
+        # M = [AC] <--> K = [GT]
+        # R = [AG] <--> Y = [CT]
+        f = 'wmrWMRskySKY'
+        r = 'RMWrmwYKSyks'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+        
+        # B = [GTC] <--> V = [ACG]
+        # D = [AGT] <--> H = [ACT]
+        f = 'BDVHbdvh'
+        r = 'dbhvDBHV'
+        self.assertEqual(smof.FSeq.getrevcomp(f), r)
 
     def test_ungap(self):
         header = 'seq1'
@@ -929,8 +948,29 @@ class TestReverse(unittest.TestCase):
             '>a1|reverse', 'DEVIL',
             '>b2|reverse', 'RELLIM'
         ]
+        # This test sequence is adapted from the Sequence Manipulation Suite
+        # (http://www.bioinformatics.org/sms2/rev_comp.html)
+        self.seq2 = [
+            '>s1 sample1',
+            'garkbdctymvhu',
+            '>s2 sample2',
+            'ctymvhgarkbda',
+            '>s3 sample3',
+            'ccccccccccga'
+        ]
+        self.seq2_revcomp = [
+            '>s1|revcom sample1',
+            'adbkraghvmytc',
+            '>s2|revcom sample2',
+            'thvmytcdbkrag',
+            '>s3|revcom sample3',
+            'tcgggggggggg'
+        ]
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
+
+    def test_reverse_complement(self):
+        self.assertEqual(get_output(self.seq2, ['reverse', '-cV']), self.seq2_revcomp)
 
 class TestSample(unittest.TestCase):
     def setUp(self):
