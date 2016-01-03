@@ -2633,19 +2633,20 @@ class Uniq(Subcommand):
             metavar='INPUT',
             nargs="*"
         )
-        parser.add_argument(
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument(
             '-c', '--count',
             help='writes (count|header) in tab-delimited format',
             action='store_true',
             default=False
         )
-        parser.add_argument(
+        group.add_argument(
             '-d', '--repeated',
             help='print only repeated entries',
             action='store_true',
             default=False
         )
-        parser.add_argument(
+        group.add_argument(
             '-u', '--uniq',
             help='print only unique entries',
             action='store_true',
