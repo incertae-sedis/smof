@@ -52,3 +52,8 @@ diff subseq-colored.fa \
       ../smof.py subseq -b 10 20 -c green -Y |
       ../smof.py subseq -b 14 16 -c red) > /dev/null
 echo $?
+
+echo -n 'Testing uniq pack/unpack ... '
+diff pack-unpack.fa \
+    <(../smof.py uniq -p pack-unpack.fa | ../smof.py uniq -P)
+echo $?

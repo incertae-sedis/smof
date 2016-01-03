@@ -2625,7 +2625,10 @@ class Uniq(Subcommand):
             description="""Emulates the GNU uniq command. Two entries are
             considered equivalent only if their sequences AND headers are
             exactly equal. Newlines are ignored but all comparisons are
-            case-sensitive."""
+            case-sensitive. The pack/unpack option is designed to be compatible
+            with the conventions used in the NCBI-BLAST non-redundant
+            databases. That is, entries with identical sequences are merged and
+            their headers are joined with SOH (0x01) as a delimiter."""
         )
         parser.add_argument(
             'fh',
@@ -2652,9 +2655,26 @@ class Uniq(Subcommand):
             action='store_true',
             default=False
         )
+        group.add_argument(
+            '-p', '--pack',
+            help='combine redundant sequences by concatenating the headers',
+            action='store_true',
+            default=False
+        )
+        group.add_argument(
+            '-P', '--unpack',
+            help='reverse the pack operation',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-z', '--pack-sep',
+            help='set delimiting string for pack/unpack operations (SOH, 0x01, by default)',
+            default='\x01'
+        )
         parser.set_defaults(func=self.func)
 
-    def generator(self, args, gen):
+    def standard_generator(self, args, gen):
         from collections import OrderedDict
         seqs = OrderedDict()
         for seq in gen.next():
@@ -2676,6 +2696,32 @@ class Uniq(Subcommand):
         else:
             for k,v in sgen:
                 yield(k)
+
+    def pack_generator(self, args, gen):
+        seqs = defaultdict(list)
+        for seq in gen.next():
+            seqs[seq.seq].append(seq.header)
+
+        for q,h in seqs.items():
+            seq = FSeq(header=args.pack_sep.join(h), seq=q)
+            yield seq
+
+    def unpack_generator(self, args, gen):
+        for seq in gen.next():
+            headers = seq.header.split(args.pack_sep)
+            for header in headers:
+                yield FSeq(header=header, seq=seq.seq)
+
+    def generator(self, args, gen):
+        if args.pack:
+            g = self.pack_generator
+        elif args.unpack:
+            g = self.unpack_generator
+        else:
+            g = self.standard_generator
+
+        for a in g(args, gen):
+            yield(a)
 
 class Wc(Subcommand):
     def _parse(self):

@@ -1078,6 +1078,16 @@ class TestUniq(unittest.TestCase):
             '>b','HAT',
             '>c','A'
         ]
+        self.redundant=[
+            '>a','CAT',
+            '>b','CAT',
+            '>c','CAT',
+            '>d','HAT',
+        ]
+        self.packed=[
+            '>a|b|c','CAT',
+            '>d','HAT',
+        ]
 
     def test_default(self):
         self.assertEqual(get_output(self.all_uniq, ['uniq']), self.all_uniq)
@@ -1095,6 +1105,13 @@ class TestUniq(unittest.TestCase):
     def test_count(self):
         self.assertEqual(get_output(self.all_uniq, ['uniq', '-c']), ['1\ta', '1\tb', '1\tc'])
         self.assertEqual(get_output(self.repeated, ['uniq', '-c']), ['1\ta', '2\tb',  '2\tc'])
+
+    def test_pack(self):
+        # pack does not guarantee conservation of order, so I compare sets
+        self.assertEqual(set(get_output(self.redundant, ['uniq', '-p', '-z', '|'])), set(['>a|b|c', 'CAT', '>d', 'HAT']))
+
+    def test_unpack(self):
+        self.assertEqual(get_output(self.packed, ['uniq', '-P', '-z', '|']), self.redundant)
 
 class TestWc(unittest.TestCase):
     def setUp(self):
