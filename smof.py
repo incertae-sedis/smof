@@ -204,7 +204,7 @@ class ColorString:
             if newcind and not newcind[-1][1]:
                 newcind[-1][1] = len(thing)
         else:
-            err('ColorString can only append strings, Fseq, or ColorString objects')
+            err('ColorString can only append strings, FSeq, or ColorString objects')
         self.cind += [[b + len(self.cind), e + len(self.cind), c] for b,e,c in newcind]
 
     def subseq(self, a, b):
@@ -1281,16 +1281,28 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="reverse each sequence (NOT reverse complement)",
+            help="reverse each sequence (by default NOT reverse complement)",
             description="""Reverse the letters in each sequence. The complement
-            is NOT taken. If you want to take the reverse complement of a
-            sequence, use a dedicated tool, like EMBOSS transeq."""
+            is NOT taken unless the -c flag is set. The extended nucleotide
+            alphabet is supported."""
         )
         parser.add_argument(
             'fh',
             help='input fasta sequence (default = stdin)',
             metavar='INPUT',
             nargs="*"
+        )
+        parser.add_argument(
+            '-c', '--complement',
+            help='take the reverse complement of the sequence',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-V', '--no-validate',
+            help='do not check whether the sequence is DNA before reverse complement',
+            action='store_true',
+            default=False
         )
         parser.add_argument(
             '-S', '--preserve-color',
@@ -1309,9 +1321,25 @@ class Reverse(Subcommand):
     def generator(self, args, gen):
         ''' Reverse each sequence '''
         self.force_color = args.force_color
+        if args.complement:
+            f = lambda s: FSeq.getrevcomp(s)
+        else:
+            def f(s):
+                s.reverse()
+                return s
+
+        if args.complement and not args.no_validate:
+            def func(s):
+                if guess_type(s) == 'dna':
+                    return f(s)
+                else:
+                    msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
+                    err(msg % ParseHeader.firstword(s.header))
+        else:
+            func = f
+
         for seq in gen.next(handle_color=args.preserve_color):
-            seq.reverse()
-            yield seq
+            yield func(seq)
 
 class Sniff(Subcommand):
     def _parse(self):
