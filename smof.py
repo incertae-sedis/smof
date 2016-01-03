@@ -1281,7 +1281,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="reverse each sequence (by default NOT reverse complement)",
+            help="reverse each sequence (or reverse complement)",
             description="""Reverse the letters in each sequence. The complement
             is NOT taken unless the -c flag is set. The extended nucleotide
             alphabet is supported."""
@@ -2622,13 +2622,15 @@ class Uniq(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="prints entries if header/sequence pair is unique",
+
             description="""Emulates the GNU uniq command. Two entries are
             considered equivalent only if their sequences AND headers are
             exactly equal. Newlines are ignored but all comparisons are
             case-sensitive. The pack/unpack option is designed to be compatible
             with the conventions used in the NCBI-BLAST non-redundant
-            databases. That is, entries with identical sequences are merged and
-            their headers are joined with SOH (0x01) as a delimiter."""
+            databases: entries with identical sequences are merged and their
+            headers are joined with SOH (0x01) as a delimiter (by default)."""
+
         )
         parser.add_argument(
             'fh',
