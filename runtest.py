@@ -948,8 +948,29 @@ class TestReverse(unittest.TestCase):
             '>a1|reverse', 'DEVIL',
             '>b2|reverse', 'RELLIM'
         ]
+        # This test sequence is adapted from the Sequence Manipulation Suite
+        # (http://www.bioinformatics.org/sms2/rev_comp.html)
+        self.seq2 = [
+            '>s1 sample1',
+            'garkbdctymvhu',
+            '>s2 sample2',
+            'ctymvhgarkbda',
+            '>s3 sample3',
+            'ccccccccccga'
+        ]
+        self.seq2_revcomp = [
+            '>s1|revcom sample1',
+            'adbkraghvmytc',
+            '>s2|revcom sample2',
+            'thvmytcdbkrag',
+            '>s3|revcom sample3',
+            'tcgggggggggg'
+        ]
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['reverse']), self.reverse)
+
+    def test_reverse_complement(self):
+        self.assertEqual(get_output(self.seq2, ['reverse', '-cV']), self.seq2_revcomp)
 
 class TestSample(unittest.TestCase):
     def setUp(self):
