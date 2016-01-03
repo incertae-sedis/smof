@@ -518,12 +518,12 @@ class FSeq:
 
     @classmethod
     def getrevcomp(cls, seq):
-        trans = lambda s: s.translate(FSeq.revtrans)
+        trans = lambda s: s[::-1].translate(FSeq.revtrans)
         if isinstance(seq, str):
-            return(trans(seq[::-1]))
+            return(trans(seq))
         elif isinstance(seq, FSeq):
-            newheader = ParseHeader.firstword(seq.header) + '|REVCOM'
-            newseq = FSeq(newheader, trans(seq.seq[::-1]))
+            newheader = ParseHeader.add_suffix(seq.header, 'revcom')
+            newseq = FSeq(newheader, trans(seq.seq))
             if seq.colseq:
                 newseq.colseq = seq.colseq
                 newseq.colseq.reverse(len(seq.seq))

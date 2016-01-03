@@ -62,7 +62,7 @@ class TestFSeq(unittest.TestCase):
         seqobj = smof.FSeq(header,seq)
         rc = smof.FSeq.getrevcomp(seqobj)
         self.assertEqual(rc.seq, 'AACGT')
-        self.assertEqual(rc.header, 'seq1|REVCOM')
+        self.assertEqual(rc.header, 'seq1|revcom')
 
     def test_getrevcomp_extended_alphabet(self):
         # test uracil and unknown
