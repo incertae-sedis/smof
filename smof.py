@@ -7,6 +7,7 @@ import sys
 import string
 import copy
 import os
+import signal
 from itertools import chain
 from collections import Counter
 from collections import defaultdict
@@ -914,20 +915,11 @@ class Subcommand:
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
-            try:
-                if(isinstance(output, FSeq)):
-                    color = sys.stdout.isatty() or self.force_color
-                    output.print(color=color, out=out)
-                else:
-                    out.write('%s\n' % output)
-            # BrokenPipeErrors occur when we attempt to send data to a pipe
-            # that has been closed. For example:
-            # $ smof sort seq.faa | smof head
-            # `smof head` prints and closes after receiving the first sequence,
-            # so `smof sort` fails. The correct behavior in this case, is for
-            # `smof head` to class as well.
-            except BrokenPipeError:
-                sys.exit(0)
+            if(isinstance(output, FSeq)):
+                color = sys.stdout.isatty() or self.force_color
+                output.print(color=color, out=out)
+            else:
+                out.write('%s\n' % output)
 
 class Clean(Subcommand):
     def _parse(self):
@@ -1056,10 +1048,7 @@ class Clean(Subcommand):
         if args.col_width == 0:
             args.col_width = int(1e12) # Approximation of infinity, i.e. no wrap
         for seq in self.generator(args, gen):
-            try:
-                seq.print(col_width=args.col_width, color=False, out=out)
-            except BrokenPipeError:
-                sys.exit(0)
+            seq.print(col_width=args.col_width, color=False, out=out)
 
 class Filter(Subcommand):
     def _parse(self):
@@ -2816,6 +2805,7 @@ class Tail(Subcommand):
 # =======
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     args = parse()
     gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)
