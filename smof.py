@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.7.0"
+__version__ = "2.7.1"
 
 # ================
 # Argument Parsing
@@ -2359,8 +2359,14 @@ class Grep(Subcommand):
                     return func(text, **kw)
             return inner
 
+        def seqtotext(func):
+            def inner(seq, **kw):
+                text = gettext(seq)
+                return func(text, **kw)
+            return inner
+
         # Check existence for matches to wrapper captures
-        @context
+        @seqtotext
         def swrpmatcher(text, **kw):
             for m in re.finditer(wrapper, text):
                 if m.group(1) in pat:
@@ -2368,7 +2374,7 @@ class Grep(Subcommand):
             return(False)
 
         # Check existence of matches
-        @context
+        @seqtotext
         def spatmatcher(text, **kw):
             for p in pat:
                 if re.search(p, text):
@@ -2376,7 +2382,7 @@ class Grep(Subcommand):
             return(False)
 
         # Check if pattern matches entire text
-        @context
+        @seqtotext
         def linematcher(text, **kw):
             for p in pat:
                 m = re.match(p, text)
@@ -2384,7 +2390,7 @@ class Grep(Subcommand):
                     return(True)
             return(False)
 
-        @context
+        @seqtotext
         def exactmatcher(text, **kw):
             return(text in pat)
 

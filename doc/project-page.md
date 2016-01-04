@@ -79,7 +79,7 @@ In addition to the GNU-like functionallity, `smof head` and `tail` can also
 limit the sequence that is output. This can be useful for diagnostic purposes.
 
 ```bash
-# print just the terminal codon from the first 5 transcripts
+# print last 3 nucleotides (last codon) from the first 5 transcripts
 smof head -l 3 -5 aa.transcripts.fna
 # print the first codon
 smof head -f 3 -5 aa.transcripts.fna
@@ -170,9 +170,9 @@ smof grep -q SKSQ aa.faa
 
 You can include flanking regions in the match
 ```bash
-# match 3 residues upstream
+# match 3 residues downstream
 smof grep -qA3 'SKSQ' aa.faa
-# match 3 residues downstream 
+# match 3 residues upstream 
 smof grep -qB3 'SKSQ' aa.faa
 # match 3 residues up- and downstream 
 smof grep -qC3 'SKSQ' aa.faa
@@ -224,8 +224,11 @@ smof grep -f id-sample.txt aa.faa
 This, however, can be a little slow, since it searchs each pattern in the file
 against the entire header. A much faster approach is to extract a search
 pattern from the headers (or sequence) and then lookup the header pattern in
-the set of search patterns.  ```bash smof grep -f id-sample.txt -w '\| (\S+)
-\|' aa.faa ```
+the set of search patterns.
+
+```bash
+smof grep -f id-sample.txt -w '\| (\S+) \|' aa.faa
+```
 
 Count occurrences (on both strands) of a DNA pattern using IUPAC extended
 nucleotide alphabet.
@@ -319,7 +322,7 @@ Or shorter than 100 letters
 smof clean -x aa.faa | smof filter -s 100 aa.faa
 ```
 
-Or that have greater than 60% AFILMVW content (hydrophobic amino acids)
+Or that have greater than 50% AFILMVW content (hydrophobic amino acids)
 
 ```bash
 smof clean -x aa.faa | smof filter -c 'AFILMVW > .5' aa.faa
@@ -428,7 +431,7 @@ Alice happens to be interested in the sequence WTQPQR from *Panicum virgatum*
 and would like to know what the homologous regions are in the other species.
 
 So Alice aligns the maturase genes with
-[http://nar.oxfordjournals.org/content/32/5/1792.short](MUSCLE) and searches
+[MUSCLE](http://nar.oxfordjournals.org/content/32/5/1792.short) and searches
 for the motif using the GFF output option.
 
 ```
