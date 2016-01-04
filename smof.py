@@ -560,6 +560,8 @@ class FSeqGenerator:
                 f = open(fastafile, 'r')
             except TypeError:
                 f = fastafile
+            except FileNotFoundError:
+                err("File '%s' not found" % fastafile)
 
             for line in f:
                 line = line.strip()
