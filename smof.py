@@ -12,7 +12,7 @@ from collections import Counter
 from collections import defaultdict
 from hashlib import md5
 
-__version__ = "2.7.1"
+__version__ = "2.7.2"
 
 # ================
 # Argument Parsing
@@ -552,7 +552,7 @@ class FSeqGenerator:
 
         for fastafile in fh:
             seq_list = []
-            header = ''
+            header = None
             # If there are multiple input files, store the filename
             # If there is only one, e.g. STDIN, don't store a name
             filename = None if len(fh) == 1 else fastafile
@@ -560,6 +560,8 @@ class FSeqGenerator:
                 f = open(fastafile, 'r')
             except TypeError:
                 f = fastafile
+            except FileNotFoundError:
+                err("File '%s' not found" % fastafile)
 
             for line in f:
                 line = line.strip()
@@ -573,11 +575,12 @@ class FSeqGenerator:
                         err("Illegally empty sequence")
                     seq_list = []
                     header = line[1:]
-                elif header:
+                # '' is valid for a header
+                elif header != None:
                     seq_list.append(line)
                 else:
                     err("First fasta line must begin with '>'")
-            if header:
+            if header != None:
                 if seq_list:
                     yield FSeq(header, ''.join(seq_list), *args, **kwargs)
                 else:
@@ -2281,6 +2284,9 @@ class Grep(Subcommand):
 
         if args.line_regexp and (args.wrap):
             err("--line_regexp is incompatible with --wrap")
+
+        if args.gff and (args.exact or args.line_regexp):
+            err('--gff is incompatible with --exact and --line_regexp')
 
         if args.fastain:
             args.match_sequence = True

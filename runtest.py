@@ -76,7 +76,7 @@ class TestFSeq(unittest.TestCase):
         f = 'wmrWMRskySKY'
         r = 'RMWrmwYKSyks'
         self.assertEqual(smof.FSeq.getrevcomp(f), r)
-        
+
         # B = [GTC] <--> V = [ACG]
         # D = [AGT] <--> H = [ACT]
         f = 'BDVHbdvh'
@@ -882,6 +882,8 @@ class TestGrepBadCombinations(unittest.TestCase):
     def test_exact_incompatible_options(self):
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-PX', 'a'])
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-GX', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '--gff', '-x', 'a'])
+        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '--gff', '-X', 'a'])
 
 class TestHeadandTail(unittest.TestCase):
     def setUp(self):
