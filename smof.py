@@ -2124,9 +2124,14 @@ class Head(Subcommand):
         )
         parser.add_argument(
             'nseqs',
-            help='print -N sequences (e.g. smof head -5)',
-            nargs="?",
-            metavar='N',
+            help='-K print first K entries',
+            metavar='K',
+            nargs="?"
+        )
+        parser.add_argument(
+            '-n', '--entries',
+            metavar='K',
+            help='print first K entries; or use -n -K to print all but the last K entries'
         )
         parser.add_argument(
             'fh',
@@ -2151,7 +2156,20 @@ class Head(Subcommand):
 
     def generator(self, args, gen):
         i = 1
-        if args.nseqs:
+        allbut = False
+
+        if args.entries:
+            if args.nseqs:
+                err("Please don't use nseqs with --entries")
+            try:
+                if args.entries[0] == '-':
+                    allbut = True
+                    nseqs = int(args.entries[1:])
+                else:
+                    nseqs = int(args.entries)
+            except AttributeError:
+                err('-n (--entries) must be a number')
+        elif args.nseqs:
             # This resolve cases where there is a positional filename and no
             # nseqs given.
             # If the first positional argument is a readable filename, treat
@@ -2167,11 +2185,19 @@ class Head(Subcommand):
         else:
             nseqs = 1
 
-        for seq in gen.next():
-            yield headtailtrunk(seq, args.first, args.last)
-            if i == nseqs:
-                break
-            i += 1
+        if allbut:
+            seqs = list()
+            for seq in gen.next():
+                if i > nseqs:
+                    yield headtailtrunk(seqs.pop(0), args.first, args.last)
+                seqs.append(seq)
+                i += 1
+        else:
+            for seq in gen.next():
+                yield headtailtrunk(seq, args.first, args.last)
+                if i == nseqs:
+                    break
+                i += 1
 
 class Grep(Subcommand):
     def _parse(self):
@@ -2885,9 +2911,14 @@ class Tail(Subcommand):
         )
         parser.add_argument(
             'nseqs',
-            help='-N print last N, +N print from Nth onwards',
-            nargs="?",
-            metavar='N',
+            help='-K print last K entries',
+            metavar='K',
+            nargs="?"
+        )
+        parser.add_argument(
+            '-n', '--entries',
+            metavar='K',
+            help='print last K entries; or use -n +K to output starting with the Kth'
         )
         parser.add_argument(
             'fh',
@@ -2911,33 +2942,48 @@ class Tail(Subcommand):
 
     def generator(self, args, gen):
         fromtop = False
-        if args.nseqs:
+        nstring = None
+
+        try:
+            # if the first positional is a file, treat is as a file
+            # otherwise, it may be for example, '-5', or whatever
             if os.access(args.nseqs, os.R_OK):
-               args.fh = [args.nseqs] + args.fh
-               nseqs = 1
+                args.fh = [args.nseqs] + args.fh
             else:
-                try:
-                    m = re.match('([-+])(\d+)', args.nseqs)
-                    if m.group(1) == "+":
-                        fromtop = True
-                    nseqs = int(m.group(2))
-                except AttributeError:
-                    err("N must be formatted as '[+-]12'")
-                if nseqs < 1:
-                    err("N must be greater than 0")
-        else:
-            nseqs = 1
+                nstring = args.nseqs
+        except TypeError:
+            pass
+
+        if args.nseqs and args.entries:
+            err('ERROR: do not use -n along with positional number argument')
+
+        if not nstring:
+            if args.entries:
+                nstring = args.entries
+            else:
+                nstring = "1"
+
+        try:
+            m = re.match('([-+])(\d+)', nstring)
+            if m.group(1) == "+":
+                fromtop = True
+            nstring = int(m.group(2))
+        except AttributeError:
+            try:
+                nstring = int(nstring)
+            except ValueError:
+                err("N must be formatted as '[+-]12'")
 
         if fromtop:
             i = 1;
             for seq in gen.next():
-                if i >= nseqs:
+                if i >= nstring:
                     yield headtailtrunk(seq, args.first, args.last)
                 i += 1
         else:
             from collections import deque
             try:
-                lastseqs = deque(maxlen=nseqs)
+                lastseqs = deque(maxlen=nstring)
             except ValueError:
                 err('--nseqs argument must be positive')
             for seq in gen.next():
