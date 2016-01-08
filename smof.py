@@ -1281,7 +1281,7 @@ class Reverse(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="reverse each sequence (by default NOT reverse complement)",
+            help="reverse each sequence (optional reverse complement)",
             description="""Reverse the letters in each sequence. The complement
             is NOT taken unless the -c flag is set. The extended nucleotide
             alphabet is supported."""
@@ -2721,7 +2721,7 @@ class Uniq(Subcommand):
         parser = self.subparsers.add_parser(
             cmd_name,
             usage=self.usage.format(cmd_name),
-            help="prints entries if header/sequence pair is unique",
+            help="count, omit, or merge repeated entries",
             description="""Emulates the GNU uniq command. Two entries are
             considered equivalent only if their sequences AND headers are
             exactly equal. Newlines are ignored but all comparisons are
