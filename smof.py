@@ -8,6 +8,7 @@ import string
 import copy
 import os
 import signal
+import textwrap
 from itertools import chain
 from collections import Counter
 from collections import defaultdict
@@ -24,7 +25,14 @@ class Parser:
         self.parser = argparse.ArgumentParser(
             prog='smof',
             usage='<fastafile> | smof <subcommand> <options>',
-            description='Tools for studying and manipulating fasta files')
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description='Tools for studying and manipulating fasta files',
+            epilog=textwrap.dedent('''\
+                Project site: http://zbwrnz.github.io/smof/
+                Report bugs/requests via http://zbwrnz.github.io/smof/issues
+                Author: Zebulun Arendsee (zbwrnz@gmail.com)
+            ''')
+        )
         self.parser.add_argument(
             '-v', '--version',
             action='version',
