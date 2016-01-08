@@ -1348,20 +1348,103 @@ class Sniff(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="extract info about the sequence",
-            description=("""Identifies the sequence type and aids in
-                         diagnostics. Ambiguous characters include RYSWKMDBHV
-                         for nucleotides and BJZ for proteins. Illegal
-                         characters include any character that is neither
-                         standard, ambiguous, a gap [_-.], or a stop [*]. The
-                         nucleotide features entry is comprised of four flags
-                         which will all equal 1 for a proper nucleotide coding
-                         sequence. For example, a sequence will be counted as
-                         1111 if 1) start with a start codon (ATG), 2) ends
-                         with a stop codon (TAG, TAA, or TGA), 3) has a length
-                         that is a multiple of three, and 4) has no internal
-                         stop codon. If a sequence lacks a start codon, but
-                         otherwise looks like a coding sequence, it will have
-                         the value 0111.""")
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description='Identifies the sequence type and aids in diagnostics.',
+            epilog=textwrap.dedent(
+            """\
+                The output can be divided into 6 sections
+
+                1. Overview and warnings
+
+                  smof sniff counts the number of unique sequences and the number
+                  of total sequences. It warns if there are any sequences with
+                  illegal characters or if there are any duplicate headers. Example:
+
+                  > 23 uniq sequences (24 total)
+                  > WARNING: headers are not unique (23/24)
+                  > WARNING: illegal characters found
+
+                  Illegal characters include any character that is neither
+                  standard, ambiguous, a gap [_-.], or a stop [*].
+
+                2. Sequence types
+
+                  For each entry, it predicts whether it is protein, DNA, RNA, or
+                  illegal. Example:
+
+                  > Sequence types:
+                  >   prot:                20         83.3333%
+                  >   dna:                 2          8.3333%
+                  >   illegal:             1          4.1667%
+                  >   rna:                 1          4.1667%
+
+                  The 2nd column is the count, 3rd percentage
+
+                3. Sequence cases
+
+                  Reports the case of the sequences, example:
+
+                  > Sequences cases:
+                  >   uppercase:           21         87.5000%
+                  >   lowercase:           2          8.3333%
+                  >   mixedcase:           1          4.1667%
+
+                4. Nucleotide features
+
+                  Reports a summary nucleotide features
+
+                  The nucleotide features entry is comprised of four flags
+                  which will all equal 1 for a proper nucleotide coding sequence
+                  (0 otherwise). A sequence will be counted as 1111 if it:
+
+                    1) starts with a start codon (ATG)
+                    2) ends with a stop codon (TAG, TAA, or TGA)
+                    3) has a length that is a multiple of three
+                    4) has no internal stop codon. If a sequence lacks a
+                       start codon, but otherwise looks like a coding sequence,
+                       it will have the value 0111.
+
+                  For example:
+
+                  > Nucleotide Features
+                  >   0000:                2          66.6667%
+                  >   1100:                1          33.3333%
+
+
+                5. Protein features
+
+                  1) terminal-stop - does the sequence end with '*'?
+                  2) initial-Met - does the sequence start with 'M'?
+                  3) internal-stop - does '*' appear within the sequence?
+                  4) selenocysteine - does the sequence include 'U'?
+
+                  Example:
+
+                  > Protein Features:
+                  >   terminal-stop:       20         100.0000%
+                  >   initial-Met:         19         95.0000%
+                  >   internal-stop:       0          0.0000%
+                  >   selenocysteine:      0          0.0000%
+
+                6. Universal features
+
+                  Example:
+
+                  > Universal Features:
+                  >   ambiguous:           1          4.1667%
+                  >   unknown:             0          0.0000%
+                  >   gapped:              0          0.0000%
+
+                Ambiguous characters are RYSWKMDBHV for nucleotides and BJZ
+                for proteins.
+
+                Unknown characters are X for proteins and N for nucleotides
+
+                Gaps are '-_.'
+
+            """
+
+            )
         )
         parser.add_argument(
             'fh',
