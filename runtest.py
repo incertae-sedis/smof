@@ -896,7 +896,17 @@ class TestHeadandTail(unittest.TestCase):
         self.assertEqual(get_output(self.seq, ['head']), ['>a','GATACA'])
         self.assertEqual(get_output(self.seq, ['head', '-2']), ['>a','GATACA','>b','GALLIF'])
 
-    def test_n(self):
+    def test_head_n(self):
+        self.assertEqual(get_output(self.seq, ['head', '-n', '1']), ['>a','GATACA'])
+        self.assertEqual(get_output(self.seq, ['head', '-n', '+1']), ['>a','GATACA'])
+        self.assertEqual(get_output(self.seq, ['head', '-n', '-1']), self.seq[0:-2])
+
+    def test_tail_n(self):
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '1']), ['>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '-1']), ['>d','ATHENS'])
+        self.assertEqual(get_output(self.seq, ['tail', '-n', '+2']), self.seq[2:])
+
+    def test_tail(self):
         self.assertEqual(get_output(self.seq, ['tail']), ['>d','ATHENS'])
         self.assertEqual(get_output(self.seq, ['tail', '-2']), ['>c','SPARTA','>d','ATHENS'])
         self.assertEqual(get_output(self.seq, ['tail', '+2']),
