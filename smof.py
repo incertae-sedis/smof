@@ -2097,17 +2097,25 @@ class Grep(Subcommand):
             cmd_name,
             usage=self.usage.format(cmd_name),
             help="roughly emulates the UNIX grep command",
-            description="""Smof grep is based on GNU grep but operates on fasta
-            entries. It allows you to extract entries where either the header
-            or the sequence match the search term. For sequence searches, it
-            can produce GFF formatted output, which specifies the location of
-            each match. The --wrap option limits search space to expressions
-            captured by a Perl regular expression. This, coupled with the
-            --file option, allows thousands of sequences to be rapidly
-            extracted based on terms from a file. Smof grep can also take a
-            fasta file as a search term input (--fastain) and return sequences
-            containing exact matches to the sequences in the search fasta
-            file. See the documentation for examples."""
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=textwrap.dedent(
+                """\
+                Smof grep is based on GNU grep but operates on fasta entries.
+                It allows you to extract entries where either the header or the
+                sequence match the search term. For sequence searches, it can
+                produce GFF formatted output, which specifies the location of
+                each match.
+
+                The --wrap option limits search space to expressions captured
+                by a Perl regular expression. This, coupled with the --file
+                option, allows thousands of sequences to be rapidly extracted
+                based on terms from a file.
+
+                Smof grep can also take a fasta file as a search term input
+                (--fastain) and return sequences containing exact matches to
+                the sequences in the search fasta file. See the documentation
+                for examples.
+                """)
         )
         parser.add_argument(
             'pattern',
@@ -2203,13 +2211,13 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-x', '--line-regexp',
-            help='select only those matches that match the whole text',
+            help='force PATTERN to match the whole text (regex allowed)',
             action='store_true',
             default=False
         )
         parser.add_argument(
             '-X', '--exact',
-            help='select only exact matches to full text (very fast)',
+            help='force PATTERN to literally equal the text (fast)',
             action='store_true',
             default=False
         )
