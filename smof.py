@@ -519,6 +519,11 @@ class FSeq:
             newseq.colseq.subseq(a, b)
         return(newseq)
 
+    def add_filename(self):
+        self.header = ParseHeader.add_tag(h=self.header, tag='filename', value=self.filename)
+        if self.colheader:
+            self.colheader = None
+
     def reverse(self):
         self.seq = self.seq[::-1]
         if self.handle_color:
@@ -589,9 +594,10 @@ class FSeqGenerator:
                     seq_list.append(line)
                 else:
                     err("First fasta line must begin with '>'")
+            # process the last sequence
             if header != None:
                 if seq_list:
-                    yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+                    yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
                 else:
                     err("Illegally empty sequence")
 
@@ -624,6 +630,9 @@ class ParseHeader:
 
     def add_suffix(h, suffix):
         return(re.sub('^(\S+)(.*)', '\\1|%s\\2' % suffix, h))
+
+    def add_tag(h, tag, value):
+        return(re.sub('^(\S+)(.*)', '\\1 %s=%s\\2' % (tag, value), h))
 
     def subseq(h, a, b):
         header = "%s|subseq(%d..%d) %s" % (ParseHeader.firstword(h), a, b, ParseHeader.description(h))
@@ -2251,6 +2260,12 @@ class Grep(Subcommand):
             help='obtain patterns from FILE, one per line'
         )
         parser.add_argument(
+            '-H', '--with-filename',
+            help='include filename in output',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
             help='a regular expression to capture patterns'
@@ -2398,6 +2413,9 @@ class Grep(Subcommand):
 
         if args.line_regexp and (args.wrap):
             err("--line_regexp is incompatible with --wrap")
+
+        if args.gff and args.with_filename:
+            err("Currently --gff is incompatible with --with-filename")
 
         if args.gff and (args.exact or args.line_regexp):
             err('--gff is incompatible with --exact and --line_regexp')
@@ -2726,7 +2744,15 @@ class Grep(Subcommand):
                                 else:
                                     seq.color_header(*pos, col=Colors.BOLD_RED)
                         yield(seq)
-        return(sgen)
+
+        if args.with_filename:
+            def sgen_H(gen, matcher):
+                for seq in sgen(gen, matcher):
+                    seq.add_filename()
+                    yield seq
+            return(sgen_H)
+        else:
+            return(sgen)
 
     def generator(self, args, gen):
         args = self._process_arguments(args)
