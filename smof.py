@@ -12,6 +12,7 @@ import textwrap
 from itertools import chain
 from collections import Counter
 from collections import defaultdict
+from collections import OrderedDict
 from hashlib import md5
 
 __version__ = "2.7.4"
@@ -520,8 +521,8 @@ class FSeq:
         return(newseq)
 
     def add_filename(self):
-        self.header = ParseHeader.add_tag(h=self.header, tag='filename', value=self.filename)
-        if self.colheader:
+        if self.filename:
+            self.header = ParseHeader.add_tag(h=self.header, tag='filename', value=self.filename)
             self.colheader = None
 
     def reverse(self):
@@ -2261,7 +2262,19 @@ class Grep(Subcommand):
         )
         parser.add_argument(
             '-H', '--with-filename',
-            help='include filename in output',
+            help='include filename as tag in output headers',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-L', '--files-without-match',
+            help='print names files with no matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--files-with-matches',
+            help='print names input files with matches',
             action='store_true',
             default=False
         )
@@ -2414,11 +2427,17 @@ class Grep(Subcommand):
         if args.line_regexp and (args.wrap):
             err("--line_regexp is incompatible with --wrap")
 
-        if args.gff and args.with_filename:
-            err("Currently --gff is incompatible with --with-filename")
+        if args.with_filename and (args.files_without_match or args.files_with_matches):
+            args.with_filename = False
 
         if args.gff and (args.exact or args.line_regexp):
             err('--gff is incompatible with --exact and --line_regexp')
+
+        if args.gff and (args.files_without_match or args.files_with_matches):
+            err("--gff is incompatible with -l and -L options")
+
+        if args.gff and args.with_filename:
+            err("Currently --gff is incompatible with --with-filename")
 
         if args.fastain:
             args.match_sequence = True
@@ -2455,7 +2474,14 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if args.gff or args.count_matches or args.only_matching or args.line_regexp or args.exact:
+        if any((args.gff,
+                args.count_matches,
+                args.only_matching,
+                args.line_regexp,
+                args.exact,
+                args.files_without_match,
+                args.files_with_matches
+               )):
             args.color = False
 
         # gff overides certain other options
@@ -2674,6 +2700,7 @@ class Grep(Subcommand):
         return((pat, wrapper))
 
     def _makegen(self, args):
+
         if args.gff:
             def sgen(gen, matcher):
                 source = "smof-{}".format(__version__)
@@ -2699,21 +2726,51 @@ class Grep(Subcommand):
 
         elif args.count or args.count_matches:
             def sgen(gen, matcher):
-                count, matches = 0, 0
+                seqcount = OrderedDict()
+                seqmatch = OrderedDict()
                 for seq in gen.next():
                     m = matcher(seq)
-                    if (m and not args.invert_match) or (not m and args.invert_match):
-                        count += 1
+                    if seq.filename not in seqcount:
+                        seqcount[seq.filename] = 0
+                        seqmatch[seq.filename] = 0
+                    if m:
                         try:
-                            matches += len(m)
-                        except:
+                            seqmatch[seq.filename] += len(m)
+                            seqcount[seq.filename] += 1
+                        except TypeError:
                             pass
-                if args.count and args.count_matches:
-                    yield "{}\t{}".format(count, matches)
-                elif args.count:
-                    yield count
-                elif args.count_matches:
-                    yield matches
+                for filename, count in seqcount.items():
+                    match = seqmatch[filename]
+                    if args.count or args.count_matches:
+                        if len(seqcount) > 1:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}\t{}".format(count, match,  filename)
+                            elif args.count:
+                                yield "{}\t{}".format(count, filename)
+                            elif args.count_matches:
+                                yield "{}\t{}".format(match, filename)
+                        else:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}".format(count, match)
+                            elif args.count:
+                                yield count
+                            elif args.count_matches:
+                                yield match
+
+        elif args.files_without_match or args.files_with_matches:
+            def sgen(gen, matcher):
+                seqmat = OrderedDict()
+                for seq in gen.next():
+                    matched = matcher(seq)
+                    if seq.filename not in seqmat:
+                        seqmat[seq.filename] = False
+                    if matched:
+                        seqmat[seq.filename] = True
+                for filename, matched in seqmat.items():
+                    if (not matched and args.files_without_match) or \
+                        (matched and args.files_with_matches):
+                        yield filename
+
 
         elif args.only_matching:
             def sgen(gen, matcher):
