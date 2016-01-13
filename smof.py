@@ -2261,12 +2261,6 @@ class Grep(Subcommand):
             help='obtain patterns from FILE, one per line'
         )
         parser.add_argument(
-            '-H', '--with-filename',
-            help='include filename as tag in output headers',
-            action='store_true',
-            default=False
-        )
-        parser.add_argument(
             '-L', '--files-without-match',
             help='print names files with no matches',
             action='store_true',
@@ -2427,17 +2421,11 @@ class Grep(Subcommand):
         if args.line_regexp and (args.wrap):
             err("--line_regexp is incompatible with --wrap")
 
-        if args.with_filename and (args.files_without_match or args.files_with_matches):
-            args.with_filename = False
-
         if args.gff and (args.exact or args.line_regexp):
             err('--gff is incompatible with --exact and --line_regexp')
 
         if args.gff and (args.files_without_match or args.files_with_matches):
             err("--gff is incompatible with -l and -L options")
-
-        if args.gff and args.with_filename:
-            err("Currently --gff is incompatible with --with-filename")
 
         if args.fastain:
             args.match_sequence = True
@@ -2802,14 +2790,7 @@ class Grep(Subcommand):
                                     seq.color_header(*pos, col=Colors.BOLD_RED)
                         yield(seq)
 
-        if args.with_filename:
-            def sgen_H(gen, matcher):
-                for seq in sgen(gen, matcher):
-                    seq.add_filename()
-                    yield seq
-            return(sgen_H)
-        else:
-            return(sgen)
+        return(sgen)
 
     def generator(self, args, gen):
         args = self._process_arguments(args)
