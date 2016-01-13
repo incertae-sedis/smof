@@ -6,6 +6,16 @@ UNIX-style FASTA tools
 For instructions on installation and a detailed tutorial, see the
 [project page](http://zbwrnz.github.io/smof).
 
+Much to my chagrine, I have found another suite of tools that overlaps heavily
+with my smof: [FAST](https://github.com/tlawrence3/FAST). Their work was
+published in May of 2015. The paper is well written and cogently argued for the
+need of bioinformatics tools that follow UNIX philosophy.
+
+> Lawrence, Travis J., et al. "FAST: FAST Analysis of Sequences Toolbox." Frontiers in Genetics 6 (2015): 172.
+
+FAST is elegant, well documented, and absolutely worth studying. I will write a
+comparison of smof and FAST at some point in the future.
+
 Screenshots
 ===========
 
