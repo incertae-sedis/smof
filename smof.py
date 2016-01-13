@@ -12,9 +12,10 @@ import textwrap
 from itertools import chain
 from collections import Counter
 from collections import defaultdict
+from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.8.0"
+__version__ = "2.9.0"
 
 # ================
 # Argument Parsing
@@ -519,6 +520,11 @@ class FSeq:
             newseq.colseq.subseq(a, b)
         return(newseq)
 
+    def add_filename(self):
+        if self.filename:
+            self.header = ParseHeader.add_tag(h=self.header, tag='filename', value=self.filename)
+            self.colheader = None
+
     def reverse(self):
         self.seq = self.seq[::-1]
         if self.handle_color:
@@ -589,9 +595,10 @@ class FSeqGenerator:
                     seq_list.append(line)
                 else:
                     err("First fasta line must begin with '>'")
+            # process the last sequence
             if header != None:
                 if seq_list:
-                    yield FSeq(header, ''.join(seq_list), *args, **kwargs)
+                    yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
                 else:
                     err("Illegally empty sequence")
 
@@ -624,6 +631,9 @@ class ParseHeader:
 
     def add_suffix(h, suffix):
         return(re.sub('^(\S+)(.*)', '\\1|%s\\2' % suffix, h))
+
+    def add_tag(h, tag, value):
+        return(re.sub('^(\S+)(.*)', '\\1 %s=%s\\2' % (tag, value), h))
 
     def subseq(h, a, b):
         header = "%s|subseq(%d..%d) %s" % (ParseHeader.firstword(h), a, b, ParseHeader.description(h))
@@ -2251,6 +2261,18 @@ class Grep(Subcommand):
             help='obtain patterns from FILE, one per line'
         )
         parser.add_argument(
+            '-L', '--files-without-match',
+            help='print names files with no matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-l', '--files-with-matches',
+            help='print names input files with matches',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-w', '--wrap',
             metavar='REG',
             help='a regular expression to capture patterns'
@@ -2402,6 +2424,9 @@ class Grep(Subcommand):
         if args.gff and (args.exact or args.line_regexp):
             err('--gff is incompatible with --exact and --line_regexp')
 
+        if args.gff and (args.files_without_match or args.files_with_matches):
+            err("--gff is incompatible with -l and -L options")
+
         if args.fastain:
             args.match_sequence = True
 
@@ -2437,7 +2462,14 @@ class Grep(Subcommand):
             args.color = False
 
         # Others don't make sense with color
-        if args.gff or args.count_matches or args.only_matching or args.line_regexp or args.exact:
+        if any((args.gff,
+                args.count_matches,
+                args.only_matching,
+                args.line_regexp,
+                args.exact,
+                args.files_without_match,
+                args.files_with_matches
+               )):
             args.color = False
 
         # gff overides certain other options
@@ -2656,6 +2688,7 @@ class Grep(Subcommand):
         return((pat, wrapper))
 
     def _makegen(self, args):
+
         if args.gff:
             def sgen(gen, matcher):
                 source = "smof-{}".format(__version__)
@@ -2681,21 +2714,51 @@ class Grep(Subcommand):
 
         elif args.count or args.count_matches:
             def sgen(gen, matcher):
-                count, matches = 0, 0
+                seqcount = OrderedDict()
+                seqmatch = OrderedDict()
                 for seq in gen.next():
                     m = matcher(seq)
-                    if (m and not args.invert_match) or (not m and args.invert_match):
-                        count += 1
+                    if seq.filename not in seqcount:
+                        seqcount[seq.filename] = 0
+                        seqmatch[seq.filename] = 0
+                    if m:
                         try:
-                            matches += len(m)
-                        except:
+                            seqmatch[seq.filename] += len(m)
+                            seqcount[seq.filename] += 1
+                        except TypeError:
                             pass
-                if args.count and args.count_matches:
-                    yield "{}\t{}".format(count, matches)
-                elif args.count:
-                    yield count
-                elif args.count_matches:
-                    yield matches
+                for filename, count in seqcount.items():
+                    match = seqmatch[filename]
+                    if args.count or args.count_matches:
+                        if len(seqcount) > 1:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}\t{}".format(count, match,  filename)
+                            elif args.count:
+                                yield "{}\t{}".format(count, filename)
+                            elif args.count_matches:
+                                yield "{}\t{}".format(match, filename)
+                        else:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}".format(count, match)
+                            elif args.count:
+                                yield count
+                            elif args.count_matches:
+                                yield match
+
+        elif args.files_without_match or args.files_with_matches:
+            def sgen(gen, matcher):
+                seqmat = OrderedDict()
+                for seq in gen.next():
+                    matched = matcher(seq)
+                    if seq.filename not in seqmat:
+                        seqmat[seq.filename] = False
+                    if matched:
+                        seqmat[seq.filename] = True
+                for filename, matched in seqmat.items():
+                    if (not matched and args.files_without_match) or \
+                        (matched and args.files_with_matches):
+                        yield filename
+
 
         elif args.only_matching:
             def sgen(gen, matcher):
@@ -2726,6 +2789,7 @@ class Grep(Subcommand):
                                 else:
                                     seq.color_header(*pos, col=Colors.BOLD_RED)
                         yield(seq)
+
         return(sgen)
 
     def generator(self, args, gen):

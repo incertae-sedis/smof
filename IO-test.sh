@@ -57,3 +57,23 @@ echo -n 'Testing uniq pack/unpack ... '
 diff pack-unpack.fa \
     <(../smof.py uniq -p pack-unpack.fa | ../smof.py uniq -P)
 echo $?
+
+echo -n 'Testing grep file options -ql ... '
+diff grep_-ql_G.fa <(../smof.py grep -ql G [123].fa)
+echo $?
+
+echo -n 'Testing grep file options -qL ... '
+diff grep_-qL_G.fa <(../smof.py grep -qL G [123].fa)
+echo $?
+
+echo -n 'Testing grep file options -qc ... '
+diff grep_-qc_G.fa <(../smof.py grep -qc G [123].fa)
+echo $?
+
+echo -n 'Testing grep file options -qm ... '
+diff grep_-qm_G.fa <(../smof.py grep -qm G [123].fa)
+echo $?
+
+echo -n 'Testing grep file options -qcm ... '
+diff grep_-qcm_G.fa <(../smof.py grep -qcm G [123].fa)
+echo $?
