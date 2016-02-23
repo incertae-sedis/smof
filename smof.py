@@ -5,7 +5,6 @@ import math
 import re
 import sys
 import string
-import copy
 import os
 import signal
 import textwrap
@@ -446,6 +445,7 @@ class FSeq:
         self.colheader = None
         self.handle_color = handle_color
         self.filename = filename
+        self.moltype = None
         if purge_color or handle_color:
             self._process_color(handle_color)
 
@@ -508,6 +508,17 @@ class FSeq:
 
     def seq_upper(self):
         self.seq = self.seq.upper()
+
+    def set_moltype(self, moltype=None):
+        if(moltype):
+            self.moltype = moltype
+        else:
+            self.moltype = guess_type(self)
+
+    def get_moltype(self):
+        if(not self.moltype):
+            self.set_moltype()
+        return self.moltype
 
     def header_upper(self):
         self.header = self.header.upper()
@@ -1340,7 +1351,7 @@ class Reverse(Subcommand):
 
         if args.complement and not args.no_validate:
             def func(s):
-                if guess_type(s) == 'dna':
+                if s.get_moltype() == 'dna':
                     return f(s)
                 else:
                     msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
@@ -1767,7 +1778,6 @@ class Stat(Subcommand):
             yield '\n'.join(lines)
 
     def _byseq(self, args, gen):
-        from itertools import chain
         seqlist = []
         charset = set()
         if args.length and not (args.counts or args.proportion):
@@ -1933,7 +1943,7 @@ class Subseq(Subcommand):
             return(seq)
         else:
             outseq = seq.subseq(start-1, end)
-            if (a > b) and guess_type(seq.seq) == 'dna':
+            if (a > b) and seq.get_moltype() == 'dna':
                 outseq = FSeq.getrevcomp(outseq)
             return(outseq)
 
