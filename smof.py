@@ -2399,6 +2399,13 @@ class Grep(Subcommand):
             default=False
         )
         parser.add_argument(
+            '--color',
+            help='Choose a highlight color',
+            choices=Colors.COLORS.keys(),
+            metavar='STR',
+            default='bold_red'
+        )
+        parser.add_argument(
             '--gff',
             help='output matches in gff format',
             action='store_true',
@@ -2467,9 +2474,11 @@ class Grep(Subcommand):
 
         # Decide when to color
         if args.force_color or (sys.stdout.isatty() and not args.no_color):
-            args.color = True
+            args.color_output = True
         else:
-            args.color = False
+            args.color_output = False
+
+        args.color = Colors.COLORS[args.color]
 
         # Others don't make sense with color
         if any((args.gff,
@@ -2480,7 +2489,7 @@ class Grep(Subcommand):
                 args.files_without_match,
                 args.files_with_matches
                )):
-            args.color = False
+            args.color_output = False
 
         # gff overides certain other options
         if args.gff:
@@ -2585,7 +2594,7 @@ class Grep(Subcommand):
             matcher = exactmatcher
         elif args.line_regexp:
             matcher = linematcher
-        elif args.gff or args.count_matches or args.color or args.only_matching:
+        elif args.gff or args.count_matches or args.color_output or args.only_matching:
             matcher = gwrpmatcher if wrapper else gpatmatcher
             by_position = True
         else:
@@ -2792,12 +2801,12 @@ class Grep(Subcommand):
                 for seq in gen.next(handle_color=args.preserve_color):
                     matches = matcher(seq)
                     if (matches and not args.invert_match) or (not matches and args.invert_match):
-                        if args.color:
+                        if args.color_output:
                             for pos in [m['pos'] for m in matches]:
                                 if args.match_sequence:
-                                    seq.color_seq(*pos, col=Colors.BOLD_RED)
+                                    seq.color_seq(*pos, col=args.color)
                                 else:
-                                    seq.color_header(*pos, col=Colors.BOLD_RED)
+                                    seq.color_header(*pos, col=args.color)
                         yield(seq)
 
         return(sgen)
