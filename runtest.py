@@ -875,9 +875,6 @@ class TestGrepBadCombinations(unittest.TestCase):
     def test_contradictory_options(self):
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-yY', 'a'])
     def test_only_matching_incompatible_options(self):
-        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-o', '--gff', 'a'])
-        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-oc', 'a'])
-        self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-om', 'a'])
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-ov', 'a'])
     def test_exact_incompatible_options(self):
         self.assertRaises(SystemExit, get_output, self.seq, ['grep', '-PX', 'a'])

@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.10.0"
+__version__ = "2.11.1"
 
 # ================
 # Argument Parsing
@@ -2459,14 +2459,14 @@ class Grep(Subcommand):
         if args.force_color and args.no_color:
             err("WTF? --force-color AND --no-color?")
 
-        if args.only_matching and (args.gff or args.count or args.count_matches or args.invert_match):
-            err("--only-matching is incompatible with --gff, --count, --count-matches, and --inver-match")
+        if args.only_matching and (args.exact or args.gff or args.count or args.count_matches):
+            args.only_matching = False
+
+        if args.only_matching and args.invert_match:
+            err("--only-matching is incompatible with --inver-match")
 
         if (args.perl_regexp or args.ambiguous_nucl) and args.exact:
             err("--exact works only with literal strings (incompatible with -P or -G")
-
-        if args.exact:
-            args.only_matching = False
 
         # Some things just don't make sense in header searches ...
         if args.gff or args.ambiguous_nucl:
