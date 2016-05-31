@@ -634,8 +634,8 @@ class Maps:
     }
 
 class ParseHeader:
-    def firstword(h):
-        return(re.sub('^(\S+).*', '\\1', h))
+    def firstword(h, delimiter=' \t'):
+        return(re.sub('^([^%s]+).*' % delimiter, '\\1', h))
 
     def description(h):
         return(re.sub('^\S+\s*', '', h))
@@ -991,6 +991,12 @@ class Clean(Subcommand):
             default=False
         )
         parser.add_argument(
+            '-s', '--reduce-header',
+            help="Remove all text from header that follows the first word (delimited by [ |])",
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
             '-r', '--mask-irregular',
             help="converts irregular letters to unknown",
             action='store_true',
@@ -1054,6 +1060,9 @@ class Clean(Subcommand):
                 trans = str.maketrans(a, b)
 
         for seq in gen.next(purge_color=True):
+            if args.reduce_header:
+                seq.header = ParseHeader.firstword(seq.header, delimiter=' \t|')
+
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space
             if args.toseq:
