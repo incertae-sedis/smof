@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/arendsee/smof.svg?branch=master)](https://travis-ci.org/arendsee/smof)
+
 smof
 ====
 
