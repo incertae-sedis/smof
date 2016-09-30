@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.12.1"
+__version__ = "2.13.0"
 
 # ================
 # Argument Parsing
@@ -48,6 +48,7 @@ def parse(argv=None):
 
     # A list of valid subcommands, each of which is a class (defined below)
     subcommands = [
+        Cut,
         Clean,
         Filter,
         Grep,
@@ -2138,6 +2139,66 @@ class Sort(Subcommand):
 # ==============
 # UNIX EMULATORS
 # ==============
+
+
+class Cut(Subcommand):
+    def _parse(self):
+        cmd_name = 'cut'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="emulates UNIX cut command, where fields are entries",
+            description="""Prints sequences by index"""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
+            '-f', '--fields',
+            help='Indices to print, comma delimited, with ranges'
+        )
+        parser.add_argument(
+            '-v', '--complement',
+            help='Invert selection',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        fields = args.fields.split(',')
+        indices = set()
+        for f in fields:
+            try:
+                indices.add(int(f)-1)
+            except ValueError:
+                try:
+                    s,t = f.split('-')
+                    try:
+                        indices |= set(range(int(s)-1, int(t)))
+                    except:
+                        err("'{}-{}' does not specify a valid range".format(str(s),str(t)))
+                except ValueError:
+                    err("Cannot parse '{}'".format(args.fields))
+
+        i = 0
+        if(args.complement):
+            for seq in gen.next():
+                if not i in indices:
+                    yield seq
+                i += 1
+        else:
+            m = max(indices)
+            for seq in gen.next():
+                if i > m:
+                    break
+                if i in indices:
+                    yield seq
+                i += 1
+
 
 class Head(Subcommand):
     def _parse(self):
