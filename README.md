@@ -18,6 +18,17 @@ need of bioinformatics tools that follow UNIX philosophy.
 FAST is elegant, well documented, and absolutely worth studying. I will write a
 comparison of smof and FAST at some point in the future.
 
+Install
+=======
+
+```
+git clone https://github.com/arendsee/smof
+cd smof
+cp -s $PWD/smof.py ~/bin/smof
+```
+
+You should replace `~/bin/smof` with some folder that is in PATH.
+
 Screenshots
 ===========
 
