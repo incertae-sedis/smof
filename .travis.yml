@@ -4,6 +4,6 @@ python:
  - "3.3"
  - "3.4"
  - "3.5"
- - "3.5-dev"
+ - "3.6"
  - "nightly"
 script: ./runtest.py && ./IO-test.sh
