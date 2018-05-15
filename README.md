@@ -1,12 +1,9 @@
-[![Build Status](https://travis-ci.org/arendsee/smof.svg?branch=master)](https://travis-ci.org/arendsee/smof)
+[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof)
 
 smof
 ====
 
 UNIX-style FASTA tools
-
-For instructions on installation and a detailed tutorial, see the
-[project page](http://zbwrnz.github.io/smof).
 
 Functions
 =========
