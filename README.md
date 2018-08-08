@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) [![Docker Automated build](https://img.shields.io/docker/automated/incertaesedis/cavatica.svg)](https://hub.docker.com/r/incertaesedis/cavatica/)
+[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) [![Docker Automated build](https://img.shields.io/docker/automated/incertaesedis/smof.svg)](https://hub.docker.com/r/incertaesedis/smof/)
 
 smof
 ====
@@ -17,6 +17,22 @@ cp -s $PWD/smof.py ~/bin/smof
 You should replace `~/bin/smof` with some folder that is in PATH.
 
 `smof` also requires `python3` be in PATH, you can check with `which python3`.
+
+Docker
+=========
+
+```
+docker pull incertaesedis/smof
+
+# Run interactively
+docker run -it smof:latest sh
+
+# Mount data and call smof
+docker run -v ${PWD}:/inout/ smof:latest /smof
+
+# Example
+docker run -v ${PWD}:/inout/ smof:latest /smof grep Iowa fasta.fa Iowa.fa
+```
 
 Functions
 =========
