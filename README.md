@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof)
+[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) [![Docker Automated build](https://img.shields.io/docker/automated/incertaesedis/cavatica.svg)](https://hub.docker.com/r/incertaesedis/cavatica/)
 
 smof
 ====
