@@ -18,20 +18,28 @@ You should replace `~/bin/smof` with some folder that is in PATH.
 
 `smof` also requires `python3` be in PATH, you can check with `which python3`.
 
-Docker
-=========
+##Docker
+Install from DockerHub, by pulling the image.
 
 ```
 docker pull incertaesedis/smof
+```
 
+Open and run the image.
+
+```
 # Run interactively
-docker run -it smof:latest sh
+docker run -it incertaesedis/smof:latest sh
 
-# Mount data and call smof
-docker run -v ${PWD}:/inout/ smof:latest /smof
+# Mount data as a volume (inout) and call smof
+docker run -v ${PWD}:/inout/ incertaesedis/smof:latest smof
+```
 
-# Example
-docker run -v ${PWD}:/inout/ smof:latest /smof grep Iowa fasta.fa Iowa.fa
+Navigate to the folder containing your fasta file and run smof.
+
+```
+# Example smof command
+docker run -v ${PWD}:/inout/ incertaesedis/smof:latest smof grep Iowa fasta.fa > Iowa.fa
 ```
 
 Functions
