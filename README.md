@@ -18,7 +18,7 @@ You should replace `~/bin/smof` with some folder that is in PATH.
 
 `smof` also requires `python3` be in PATH, you can check with `which python3`.
 
-##Docker
+## Docker
 Install from DockerHub, by pulling the image.
 
 ```
