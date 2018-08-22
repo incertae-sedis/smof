@@ -73,7 +73,7 @@ This documentation can be accessed interactively:
 smof -h
 ```
 
-Also documnetation for individual subcommands can be accessed:
+Also documentation for individual subcommands can be accessed:
 
 ```
 smof grep -h
