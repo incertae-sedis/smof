@@ -2146,9 +2146,15 @@ class Consensus(Subcommand):
             help="finds the consensus sequence for aligned sequence",
             description="""Given input in aligned FASTA file format, where all
             sequences are of equal length (possibly with gaps), `consensus`
-            will find the most common character in each column. Optionall, it
-            will instead provide the counts or proportions of each character at
-            each position."""
+            will find the most common character in each column. Ties are
+            resolved alphabetically. Optionally, it will instead provide the
+            counts or proportions of each character at each position."""
+        )
+        parser.add_argument(
+            "-t", "--table",
+            help="Print count table instead of consensus",
+            action="store_true",
+            default=False
         )
         parser.add_argument(
             'fh',
@@ -2172,12 +2178,18 @@ class Consensus(Subcommand):
         counts = Counter(('').join([s.seq for s in seqs]))
         characters = list(counts.keys())
             
-        out.write("\t".join(characters))
-        out.write("\n")
-        for column in transpose:
-            c = Counter(column)
-            out.write("\t".join([str(c[x]) for x in characters]))
+        if args.table:
+            out.write("\t".join(characters))
             out.write("\n")
+            for column in transpose:
+                c = Counter(column)
+                out.write("\t".join([str(c[x]) for x in characters]))
+                out.write("\n")
+
+        else:
+            consensus = [Counter(c).most_common()[0][0] for c in transpose]
+            header = "Consensus"
+            FSeq(header, ''.join(consensus)).print()
             
 
 # ==============
