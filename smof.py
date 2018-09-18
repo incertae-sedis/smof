@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.12.2"
+__version__ = "2.13.0"
 
 # ================
 # Argument Parsing
@@ -50,6 +50,7 @@ def parse(argv=None):
     subcommands = [
         Cut,
         Clean,
+        Consensus,
         Filter,
         Grep,
         Md5sum,
@@ -2135,6 +2136,61 @@ class Sort(Subcommand):
         for s in seqs:
             yield s
 
+
+class Consensus(Subcommand):
+    def _parse(self):
+        cmd_name = 'consensus'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="finds the consensus sequence for aligned sequence",
+            description="""Given input in aligned FASTA file format, where all
+            sequences are of equal length (possibly with gaps), `consensus`
+            will find the most common character in each column. Ties are
+            resolved alphabetically. Optionally, it will instead provide the
+            counts or proportions of each character at each position."""
+        )
+        parser.add_argument(
+            "-t", "--table",
+            help="Print count table instead of consensus",
+            action="store_true",
+            default=False
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.set_defaults(func=self.func)
+
+    def generator(self, args, gen):
+        raise NotImplemented
+
+    def write(self, args, gen, out=sys.stdout):
+        seqs = [s for s in gen.next()]
+        imax = max([len(s.seq) for s in seqs])
+        try:
+            transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
+        except IndexError:
+            err("All sequences must be of equivalent length")
+
+        counts = Counter(('').join([s.seq for s in seqs]))
+        characters = list(counts.keys())
+            
+        if args.table:
+            out.write("\t".join(characters))
+            out.write("\n")
+            for column in transpose:
+                c = Counter(column)
+                out.write("\t".join([str(c[x]) for x in characters]))
+                out.write("\n")
+
+        else:
+            consensus = [Counter(c).most_common()[0][0] for c in transpose]
+            header = "Consensus"
+            FSeq(header, ''.join(consensus)).print()
+            
 
 # ==============
 # UNIX EMULATORS
