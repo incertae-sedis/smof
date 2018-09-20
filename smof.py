@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.13.0"
+__version__ = "2.14.0"
 
 # ================
 # Argument Parsing
@@ -2090,6 +2090,18 @@ class Sort(Subcommand):
             help="randomly sort sequences",
             action='store_true',
             default=False)
+        parser.add_argument(
+            '-k', '--key',
+            default=None,
+            help='Key to sort on (column number or tag)')
+        parser.add_argument(
+            '-t', '--field-separator',
+            help="The field separator",
+            default="|")
+        parser.add_argument(
+            '-p', '--pair-separator',
+            help="The separator between a tag and value",
+            default="=")
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -2120,6 +2132,34 @@ class Sort(Subcommand):
                     err("No match for regex '{}'".format(args.regex))
                 except IndexError:
                     err("Nothing was captured in regex '{}'".format(args.regex))
+        elif args.key:
+            try:
+                key = int(args.key) - 1
+                def sortterm(x):
+                    try:
+                        return(typer(x.header.split(args.field_separator)[key]))
+                    except IndexError:
+                        err("Cannot sort by column '{}', two few columns".format(key))
+                    except Exception as e:
+                        err(str(e))
+            except:
+                key = args.key
+                def sortterm(x):
+                    if args.pair_separator == args.field_separator:
+                        xs = x.header.split(args.field_separator)
+                        d = {xs[i]:xs[i+1] for i in range(0,len(xs),2)}
+                    else:
+                        xs = [y.split(args.pair_separator) for y in x.header.split(args.field_separator)]
+                        try:
+                            d = {k:v for k,v in xs}
+                        except ValueError as e:
+                            err(str(e))
+                    try:
+                        return(typer(d[key]))
+                    except KeyError:
+                        err("Could not find key '{}'".format(key))
+                    except Exception as e:
+                        err(str(e))
         elif args.random_sort:
             import random
             def sortterm(x):
