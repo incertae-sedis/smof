@@ -2096,11 +2096,11 @@ class Sort(Subcommand):
             help='Key to sort on (column number or tag)')
         parser.add_argument(
             '-t', '--field-separator',
-            help="The field separator",
+            help="The field separator (default: '|')",
             default="|")
         parser.add_argument(
             '-p', '--pair-separator',
-            help="The separator between a tag and value",
+            help="The separator between a tag and value  (default: '=')",
             default="=")
         parser.set_defaults(func=self.func)
 
