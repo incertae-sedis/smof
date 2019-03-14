@@ -13,7 +13,7 @@ Install
 ```
 git clone https://github.com/arendsee/smof
 cd smof
-cp -s $PWD/smof.py ~/bin/smof
+ln -s $PWD/smof.py ~/bin/smof
 ```
 
 You should replace `~/bin/smof` with some folder that is in PATH.
