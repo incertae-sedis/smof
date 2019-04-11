@@ -33,6 +33,7 @@ runtest "grep" \
         grep-test_-q_DF.fa \
         <(../smof.py grep -q DF grep-test.fa)
 
+# NOTE: for macOS, this should be md5, not md5sum. To make the test work, just add a symlink.
 [[ md5sum ]] && {
     runtest 'md5sum' \
             <(tr -d '>\n' < md5sum.fa | md5sum | awk '{print $1}') \

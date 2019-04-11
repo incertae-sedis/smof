@@ -564,10 +564,12 @@ class TestFSeqGenerator(unittest.TestCase):
         self.assertFalse(self.is_valid(self.bad_first))
 
     def test_empty_seq(self):
-        self.assertFalse(self.is_valid(self.empty_seq))
+        # empty sequences are now supported
+        self.assertTrue(self.is_valid(self.empty_seq))
 
     def test_empty_last_seq(self):
-        self.assertFalse(self.is_valid(self.empty_last_seq))
+        # empty sequences are now supported
+        self.assertTrue(self.is_valid(self.empty_last_seq))
 
     def test_no_sequence(self):
         self.assertTrue(self.is_valid(self.no_sequence))
