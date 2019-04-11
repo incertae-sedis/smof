@@ -1113,13 +1113,13 @@ class Filter(Subcommand):
         parser.add_argument(
             '-s', '--shorter-than',
             help="keep only if length is less than or equal to LEN",
-            type=counting_number,
+            type=positive_int, # 0 is valid, it would keep only 0-length sequences
             metavar='LEN'
         )
         parser.add_argument(
             '-l', '--longer-than',
             help="keep only if length is greater than or equal to LEN",
-            type=positive_int, # A sequence can have length==0, so `-l 0` is valid
+            type=positive_int, # 0 is valid (but pointless) -- it will keep everything
             metavar='LEN'
         )
         parser.add_argument(
@@ -1131,9 +1131,9 @@ class Filter(Subcommand):
 
     def generator(self, args, gen):
         tests = []
-        if args.shorter_than:
+        if args.shorter_than != None: # args.shorter_than CAN be 0, so explicitly match to None
             tests.append(lambda s, v=args.shorter_than: len(s) <= v)
-        if args.longer_than:
+        if args.longer_than != None: # args.longer_than CAN be 0, so explicitly match to None
             tests.append(lambda s, v=args.longer_than: len(s) >= v)
         if args.composition:
             try:

@@ -650,15 +650,18 @@ class TestFilter(unittest.TestCase):
         self.seq = [
             '>a', 'ASDFX',
             '>b', 'ASDF',
-            '>c', 'ASD'
+            '>c', 'ASD',
+            '>d', ''
         ]
 
     def test_shorter_than(self):
-        self.assertEqual(get_output(self.seq, ['filter', '-s', 5])[0::2], ['>a', '>b', '>c'])
-        self.assertEqual(get_output(self.seq, ['filter', '-s', 4])[0::2], ['>b', '>c'])
-        self.assertEqual(get_output(self.seq, ['filter', '-s', 3])[0::2], ['>c'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 5])[0::2], ['>a', '>b', '>c', '>d'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 4])[0::2], ['>b', '>c', '>d'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 3])[0::2], ['>c', '>d'])
+        self.assertEqual(get_output(self.seq, ['filter', '-s', 0])[0::2], ['>d'])
 
     def test_longer_than(self):
+        self.assertEqual(get_output(self.seq, ['filter', '-l', 0])[0::2], ['>a', '>b', '>c', '>d'])
         self.assertEqual(get_output(self.seq, ['filter', '-l', 3])[0::2], ['>a', '>b', '>c'])
         self.assertEqual(get_output(self.seq, ['filter', '-l', 4])[0::2], ['>a', '>b'])
         self.assertEqual(get_output(self.seq, ['filter', '-l', 5])[0::2], ['>a'])
