@@ -1119,7 +1119,7 @@ class Filter(Subcommand):
         parser.add_argument(
             '-l', '--longer-than',
             help="keep only if length is greater than or equal to LEN",
-            type=counting_number,
+            type=positive_int, # A sequence can have length==0, so `-l 0` is valid
             metavar='LEN'
         )
         parser.add_argument(
