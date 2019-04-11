@@ -599,8 +599,9 @@ class FSeqGenerator:
                     if seq_list:
                         yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
                     elif header:
-                        # If no sequence but there is a header ...
-                        err("Illegally empty sequence")
+                        # NOTE: yields an empty sequence! This is usually
+                        # a BAD THING, but it can happen in the wild
+                        yield FSeq(header, '', filename=filename, *args, **kwargs)
                     seq_list = []
                     header = line[1:]
                 # '' is valid for a header
@@ -613,7 +614,8 @@ class FSeqGenerator:
                 if seq_list:
                     yield FSeq(header, ''.join(seq_list), filename=filename, *args, **kwargs)
                 else:
-                    err("Illegally empty sequence")
+                    # NOTE: yields empty sequence!
+                    yield FSeq(header, '', filename=filename, *args, **kwargs)
 
             try:
                 f.close()
