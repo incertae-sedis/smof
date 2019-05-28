@@ -11,7 +11,7 @@ Install
 =======
 
 ```
-git clone https://github.com/arendsee/smof
+git clone https://github.com/incertae-sedis/smof
 cd smof
 ln -s $PWD/smof.py ~/bin/smof
 ```
