@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.13.1"
+__version__ = "2.14.0"
 
 # ================
 # Argument Parsing
@@ -64,6 +64,7 @@ def parse(argv=None):
         Stat,
         Subseq,
         Tail,
+        Translate,
         Uniq,
         Wc
     ]
@@ -440,6 +441,25 @@ class FSeq:
     revtrans = str.maketrans('acgtuwsmkrybvdhnACGTUWSMKRYBVDHN', 'tgcaaswkmyrvbhdnTGCAASWKMYRVBHDN')
     # Translator of ungapping
     ungapper = str.maketrans('', '', ''.join(Alphabet.GAP))
+    # Codon table for translation
+    codon_table = { 
+      "TTT":"F", "TCT":"S", "TAT":"Y", "TGT":"C",
+      "TTC":"F", "TCC":"S", "TAC":"Y", "TGC":"C",
+      "TTA":"L", "TCA":"S", "TAA":"*", "TGA":"*",
+      "TTG":"L", "TCG":"S", "TAG":"*", "TGG":"W",
+      "CTT":"L", "CCT":"P", "CAT":"H", "CGT":"R",
+      "CTC":"L", "CCC":"P", "CAC":"H", "CGC":"R",
+      "CTA":"L", "CCA":"P", "CAA":"Q", "CGA":"R",
+      "CTG":"L", "CCG":"P", "CAG":"Q", "CGG":"R",
+      "ATT":"I", "ACT":"T", "AAT":"N", "AGT":"S",
+      "ATC":"I", "ACC":"T", "AAC":"N", "AGC":"S",
+      "ATA":"I", "ACA":"T", "AAA":"K", "AGA":"R",
+      "ATG":"M", "ACG":"T", "AAG":"K", "AGG":"R",
+      "GTT":"V", "GCT":"A", "GAT":"D", "GGT":"G",
+      "GTC":"V", "GCC":"A", "GAC":"D", "GGC":"G",
+      "GTA":"V", "GCA":"A", "GAA":"E", "GGA":"G",
+      "GTG":"V", "GCG":"A", "GAG":"E", "GGG":"G"
+    }
     def __init__(self, header, seq, filename=None, handle_color=False, purge_color=False):
         self.seq = seq
         self.header = header
@@ -2006,6 +2026,82 @@ class Subseq(Subcommand):
 
         for item in sgen(args, gen):
             yield item
+
+
+class Translate(Subcommand):
+    def _parse(self):
+        cmd_name = 'translate'
+        parser = self.subparsers.add_parser(
+            cmd_name,
+            usage=self.usage.format(cmd_name),
+            help="translate a DNA sequence into a protein sequence",
+            description="""Only the standard gene code table is supported. Any
+            codons with ambiguous characters will be translated as X. Trailing
+            characters will be ignored. All gaps [_.-] will be removed."""
+        )
+        parser.add_argument(
+            'fh',
+            help='input fasta sequence (default = stdin)',
+            metavar='INPUT',
+            nargs="*"
+        )
+        parser.add_argument(
+            '-s', '--require-start',
+            help='Require a start codon',
+            action='store_true',
+            default=False
+        )
+        parser.add_argument(
+            '-f', '--all-frames',
+            help='Translate in all frames, keep longest',
+            action='store_true',
+            default=False
+        )
+        parser.set_defaults(func=self.func)
+
+    def _translate(self, dna, args):
+        dna = dna.translate(FSeq.ungapper).upper()
+
+        if args.all_frames:
+            start_positions = [2,3,4]
+        else: 
+            start_positions = [2]
+
+        # get full translations in 1 or 3 plus-sense frames
+        aas = []
+        for start_position in start_positions:
+            aa = []
+            for i in range(start_position, len(dna), 3):
+                codon = dna[i-2:i+1]
+                if codon in FSeq.codon_table:
+                    aa.append(FSeq.codon_table[codon])
+                else:
+                    aa.append("X")
+            aas.append(''.join(aa))
+
+        trim = re.compile("^[^M]+")
+
+        # either find the longest translated product
+        if args.all_frames:
+            aa_candidates = chain.from_iterable([aa.split('*') for aa in aas])
+            # trim everything before the start codon in each possible product
+            if args.require_start:
+                aa_candidates = [re.sub(trim, "", aa) for aa in aa_candidates]
+            # find the single longest product (if require_start=True, this is the longest ORF)
+            aa_final = max(aa_candidates, key=len) 
+        # or just find the first translated product
+        else:
+            aa_final = aas[0]
+            if args.require_start:
+                aa_final = re.sub(trim, "", aa_final)
+
+        return(aa_final)
+
+
+    def generator(self, args, gen):
+        ''' Reverse each sequence '''
+        for seq in gen.next():
+            yield FSeq(header=seq.header, seq=self._translate(seq.seq, args))
 
 
 # ==============
