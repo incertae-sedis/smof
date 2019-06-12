@@ -606,6 +606,7 @@ class TestClean(unittest.TestCase):
         self.aaseq = ['>p', ' gAtA cA-NB ']
         self.longseq = ['>l', 'A'*91]
         self.header = ['>l a', 'A', '>m|a', 'A']
+        self.gapamb = ['>a', 'yy--_.ATT']
 
     def test_default(self):
         self.assertEqual(get_output(self.seq, ['clean'])[1], 'gAtAcA-NY')
@@ -641,9 +642,12 @@ class TestClean(unittest.TestCase):
         # test no-wrap
         self.assertEqual(get_output(self.longseq, ['clean', '-w', '0'])[1], 'A'*91)
 
-    def reduce_header(self):
-        self.assertEqual(get_output(self.header, ['clean', '-s'])[0], 'A')
-        self.assertEqual(get_output(self.header, ['clean', '-s'])[2], 'A')
+    def test_reduce_header(self):
+        self.assertEqual(get_output(self.header, ['clean', '-s'])[0], '>l')
+        self.assertEqual(get_output(self.header, ['clean', '-s'])[2], '>m')
+
+    def test_reduce_and_mask(self):
+        self.assertEqual(get_output(self.gapamb, ['clean', '-uxrt', 'n'])[1], 'NNATT')
 
 class TestFilter(unittest.TestCase):
     def setUp(self):
