@@ -976,7 +976,7 @@ def translate_dna(dna, all_frames=False, from_start=False):
         # trim everything before the start codon in each possible product
         if from_start:
             aa_candidates = [re.sub(trim, "", aa) for aa in aa_candidates]
-        # find the single longest product (if require_start=True, this is the longest ORF)
+        # find the single longest product (if from_start=True, this is the longest ORF)
         aa_final = max(aa_candidates, key=len)
     # or just find the first translated product
     else:
@@ -2109,7 +2109,7 @@ class Translate(Subcommand):
             aaseq = translate_dna(
               seq.seq,
               all_frames=args.all_frames,
-              require_start=args.from_start
+              from_start=args.from_start
             )
             yield FSeq(header=seq.header, seq=aaseq)
 
