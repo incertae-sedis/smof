@@ -1080,6 +1080,28 @@ class TestSubseq(unittest.TestCase):
         # PICKLE however doesn't appear to be dna, so reversing does nothing
         self.assertEqual(get_output(self.aaseq, ['subseq', '-b', 3, 1])[1], 'PIC')
 
+class TestTranslateDNA(unittest.TestCase):
+  def test_simple(self):
+    self.assertEqual(smof.translate_dna("ATG"), "M")
+    self.assertEqual(smof.translate_dna("ATGT"), "M")
+    self.assertEqual(smof.translate_dna("AT"), "")
+    self.assertEqual(smof.translate_dna(""), "")
+    self.assertEqual(smof.translate_dna("TAA"), "*")
+    self.assertEqual(smof.translate_dna("TAAATG"), "*M")
+    self.assertEqual(smof.translate_dna("TTTTCTTATTGTTTCTCCTACTGCTTATCATAATGATTGTCGTAGTGGCTTCCTCATCGTCTCCCCCACCGCCTACCACAACGACTGCCGCAGCGGATTACTAATAGTATCACCAACAGCATAACAAAAAGAATGACGAAGAGGGTTGCTGATGGTGTCGCCGACGGCGTAGCAGAAGGAGTGGCGGAGGGG"), "FSYCFSYCLS**LS*WLPHRLPHRLPQRLPQRITNSITNSITKRMTKRVADGVADGVAEGVAEG")
+  def test_ambiguous_handling(self):
+    self.assertEqual(smof.translate_dna("TTTATGYNNATG"), "FMXM")
+    self.assertEqual(smof.translate_dna("YTT"), "X")
+    self.assertEqual(smof.translate_dna("-AT---GT_..TT-"), "MF")
+  def test_all_frames(self):
+    self.assertEqual(smof.translate_dna("TTTATGT", all_frames=True), "FM")
+    self.assertEqual(smof.translate_dna("ATGTGA", all_frames=False), "M*")
+    self.assertEqual(smof.translate_dna("ATGTGA", all_frames=True), "M")
+    self.assertEqual(smof.translate_dna("ATGTGAT", all_frames=True), "CD") # match 2nd frame
+    self.assertEqual(smof.translate_dna("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF") # match in 3rd frame 
+  def test_require_start_and_all_frames(self):
+    self.assertEqual(smof.translate_dna("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True), "MFFF") # match in 3rd frame 
+
 class TestUniq(unittest.TestCase):
     def setUp(self):
         self.all_uniq=[

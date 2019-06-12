@@ -14,7 +14,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.14.0"
+__version__ = "2.14.1"
 
 # ================
 # Argument Parsing
@@ -946,6 +946,48 @@ def ambiguous2perl(pattern):
             in_bracket = False
         perlpat.append(c)
     return(''.join(perlpat))
+
+
+def translate_dna(dna, all_frames=False, from_start=False):
+    dna = dna.translate(FSeq.ungapper).upper()
+
+    if all_frames:
+        start_positions = [2,3,4]
+    else: 
+        start_positions = [2]
+
+    # get full translations in 1 or 3 plus-sense frames
+    aas = []
+    for start_position in start_positions:
+        aa = []
+        for i in range(start_position, len(dna), 3):
+            codon = dna[i-2:i+1]
+            if codon in FSeq.codon_table:
+                aa.append(FSeq.codon_table[codon])
+            else:
+                aa.append("X")
+        aas.append(''.join(aa))
+
+    trim = re.compile("^[^M]+")
+
+    # either find the longest translated product
+    if all_frames:
+        aa_candidates = chain.from_iterable([aa.split('*') for aa in aas])
+        # trim everything before the start codon in each possible product
+        if from_start:
+            aa_candidates = [re.sub(trim, "", aa) for aa in aa_candidates]
+        # find the single longest product (if require_start=True, this is the longest ORF)
+        aa_final = max(aa_candidates, key=len)
+    # or just find the first translated product
+    else:
+        aa_final = aas[0]
+        if from_start and not aa_final[0] == "M": 
+          err("In translation, a sequence did not start with an ATG (maybe add -f flag)")
+
+
+    return(aa_final)
+
+
 
 
 # ====================
@@ -2037,7 +2079,9 @@ class Translate(Subcommand):
             help="translate a DNA sequence into a protein sequence",
             description="""Only the standard gene code table is supported. Any
             codons with ambiguous characters will be translated as X. Trailing
-            characters will be ignored. All gaps [_.-] will be removed."""
+            characters will be ignored. All gaps [_.-] will be removed. When -f
+            is True, then the longest product will be found. To resolve ties,
+            the first frame is preferred and then the position."""
         )
         parser.add_argument(
             'fh',
@@ -2046,8 +2090,8 @@ class Translate(Subcommand):
             nargs="*"
         )
         parser.add_argument(
-            '-s', '--require-start',
-            help='Require a start codon',
+            '-s', '--from-start',
+            help='Require each product begin with a start codon',
             action='store_true',
             default=False
         )
@@ -2059,49 +2103,15 @@ class Translate(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _translate(self, dna, args):
-        dna = dna.translate(FSeq.ungapper).upper()
-
-        if args.all_frames:
-            start_positions = [2,3,4]
-        else: 
-            start_positions = [2]
-
-        # get full translations in 1 or 3 plus-sense frames
-        aas = []
-        for start_position in start_positions:
-            aa = []
-            for i in range(start_position, len(dna), 3):
-                codon = dna[i-2:i+1]
-                if codon in FSeq.codon_table:
-                    aa.append(FSeq.codon_table[codon])
-                else:
-                    aa.append("X")
-            aas.append(''.join(aa))
-
-        trim = re.compile("^[^M]+")
-
-        # either find the longest translated product
-        if args.all_frames:
-            aa_candidates = chain.from_iterable([aa.split('*') for aa in aas])
-            # trim everything before the start codon in each possible product
-            if args.require_start:
-                aa_candidates = [re.sub(trim, "", aa) for aa in aa_candidates]
-            # find the single longest product (if require_start=True, this is the longest ORF)
-            aa_final = max(aa_candidates, key=len) 
-        # or just find the first translated product
-        else:
-            aa_final = aas[0]
-            if args.require_start:
-                aa_final = re.sub(trim, "", aa_final)
-
-        return(aa_final)
-
-
     def generator(self, args, gen):
         ''' Reverse each sequence '''
         for seq in gen.next():
-            yield FSeq(header=seq.header, seq=self._translate(seq.seq, args))
+            aaseq = translate_dna(
+              seq.seq,
+              all_frames=args.all_frames,
+              require_start=args.from_start
+            )
+            yield FSeq(header=seq.header, seq=aaseq)
 
 
 # ==============
