@@ -7,7 +7,8 @@ RUN apk add --no-cache \
     python3
 
 RUN git clone https://github.com/incertae-sedis/smof.git smof-git
-RUN ln -s /smof-git/smof.py /smof
+#RUN ln -s /smof-git/smof.py /smof
+RUN pip install smof
 RUN mkdir inout
 WORKDIR /inout
 ENV PATH=/:/smof-git/:$PATH
