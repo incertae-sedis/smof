@@ -1,4 +1,5 @@
 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) [![Docker Docker build](https://img.shields.io/docker/cloud/build/incertaesedis/smof.svg)](https://hub.docker.com/r/incertaesedis/smof/) [![docker pulls](https://img.shields.io/docker/pulls/incertaesedis/smof.svg)](https://hub.docker.com/r/incertaesedis/smof/)
 [![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) 
 [![DOI](https://zenodo.org/badge/19203682.svg)](https://zenodo.org/badge/latestdoi/19203682)
 
@@ -7,7 +8,12 @@ smof
 
 UNIX-style FASTA tools
 
-![grepshot](images/grepshot.png)
+Installation
+============
+
+```
+pip install smof
+```
 
 Functions
 =========
