@@ -7,6 +7,7 @@ smof
 
 UNIX-style FASTA tools
 
+![grepshot](images/grepshot.png)
 
 Getting Help
 ============
