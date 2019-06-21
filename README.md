@@ -1,5 +1,5 @@
 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
-[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) [![Docker Docker build](https://img.shields.io/docker/cloud/build/incertaesedis/smof.svg)](https://hub.docker.com/r/incertaesedis/smof/) [![docker pulls](https://img.shields.io/docker/pulls/incertaesedis/smof.svg)](https://hub.docker.com/r/incertaesedis/smof/)
+[![Build Status](https://travis-ci.org/incertae-sedis/smof.svg?branch=master)](https://travis-ci.org/incertae-sedis/smof) 
 [![DOI](https://zenodo.org/badge/19203682.svg)](https://zenodo.org/badge/latestdoi/19203682)
 
 smof
@@ -10,38 +10,12 @@ UNIX-style FASTA tools
 Install
 =======
 
-```
-git clone https://github.com/incertae-sedis/smof
-cd smof
-ln -s $PWD/smof.py ~/bin/smof
-```
-
-You should replace `~/bin/smof` with some folder that is in PATH.
-
-`smof` also requires `python3` be in PATH, you can check with `which python3`.
-
-## Docker
-Install from DockerHub, by pulling the image.
+`smof` is a Python3 package that can be installed with `pip`. You must use
+a Python 3 version of `pip`. This may be named `pip3`, `pip3.7`, or something.
+You can check the version of your `pip` command with the `--version` flag. 
 
 ```
-docker pull incertaesedis/smof
-```
-
-Open and run the image.
-
-```
-# Run interactively
-docker run -it incertaesedis/smof:latest sh
-
-# Mount data as a volume (inout) and call smof
-docker run -v ${PWD}:/inout/ incertaesedis/smof:latest smof
-```
-
-Navigate to the folder containing your fasta file and run smof.
-
-```
-# Example smof command
-docker run -v ${PWD}:/inout/ incertaesedis/smof:latest smof grep Iowa fasta.fa > Iowa.fa
+pip3 install smof
 ```
 
 Functions

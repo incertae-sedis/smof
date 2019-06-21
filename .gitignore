@@ -1,5 +1,4 @@
 .ropeproject/
-
 *.pdf
 *.faa
 *.fasta
@@ -7,7 +6,7 @@
 *.fna
 *.gff
 *.gff3
-
-tags
-
-__pycache__
+build/
+dist/
+smof.egg-info/
+__pycache__/
