@@ -7,7 +7,14 @@ smof
 
 UNIX-style FASTA tools
 
-Install
+Install via pip
+======
+
+```
+pip install smof
+```
+
+Install (out of date)
 =======
 
 ```
