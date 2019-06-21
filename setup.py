@@ -1,11 +1,13 @@
 from setuptools import setup
 
+from smof.version import __version__
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
   name='smof',
-  version='2.14.1',
+  version=__version__,
   description="UNIX-style utilities for FASTA file exploration",
   long_description=long_description,
   long_description_content_type="text/markdown",

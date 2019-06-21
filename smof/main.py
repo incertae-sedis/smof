@@ -12,7 +12,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from hashlib import md5
 
-__version__ = "2.14.1"
+from smof.version import __version__
 
 # ================
 # Argument Parsing
