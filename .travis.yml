@@ -5,5 +5,5 @@ python:
  - "3.4"
  - "3.5"
  - "3.6"
- - "nightly"
-script: ./runtest.py && ./IO-test.sh
+ - "3.7"
+script: ./runtest.py
