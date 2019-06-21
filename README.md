@@ -9,24 +9,6 @@ UNIX-style FASTA tools
 
 ![grepshot](images/grepshot.png)
 
-Getting Help
-============
-
-Detailed instructions on how to use each command in `smof` is available via the
-'-h' option.
-
-To list subcommands
-
-``` bash
-smof -h
-```
-
-Get help on a specific subcommand
-
-``` bash
-smof grep -h
-```
-
 Functions
 =========
 
@@ -53,6 +35,22 @@ Functions
  | `translate` | translate a DNA sequence into a protein sequence      |
  | `uniq`      | count, omit, or merge repeated entries                |
  | `wc`        | roughly emulates the UNIX wc command                  |
+
+
+Detailed instructions on how to use each command in `smof` is available via the
+'-h' option.
+
+To list subcommands
+
+``` bash
+smof -h
+```
+
+Get help on a specific subcommand
+
+``` bash
+smof grep -h
+```
 
 Sample data
 ===========
@@ -366,8 +364,8 @@ smof stat -q aa.supercontigs.fna | head
 There are many other options. Run `smof stat -h` for descriptions.
 
 
-Case study 1: exploration and motif extraction
-==============================================
+Case study: exploring motifs in chloroplast genomes
+===================================================
 
 Alice is interested in the chloroplast *maturase* gene. Bob gives her a sample
 dataset which includes 10 fasta files of proteins encoded by the chloroplast
