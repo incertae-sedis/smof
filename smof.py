@@ -3616,7 +3616,10 @@ class Tail(Subcommand):
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    if os.name is not 'nt':
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    if os.name is 'nt':
+        os.system('color')	#allows ANSI color on windows
     args = parse()
     gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)
