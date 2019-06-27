@@ -127,23 +127,23 @@ class Alphabet:
 
 
 class Colors:
-    OFF = chr(27) + "[0;0m"
-    RED = chr(27) + "[0;31m"
-    GREEN = chr(27) + "[0;32m"
-    YELLOW = chr(27) + "[0;33m"
-    MAGENTA = chr(27) + "[0;35m"
-    CYAN = chr(27) + "[0;36m"
-    WHITE = chr(27) + "[0;37m"
-    BLUE = chr(27) + "[0;34m"
-    BOLD_RED = chr(27) + "[1;31m"
-    BOLD_GREEN = chr(27) + "[1;32m"
-    BOLD_YELLOW = chr(27) + "[1;33m"
-    BOLD_MAGENTA = chr(27) + "[1;35m"
-    BOLD_CYAN = chr(27) + "[1;36m"
-    BOLD_WHITE = chr(27) + "[1;37m"
-    BOLD_BLUE = chr(27) + "[1;34m"
+    OFF = chr(27) + r"[0;0m"
+    RED = chr(27) + r"[0;31m"
+    GREEN = chr(27) + r"[0;32m"
+    YELLOW = chr(27) + r"[0;33m"
+    MAGENTA = chr(27) + r"[0;35m"
+    CYAN = chr(27) + r"[0;36m"
+    WHITE = chr(27) + r"[0;37m"
+    BLUE = chr(27) + r"[0;34m"
+    BOLD_RED = chr(27) + r"[1;31m"
+    BOLD_GREEN = chr(27) + r"[1;32m"
+    BOLD_YELLOW = chr(27) + r"[1;33m"
+    BOLD_MAGENTA = chr(27) + r"[1;35m"
+    BOLD_CYAN = chr(27) + r"[1;36m"
+    BOLD_WHITE = chr(27) + r"[1;37m"
+    BOLD_BLUE = chr(27) + r"[1;34m"
 
-    patstr = chr(27) + "\[[0-9;]+m"
+    patstr = chr(27) + r"\[[0-9;]+m"
     pat = re.compile(patstr)
 
     COLORS = {
@@ -175,7 +175,7 @@ class ColorAA:
         # add lower cases
         self.group = [[l + l.lower(), g, c] for l, g, c in self.group]
 
-    def color(a):
+    def color(self, a):
         for chars, group, color in self.group:
             if a in chars:
                 return Colors.OFF + a + color
@@ -259,7 +259,7 @@ class ColorString:
 
     def print(self, seq, colwidth=None, out=sys.stdout):
         starts = {x[0]: x[2] for x in self.cind}
-        ends = set([x[1] for x in self.cind])
+        ends = {x[1] for x in self.cind}
         colored = False
         for i in range(len(seq)):
             try:
@@ -275,14 +275,6 @@ class ColorString:
             out.write(seq[i])
         out.write(self.bgcolor if colored else "")
         out.write("\n")
-
-    def colormatch(self, pattern, col=None):
-        col = self.default if not col else col
-        s = "".join([x[1] for x in self.seq])
-        for m in re.compile(pattern).finditer(s):
-            a = m.start()
-            b = m.start() + len(m.group())
-            self.colorpos(a, b, col)
 
     def copy(self):
         new_obj = ColorString(bgcolor=self.bgcolor, default=self.default)
@@ -335,7 +327,7 @@ class FileDescription:
         stype = self._handle_type(counts)
 
         if stype == "prot":
-            tstop = bool("*" == s[-1])
+            tstop = "*" == s[-1]
             self.pfeat["terminal-stop"] += tstop
             self.pfeat["internal-stop"] += (counts["*"] - tstop) > 0
             self.pfeat["selenocysteine"] += "U" in counts
@@ -545,7 +537,8 @@ class FSeq:
     def __eq__(self, other):
         return (self.header, self.seq) == (other.header, other.seq)
 
-    def _clear_color(self, text):
+    @staticmethod
+    def _clear_color(text):
         return re.sub(Colors.pat, "", text)
 
     def color_seq(self, *args, **kwargs):
@@ -672,7 +665,7 @@ class FSeqGenerator:
                 line = line.strip()
                 if not line or line[0] == "#":
                     continue
-                if ">" == line[0]:
+                if line[0] == ">":
                     if seq_list:
                         yield FSeq(
                             header,
@@ -688,12 +681,12 @@ class FSeqGenerator:
                     seq_list = []
                     header = line[1:]
                 # '' is valid for a header
-                elif header != None:
+                elif header is not None:
                     seq_list.append(line)
                 else:
                     err("First fasta line must begin with '>'")
             # process the last sequence
-            if header != None:
+            if header is not None:
                 if seq_list:
                     yield FSeq(
                         header, "".join(seq_list), filename=filename, *args, **kwargs
@@ -725,18 +718,23 @@ class Maps:
 
 
 class ParseHeader:
+    @staticmethod
     def firstword(h, delimiter=" \t"):
         return re.sub("^([^%s]+).*" % delimiter, "\\1", h)
 
+    @staticmethod
     def description(h):
-        return re.sub("^\S+\s*", "", h)
+        return re.sub(r"^\S+\s*", "", h)
 
+    @staticmethod
     def add_suffix(h, suffix):
-        return re.sub("^(\S+)(.*)", "\\1|%s\\2" % suffix, h)
+        return re.sub(r"^(\S+)(.*)", "\\1|%s\\2" % suffix, h)
 
+    @staticmethod
     def add_tag(h, tag, value):
-        return re.sub("^(\S+)(.*)", "\\1 %s=%s\\2" % (tag, value), h)
+        return re.sub(r"^(\S+)(.*)", "\\1 %s=%s\\2" % (tag, value), h)
 
+    @staticmethod
     def subseq(h, a, b):
         header = "%s|subseq(%d..%d) %s" % (
             ParseHeader.firstword(h),
@@ -746,6 +744,7 @@ class ParseHeader:
         )
         return header.strip()
 
+    @staticmethod
     def permute(h, start, end, wordsize):
         header = "%s|permutation:start=%d;end=%d;word_size=%d %s" % (
             ParseHeader.firstword(h),
@@ -756,11 +755,13 @@ class ParseHeader:
         )
         return header.strip()
 
+    @staticmethod
     def ncbi_format(h, fields):
-        raise NotImplemented
+        raise NotImplementedError
 
+    @staticmethod
     def regex_group(h, regex):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class SeqStat:
@@ -820,69 +821,72 @@ class SeqStat:
 
 class StatFun:
     @classmethod
-    def N50(cls, x, issorted=False):
-        x = sorted(x) if not issorted else x
-        N = sum(x)
+    def N50(cls, xs, issorted=False):
+        xs = sorted(xs) if not issorted else xs
+        N = sum(xs)
         total = 0
-        for i in range(len(x) - 1, -1, -1):
-            total += x[i]
+        for i in range(len(xs) - 1, -1, -1):
+            total += xs[i]
             if total > N / 2:
-                return x[i]
+                return xs[i]
 
     @classmethod
-    def mean(cls, x):
-        return sum(x) / len(x)
-
-    @classmethod
-    def median(cls, x, issorted=False):
-        return cls.quantile(x, 0.5, issorted=issorted)
-
-    @classmethod
-    def sd(cls, x):
-        if len(x) < 2:
-            return "NA"
+    def mean(cls, xs):
+        if not xs:
+            mu = float("nan")
         else:
-            mean = sum(x) / len(x)
-            stdev = (sum((y - mean) ** 2 for y in x) / (len(x) - 1)) ** 0.5
-            return stdev
-        return sd
+            mu = sum(xs) / len(xs)
+        return mu
 
     @classmethod
-    def quantile(cls, x, q, issorted=False):
+    def median(cls, xs, issorted=False):
+        return cls.quantile(xs, 0.5, issorted=issorted)
+
+    @classmethod
+    def sd(cls, xs):
+        if len(xs) < 2:
+            stdev = float("nan")
+        else:
+            mean = sum(xs) / len(xs)
+            stdev = (sum((y - mean) ** 2 for y in xs) / (len(xs) - 1)) ** 0.5
+        return stdev
+
+    @classmethod
+    def quantile(cls, xs, q, issorted=False):
         """
         Calculates quantile as the weighted average between indices
         """
         # Die if out of bounds
-        if not (0 <= q <= 1):
+        if not 0 <= q <= 1:
             err("quantile must be between 0 and 1")
 
         # Ensure the vector is sorted
-        x = sorted(x) if not issorted else x
+        xs = sorted(xs) if not issorted else xs
 
         # Return max or min for q = 1 or 0
         if q == 1:
-            return x[-1]
+            return xs[-1]
         elif q == 0:
-            return x[0]
+            return xs[0]
 
-        v = (len(x) - 1) * q
+        v = (len(xs) - 1) * q
         r = v % 1
         i = math.floor(v)
-        quantile = x[i] * (1 - r) + x[i + 1] * r
+        quantile = xs[i] * (1 - r) + xs[i + 1] * r
         return quantile
 
     @classmethod
-    def summary(cls, x):
-        x = sorted(x)
+    def summary(cls, xs):
+        xs = sorted(xs)
         out = {
-            "min": x[0],
-            "max": x[-1],
-            "1st_qu": cls.quantile(x, 0.25, issorted=True),
-            "median": cls.quantile(x, 0.50, issorted=True),
-            "3rd_qu": cls.quantile(x, 0.75, issorted=True),
-            "mean": cls.mean(x),
-            "sd": cls.sd(x),
-            "N50": cls.N50(x, issorted=True),
+            "min": xs[0],
+            "max": xs[-1],
+            "1st_qu": cls.quantile(xs, 0.25, issorted=True),
+            "median": cls.quantile(xs, 0.50, issorted=True),
+            "3rd_qu": cls.quantile(xs, 0.75, issorted=True),
+            "mean": cls.mean(xs),
+            "sd": cls.sd(xs),
+            "N50": cls.N50(xs, issorted=True),
         }
         return out
 
@@ -1061,7 +1065,7 @@ def translate_dna(dna, all_frames=False, from_start=False):
                 aa.append("X")
         aas.append("".join(aa))
 
-    trim = re.compile("^[^M]+")
+    trim = re.compile(r"^[^M]+")
 
     # either find the longest translated product
     if all_frames:
@@ -1096,10 +1100,10 @@ class Subcommand:
         self._parse()
 
     def _parse(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def generator(self, args, gen):
-        raise NotImplemented
+        raise NotImplementedError
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
@@ -1180,7 +1184,8 @@ class Clean(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _process_args(self, args):
+    @staticmethod
+    def _process_args(args):
         if (args.mask_lowercase or args.mask_irregular) and not args.type:
             err("Please provide sequence type (--type)")
 
@@ -1229,9 +1234,9 @@ class Clean(Subcommand):
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space
             if args.toseq:
-                seq.seq = re.sub("[^A-Za-z]", "", seq.seq)
+                seq.seq = re.sub(r"[^A-Za-z]", "", seq.seq)
             else:
-                seq.seq = re.sub("[^\S]", "", seq.seq)
+                seq.seq = re.sub(r"[^\S]", "", seq.seq)
 
             # Irregular or lowercase to unknown
             if trans:
@@ -1294,13 +1299,11 @@ class Filter(Subcommand):
 
     def generator(self, args, gen):
         tests = []
-        if (
-            args.shorter_than != None
-        ):  # args.shorter_than CAN be 0, so explicitly match to None
+        if args.shorter_than is not None:
+            # args.shorter_than CAN be 0, so explicitly match to None
             tests.append(lambda s, v=args.shorter_than: len(s) <= v)
-        if (
-            args.longer_than != None
-        ):  # args.longer_than CAN be 0, so explicitly match to None
+        if args.longer_than is not None:
+            # args.longer_than CAN be 0, so explicitly match to None
             tests.append(lambda s, v=args.longer_than: len(s) >= v)
         if args.composition:
             try:
@@ -1542,7 +1545,10 @@ class Reverse(Subcommand):
         """ Reverse each sequence """
         self.force_color = args.force_color
         if args.complement:
-            f = lambda s: FSeq.getrevcomp(s)
+
+            def f(s):
+                return FSeq.getrevcomp(s)
+
         else:
 
             def f(s):
@@ -1837,7 +1843,8 @@ class Stat(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _process_args(self, args):
+    @staticmethod
+    def _process_args(args):
         # If no output options are specified, do length stats
         if not any(
             (args.counts, args.type, args.length, args.proportion, args.count_lower)
@@ -1845,7 +1852,8 @@ class Stat(Subcommand):
             args.length = True
         return args
 
-    def _get_length_lines(self, args, g):
+    @staticmethod
+    def _get_length_lines(args, g):
         lines = []
         total = sum(g.lengths)
         N = len(g.lengths)
@@ -1878,7 +1886,8 @@ class Stat(Subcommand):
             lines.append("nchars: {}".format(lstr))
         return lines
 
-    def _get_hist_lines(self, args, g, title=None, height=10, width=60, log=False):
+    @staticmethod
+    def _get_hist_lines(args, g, title=None, height=10, width=60, log=False):
         lines = []
         try:
             import numpy
@@ -1902,7 +1911,8 @@ class Stat(Subcommand):
             lines.append("|{}|".format(out))
         return lines
 
-    def _get_aaprofile_lines(self, args, g, title=None, height=10):
+    @staticmethod
+    def _get_aaprofile_lines(args, g, title=None, height=10):
         lines = []
         if title:
             lines.append("")
@@ -1927,7 +1937,8 @@ class Stat(Subcommand):
         lines.append(names + Colors.OFF)
         return lines
 
-    def _get_count_lines(self, args, g):
+    @staticmethod
+    def _get_count_lines(args, g):
         lines = []
         lower = sum_lower(g.counts) if args.count_lower else None
         if not args.case_sensitive:
@@ -1994,13 +2005,14 @@ class Stat(Subcommand):
                 lines = self._get_aaprofile_lines(args, g)
             yield "\n".join(lines)
 
-    def _byseq(self, args, gen):
+    @staticmethod
+    def _byseq(args, gen):
         seqlist = []
         charset = set()
         if args.length and not (args.counts or args.proportion):
             for seq in gen.next():
                 seqid = ParseHeader.firstword(seq.header)
-                yield ("{}{}{}".format(seqid, args.delimiter, len(seq.seq)))
+                yield "{}{}{}".format(seqid, args.delimiter, len(seq.seq))
         else:
             for seq in gen.next():
                 seqstat = SeqStat(seq)
@@ -2037,7 +2049,7 @@ class Stat(Subcommand):
         else:
             g = self._byfile(args, gen)
         for item in g:
-            yield (item)
+            yield item
 
 
 class Split(Subcommand):
@@ -2158,7 +2170,8 @@ class Subseq(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _subseq(self, seq, a, b, color=None):
+    @staticmethod
+    def _subseq(seq, a, b, color=None):
         start, end = sorted([a, b])
         end = min(end, len(seq.seq))
 
@@ -2169,12 +2182,12 @@ class Subseq(Subcommand):
         if color:
             c = Colors.COLORS[color]
             seq.colseq.colorpos(start - 1, end, c)
-            return seq
+            outseq = seq
         else:
             outseq = seq.subseq(start - 1, end)
             if (a > b) and seq.get_moltype() == "dna":
                 outseq = FSeq.getrevcomp(outseq)
-            return outseq
+        return outseq
 
     def _gff_generator(self, args, gen):
         subseqs = defaultdict(list)
@@ -2419,8 +2432,6 @@ class Sort(Subcommand):
                         return typer(x.header.split(args.field_separator)[key])
                     except IndexError:
                         err("Cannot sort by column '{}', two few columns".format(key))
-                    except Exception as e:
-                        err(str(e))
 
             except:
                 key = args.key
@@ -2461,7 +2472,7 @@ class Sort(Subcommand):
             def sortterm(x):
                 return x.header
 
-        seqs.sort(key=lambda x: sortterm(x), reverse=args.reverse)
+        seqs.sort(key=sortterm, reverse=args.reverse)
 
         for s in seqs:
             yield s
@@ -2496,7 +2507,7 @@ class Consensus(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        raise NotImplemented
+        raise NotImplementedError
 
     def write(self, args, gen, out=sys.stdout):
         seqs = [s for s in gen.next()]
@@ -2566,7 +2577,7 @@ class Cut(Subcommand):
                     s, t = f.split("-")
                     try:
                         indices |= set(range(int(s) - 1, int(t)))
-                    except:
+                    except TypeError:
                         err(
                             "'{}-{}' does not specify a valid range".format(
                                 str(s), str(t)
@@ -2660,7 +2671,7 @@ class Head(Subcommand):
                 nseqs = 1
             else:
                 try:
-                    nseqs = int(re.match("-(\d+)", args.nseqs).group(1))
+                    nseqs = int(re.match(r"-(\d+)", args.nseqs).group(1))
                 except AttributeError:
                     err("N must be formatted as '-12'")
         else:
@@ -2907,7 +2918,8 @@ class Grep(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def _process_arguments(self, args):
+    @staticmethod
+    def _process_arguments(args):
         # If the pattern is readable, it is probably meant to be an input, not
         # a pattern
         if args.pattern and os.access(args.pattern, os.R_OK):
@@ -2995,12 +3007,13 @@ class Grep(Subcommand):
 
         return args
 
-    def _create_matcher(self, args, pat, wrapper):
+    @staticmethod
+    def _create_matcher(args, pat, wrapper):
 
         # Select a search space preparation function
         if args.match_sequence:
             if args.gapped:
-                gettext = lambda x: "".join(re.split("-+", x.seq))
+                gettext = lambda x: "".join(re.split(r"-+", x.seq))
             else:
                 gettext = lambda x: x.seq
         else:
@@ -3114,7 +3127,7 @@ class Grep(Subcommand):
                     'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
                     """
                     matches = matcher(seq, **kw)
-                    gaps = list(re.finditer("-+", seq.seq))
+                    gaps = list(re.finditer(r"-+", seq.seq))
                     if not gaps:
                         return matches
                     for g in gaps:
@@ -3178,7 +3191,8 @@ class Grep(Subcommand):
 
         return matcher
 
-    def _get_pattern(self, args):
+    @staticmethod
+    def _get_pattern(args):
         pat = set()
         if args.fastain:
             # read patterns from a fasta file
@@ -3217,7 +3231,8 @@ class Grep(Subcommand):
 
         return (pat, wrapper)
 
-    def _makegen(self, args):
+    @staticmethod
+    def _makegen(args):
 
         if args.gff:
 
@@ -3242,7 +3257,7 @@ class Grep(Subcommand):
                         row[3] = m["pos"][0] + 1
                         row[4] = m["pos"][1]
                         row[6] = m["strand"]
-                        yield ("\t".join([str(s) for s in row]))
+                        yield "\t".join([str(s) for s in row])
 
         elif args.count or args.count_matches:
 
@@ -3327,7 +3342,7 @@ class Grep(Subcommand):
                                     seq.color_seq(*pos, col=args.color)
                                 else:
                                     seq.color_header(*pos, col=args.color)
-                        yield (seq)
+                        yield seq
 
         return sgen
 
@@ -3410,8 +3425,8 @@ class Uniq(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    def standard_generator(self, args, gen):
-        from collections import OrderedDict
+    @staticmethod
+    def standard_generator(args, gen):
 
         seqs = OrderedDict()
         for seq in gen.next():
@@ -3429,12 +3444,13 @@ class Uniq(Subcommand):
 
         if args.count:
             for k, v in sgen:
-                yield ("{}\t{}".format(v, k.header))
+                yield "{}\t{}".format(v, k.header)
         else:
             for k, v in sgen:
-                yield (k)
+                yield k
 
-    def pack_generator(self, args, gen):
+    @staticmethod
+    def pack_generator(args, gen):
         seqs = defaultdict(list)
         for seq in gen.next():
             seqs[seq.seq].append(seq.header)
@@ -3443,7 +3459,8 @@ class Uniq(Subcommand):
             seq = FSeq(header=args.pack_sep.join(h), seq=q)
             yield seq
 
-    def unpack_generator(self, args, gen):
+    @staticmethod
+    def unpack_generator(args, gen):
         for seq in gen.next():
             headers = seq.header.split(args.pack_sep)
             for header in headers:
@@ -3458,7 +3475,7 @@ class Uniq(Subcommand):
             g = self.standard_generator
 
         for a in g(args, gen):
-            yield (a)
+            yield a
 
 
 class Wc(Subcommand):
@@ -3578,7 +3595,7 @@ class Tail(Subcommand):
                 nstring = "1"
 
         try:
-            m = re.match("([-+])(\d+)", nstring)
+            m = re.match(r"([-+])(\d+)", nstring)
             if m.group(1) == "+":
                 fromtop = True
             nstring = int(m.group(2))
@@ -3614,10 +3631,10 @@ class Tail(Subcommand):
 
 
 def main():
-    if os.name is not 'nt':
+    if os.name is not "nt":
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    if os.name is 'nt':
-        os.system('color')	#allows ANSI color on windows
+    if os.name is "nt":
+        os.system("color")  # allows ANSI color on windows
     args = parse()
     gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)
