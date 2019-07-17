@@ -1385,6 +1385,13 @@ class Md5sum(Subcommand):
             action="store_true",
             default=False,
         )
+        method.add_argument(
+            "-r",
+            "--replace-header",
+            help="replace the header of each entry with the checksum of the sequence",
+            action="store_true",
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
@@ -1408,7 +1415,9 @@ class Md5sum(Subcommand):
             s = seq.seq.encode("ascii")
             h = seq.header.encode("ascii")
             # Write <header>\t<sequence hash> for each sequence
-            if args.each_sequence:
+            if args.replace_header:
+                yield FSeq(md5(s).hexdigest(), seq.seq)
+            elif args.each_sequence:
                 yield "{}\t{}".format(
                     ParseHeader.firstword(seq.header), md5(s).hexdigest()
                 )
@@ -1416,7 +1425,7 @@ class Md5sum(Subcommand):
                 fun(s, h)
 
         # Print output hash for cumulative options
-        if not args.each_sequence:
+        if not (args.each_sequence or args.replace_header):
             yield md5hash.hexdigest()
 
 
