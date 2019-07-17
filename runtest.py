@@ -632,6 +632,17 @@ class TestMd5sum(unittest.TestCase):
             ],
         )
 
+    def test_replaceseq(self):
+        self.assertEqual(
+            get_output(self.seqs, ["md5sum", "-r"]),
+            [
+                ">6d87a19f011653459575ceb722db3b69",
+                "ASDF",
+                ">6e9758614cca89162b2d19922de103bb",
+                "TYUI",
+            ],
+        )
+
     def test_headers(self):
         self.assertEqual(
             get_output(self.seqs, ["md5sum", "-d"]),
