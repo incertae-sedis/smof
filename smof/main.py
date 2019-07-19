@@ -3220,7 +3220,7 @@ class Grep(Subcommand):
                 apat.update([perlpat])
             pat = apat
 
-        if not pat:
+        if not pat and not (args.fastain or args.file):
             err("Please provide a pattern")
 
         # TODO searching for perfect matches would be faster without using
@@ -3432,6 +3432,13 @@ class Uniq(Subcommand):
             help="set delimiting string for pack/unpack operations (SOH, 0x01, by default)",
             default="\x01",
         )
+        parser.add_argument(
+            "-f",
+            "--final-header",
+            help="make headers unique by deleting all but the final entry with a given header (the sequence is ignored, so order matters, you may want to sort by sequence first for reproducibility)",
+            action="store_true",
+            default=False,
+        )
         parser.set_defaults(func=self.func)
 
     @staticmethod
@@ -3475,8 +3482,17 @@ class Uniq(Subcommand):
             for header in headers:
                 yield FSeq(header=header, seq=seq.seq)
 
+    @staticmethod
+    def final_header_generator(args, gen):
+        d = {seq.header: seq.seq for seq in gen.next()}
+        for header, sequence in d.items():
+            seq = FSeq(header=header, seq=sequence)
+            yield seq
+
     def generator(self, args, gen):
-        if args.pack:
+        if args.final_header:
+            g = self.final_header_generator
+        elif args.pack:
             g = self.pack_generator
         elif args.unpack:
             g = self.unpack_generator

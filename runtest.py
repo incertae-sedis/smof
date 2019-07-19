@@ -1372,6 +1372,7 @@ class TestUniq(unittest.TestCase):
         self.repeated = [">a", "CAT", ">b", "HAT", ">c", "A", ">b", "HAT", ">c", "A"]
         self.redundant = [">a", "CAT", ">b", "CAT", ">c", "CAT", ">d", "HAT"]
         self.packed = [">a|b|c", "CAT", ">d", "HAT"]
+        self.repeated_header = [">a", "CAT", ">d", "HAT", ">a", "MATH"]
 
     def test_default(self):
         self.assertEqual(get_output(self.all_uniq, ["uniq"]), self.all_uniq)
@@ -1386,6 +1387,12 @@ class TestUniq(unittest.TestCase):
         self.assertEqual(get_output(self.all_uniq, ["uniq", "-d"]), [""])
         self.assertEqual(
             get_output(self.repeated, ["uniq", "-d"]), [">b", "HAT", ">c", "A"]
+        )
+
+    def test_duplicated(self):
+        self.assertEqual(
+            get_output(self.repeated_header, ["uniq", "-f"]),
+            [">a", "MATH", ">d", "HAT"],
         )
 
     def test_count(self):
