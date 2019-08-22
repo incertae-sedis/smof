@@ -28,8 +28,8 @@ class Parser:
             description="Tools for studying and manipulating fasta files",
             epilog=textwrap.dedent(
                 """\
-                Project site: http://zbwrnz.github.io/smof/
-                Report bugs/requests via http://zbwrnz.github.io/smof/issues
+                Project site: https://github.com/incertae-sedis/smof
+                Report bugs/requests via https://github.com/incertae-sedis/smof/issues
                 Author: Zebulun Arendsee (zbwrnz@gmail.com)
             """
             ),
