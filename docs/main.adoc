@@ -1,11 +1,183 @@
-== `smof`
+= `smof` - Simple Manipulator Of Fasta
 
-[.lead]
-This is the lead paragraph. So it should be larger and more beautiful and more
-awesome than any other paragraph that will ever appear in this particularly
-beautiful documentation page that has so much grand stuff all stated in such
-unusually concise and totally-not-verbose manner. 
+== Getting Started
 
-IMPORTANT: be concise and don't spend lots of time writing words that are
-totally not needed to get the point across to all the lovely ladies and
-gentlemen and precocious children who might be reading this.
+`smof` is a command line tool that can be installed through `pip` as follows:
+
+----
+pip install smof
+----
+
+Usage information can be accessed with the `-h/--help` option:
+
+----
+$ smof -h
+usage: <fastafile> | smof <subcommand> <options>
+
+Tools for studying and manipulating fasta files
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         show program's version number and exit
+
+subcommands:
+  [ for help on each: smof <subcommand> -h ]
+    cut                 emulates UNIX cut command, where fields are entries
+    clean               cleans fasta files
+    consensus           finds the consensus sequence for aligned sequence
+    filter              extracts sequences meeting the given conditions
+    grep                roughly emulates the UNIX grep command
+    md5sum              calculate an md5 checksum for the input sequences
+    head                writes the first sequences in a file
+    permute             randomly order sequence
+    reverse             reverse each sequence (or reverse complement)
+    sample              randomly select entries from fasta file
+    sniff               extract info about the sequence
+    sort                sort sequences
+    split               split a fasta file into smaller files
+    stat                calculate sequence statistics
+    subseq              extract subsequence from each entry (revcomp if a<b)
+    tail                writes the last sequences in a file
+    translate           translate a DNA sequence into a protein sequence
+    uniq                count, omit, or merge repeated entries
+    wc                  roughly emulates the UNIX wc command
+----
+
+Detailed information about each subcommand can also be accessed through `-h/--help`:
+
+----
+$ smof clean -h
+
+usage: <fastafile> | smof clean <options>
+
+Remove all space within the sequences and write them in even columns (default
+width of 80 characters). Case and all characters (except whitespace) are
+preserved by default.
+
+positional arguments:
+  INPUT                 input fasta sequence (default = stdin)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t n|p, --type n|p    sequence type
+  -u, --toupper         convert to uppercase
+  -l, --tolower         convert to lowercase
+  -x, --toseq           removes all non-letter characters (gaps, stops, etc.)
+  -s, --reduce-header   Remove all text from header that follows the first
+                        word (delimited by [ |])
+  -r, --mask-irregular  converts irregular letters to unknown
+  -m, --mask-lowercase  convert lower-case to unknown
+  -w W, --col_width W   width of the sequence output (0 indicates no wrapping)
+----
+
+== Examples
+
+All the examples below use the files in the `sample-data/`
+folder available at the project GitHub site
+(https://github.com/incertae-sedis/smof).
+
+
+[cols=2, options=header]
+|===
+| subcommand
+| description
+
+| `cut`
+| emulates UNIX cut command, where fields are entries
+
+| `clean`     
+| cleans fasta files
+
+| `consensus` 
+| finds the consensus sequence for aligned sequence
+
+| `filter`    
+| extracts sequences meeting the given conditions
+
+| `grep`      
+| roughly emulates the UNIX grep command
+
+| `md5sum`    
+| calculate an md5 checksum for the input sequences
+
+| `head`      
+| writes the first sequences in a file
+
+| `permute`   
+| randomly order sequence
+
+| `reverse`   
+| reverse each sequence (or reverse complement)
+
+| `sample`    
+| randomly select entries from fasta file
+
+| `sniff`     
+| extract info about the sequence
+
+| `sort`      
+| sort sequences
+
+| `split`     
+| split a fasta file into smaller files
+
+| `stat`      
+| calculate sequence statistics
+
+| `subseq`    
+| extract subsequence from each entry (revcomp if a\<b)
+
+| `tail`      
+| writes the last sequences in a file
+
+| `translate` 
+| translate a DNA sequence into a protein sequence
+
+| `uniq`      
+| count, omit, or merge repeated entries
+
+| `wc`        
+| roughly emulates the UNIX wc command
+|===
+
+=== `head` and `tail`
+
+Many of the `smof` subcommands are designed to closely parallel standard UNIX
+tools. For example, `smof head` and `smof tail` behave similarly to GNU `head`
+and `tail`, except that they process by FASTA entry rather than by line.
+
+----
+$ smof head aa.faa
+>YP_008964013.1 ribosomal protein S12 [Ajuga reptans]
+MPTIKQLIRNTRQPIRNVTKSPALGGCPQRRGTCTRVYTITPKKPNSALRKVARVRLTSGFEITAYIPGIGHNSQEHSSV
+----
+
+Or, as with GNU tail, we can get the last two entries
+
+----
+smof tail 2 aa.faa
+>YP_008964016.1 ribosomal protein S16 [Ajuga reptans]
+MVKLRLKRCGRKQRAVYRIVAIDVRSRREGKDLRRVGFYDPMKNQTYLNVPLILYFLEKGAQPTGTVQNLLKKAEVFKEL
+PPNQMKFN
+>YP_008964017.1 photosystem II protein K [Ajuga reptans]
+MLNIISLICICMNSPLYSSSFFFGKLPEAYAFLNPIVDVMPVIPLFFFLLAFVWQAAVSFR
+----
+
+Or all but the last two lines: `smof tail +2 aa.faa`.
+
+The `head` and `tail` commands also allow the sequences themselves to be headed
+and tailed:
+
+----
+$ smof head -f5 -l1 -n3 aa.faa
+>YP_008964013.1|TRUNCATED:first-5_last-1
+MPTIK...K
+>YP_008964014.1|TRUNCATED:first-5_last-1
+MTAIL...G
+>YP_008964015.1|TRUNCATED:first-5_last-1
+MEEIQ...S
+>YP_008964016.1|TRUNCATED:first-5_last-1
+MVKLR...N
+>YP_008964017.1|TRUNCATED:first-5_last-1
+MLNII...R
+----
