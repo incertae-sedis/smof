@@ -1,6 +1,4 @@
----
-layout: home
----
+== `smof`
 
 [.lead]
 This is the lead paragraph. So it should be larger and more beautiful and more
