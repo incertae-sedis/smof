@@ -1,3 +1,13 @@
 ---
 layout: home
 ---
+
+[.lead]
+This is the lead paragraph. So it should be larger and more beautiful and more
+awesome than any other paragraph that will ever appear in this particularly
+beautiful documentation page that has so much grand stuff all stated in such
+unusually concise and totally-not-verbose manner. 
+
+IMPORTANT: be concise and don't spend lots of time writing words that are
+totally not needed to get the point across to all the lovely ladies and
+gentlemen and precocious children who might be reading this.
