@@ -3467,10 +3467,12 @@ class Uniq(Subcommand):
 
     @staticmethod
     def pack_generator(args, gen):
-        seqs = defaultdict(list)
+        seqs = OrderedDict()
         for seq in gen.next():
-            seqs[seq.seq].append(seq.header)
-
+            if seq.seq in seqs:
+                seqs[seq.seq].append(seq.header)
+            else:
+                seqs[seq.seq] = [seq.header]
         for q, h in seqs.items():
             seq = FSeq(header=args.pack_sep.join(h), seq=q)
             yield seq
@@ -3484,8 +3486,10 @@ class Uniq(Subcommand):
 
     @staticmethod
     def final_header_generator(args, gen):
-        d = {seq.header: seq.seq for seq in gen.next()}
-        for header, sequence in d.items():
+        seqs = OrderedDict()
+        for seq in gen.next():
+            seqs[seq.header] = seq.seq
+        for header, sequence in seqs.items():
             seq = FSeq(header=header, seq=sequence)
             yield seq
 
