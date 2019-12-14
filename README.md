@@ -4,7 +4,7 @@
 ![PyPI](https://img.shields.io/pypi/v/smof.svg)
 [![DOI](https://zenodo.org/badge/19203682.svg)](https://zenodo.org/badge/latestdoi/19203682)
 
-smof
+smof - Simple Manipulation Of FASTA
 ====
 
 UNIX-style FASTA tools
