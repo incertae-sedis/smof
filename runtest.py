@@ -663,6 +663,8 @@ class TestClean(unittest.TestCase):
         self.longseq = [">l", "A" * 91]
         self.header = [">l a", "A", ">m|a", "A"]
         self.gapamb = [">a", "yy--_.ATT"]
+        self.nonstandard_dna = [">a", ".-_XCAT"]
+        self.nonstandard_pro = [">a", ".-_GANDALF"]
 
     def test_default(self):
         self.assertEqual(get_output(self.seq, ["clean"])[1], "gAtAcA-NY")
@@ -708,6 +710,16 @@ class TestClean(unittest.TestCase):
         self.assertEqual(
             get_output([">n", "ATryjG*"], ["clean", "-t", "n", "-r"])[1], "ATNNjG*"
         )
+
+    def test_nonstandard_dna(self):
+      self.assertEqual(
+          get_output(self.nonstandard_dna, ["clean", "-d", "-t", "n"])[1], "---NCAT"
+      )
+
+    def test_nonstandard_pro(self):
+      self.assertEqual(
+          get_output(self.nonstandard_pro, ["clean", "-d", "-t", "p"])[1], "---GANDALF"
+      )
 
     def test_wrap(self):
         self.assertEqual(get_output(self.longseq, ["clean", "-w", "30"])[1], "A" * 30)

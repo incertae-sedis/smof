@@ -1182,6 +1182,12 @@ class Clean(Subcommand):
             type=positive_int,
             default=80,
         )
+        parser.add_argument(
+            "-d", "--standardize",
+            help="Convert 'X' in DNA to 'N' and '[._]' to '-' (for gaps)",
+            action="store_true",
+            default=False
+        )
         parser.set_defaults(func=self.func)
 
     @staticmethod
@@ -1205,10 +1211,12 @@ class Clean(Subcommand):
                 # ambiguous characters
                 irr = "".join(Alphabet.PROT_AMB) + "U"
                 unk = "X"
+                standardize = lambda seq: re.sub("[._]", "-", seq)
             elif args.type.lower()[0] in ["n", "d"]:
                 # irregular nucleotides are ambiguous characters
                 irr = "".join(Alphabet.DNA_AMB)
                 unk = "N"
+                standardize = lambda seq: re.sub("X", "N", re.sub("[._]", "-", seq))
             else:
                 err("Type not recognized")
 
@@ -1230,6 +1238,9 @@ class Clean(Subcommand):
         for seq in gen.next(purge_color=True):
             if args.reduce_header:
                 seq.header = ParseHeader.firstword(seq.header, delimiter=" \t|")
+
+            if args.standardize:
+                seq.seq = standardize(seq.seq)
 
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space
