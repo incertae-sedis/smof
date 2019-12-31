@@ -1211,12 +1211,12 @@ class Clean(Subcommand):
                 # ambiguous characters
                 irr = "".join(Alphabet.PROT_AMB) + "U"
                 unk = "X"
-                standardize = lambda seq: re.sub("[._]", "-", seq)
+                standard_trans = str.maketrans("._", "--")
             elif args.type.lower()[0] in ["n", "d"]:
                 # irregular nucleotides are ambiguous characters
                 irr = "".join(Alphabet.DNA_AMB)
                 unk = "N"
-                standardize = lambda seq: re.sub("X", "N", re.sub("[._]", "-", seq))
+                standard_trans = str.maketrans("Xx._", "Nn--")
             else:
                 err("Type not recognized")
 
@@ -1240,7 +1240,7 @@ class Clean(Subcommand):
                 seq.header = ParseHeader.firstword(seq.header, delimiter=" \t|")
 
             if args.standardize:
-                seq.seq = standardize(seq.seq)
+                seq.seq = seq.seq.translate(standard_trans)
 
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space

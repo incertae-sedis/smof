@@ -663,7 +663,7 @@ class TestClean(unittest.TestCase):
         self.longseq = [">l", "A" * 91]
         self.header = [">l a", "A", ">m|a", "A"]
         self.gapamb = [">a", "yy--_.ATT"]
-        self.nonstandard_dna = [">a", ".-_XCAT"]
+        self.nonstandard_dna = [">a", ".-_XxCAT"]
         self.nonstandard_pro = [">a", ".-_GANDALF"]
 
     def test_default(self):
@@ -713,7 +713,7 @@ class TestClean(unittest.TestCase):
 
     def test_nonstandard_dna(self):
       self.assertEqual(
-          get_output(self.nonstandard_dna, ["clean", "-d", "-t", "n"])[1], "---NCAT"
+          get_output(self.nonstandard_dna, ["clean", "-d", "-t", "n"])[1], "---NnCAT"
       )
 
     def test_nonstandard_pro(self):
