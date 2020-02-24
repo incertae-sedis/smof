@@ -1240,7 +1240,10 @@ class Clean(Subcommand):
                 seq.header = ParseHeader.firstword(seq.header, delimiter=" \t|")
 
             if args.standardize:
-                seq.seq = seq.seq.translate(standard_trans)
+                try:
+                  seq.seq = seq.seq.translate(standard_trans)
+                except UnboundLocalError:
+                  err("Please provide a type argument (-t)")
 
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space
