@@ -1338,6 +1338,19 @@ class TestSubseq(unittest.TestCase):
 
 
 class TestTranslateDNA(unittest.TestCase):
+    def test_find_max_orf(self):
+        self.assertEqual(smof.find_max_orf("ATG", from_start=True), (0, 3))
+        self.assertEqual(smof.find_max_orf("TAAATG", from_start=True), (3, 3))
+        self.assertEqual(smof.find_max_orf("TAAATGTAG", from_start=True), (3, 3))
+        self.assertEqual(smof.find_max_orf("TAAATGATGTAG", from_start=True), (3, 6))
+        self.assertEqual(smof.find_max_orf("AATG", from_start=True), (1, 3))
+        self.assertEqual(smof.find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9))
+        self.assertEqual(smof.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15))
+        self.assertEqual(smof.find_max_orf("ATG", from_start=False), (0, 3))
+        self.assertEqual(smof.find_max_orf("TAAATG", from_start=False), (1, 3))
+        self.assertEqual(smof.find_max_orf("TAAATGTAG", from_start=False), (1, 6))
+        self.assertEqual(smof.find_max_orf("TAAATGATGTAG", from_start=False), (2, 9))
+
     def test_simple(self):
         self.assertEqual(smof.translate_dna("ATG"), "M")
         self.assertEqual(smof.translate_dna("ATGT"), "M")
@@ -1358,23 +1371,43 @@ class TestTranslateDNA(unittest.TestCase):
         self.assertEqual(smof.translate_dna("-AT---GT_..TT-"), "MF")
 
     def test_all_frames(self):
-        self.assertEqual(smof.translate_dna("TTTATGT", all_frames=True), "FM")
-        self.assertEqual(smof.translate_dna("ATGTGA", all_frames=False), "M*")
-        self.assertEqual(smof.translate_dna("ATGTGA", all_frames=True), "M")
+        self.assertEqual(smof.get_orf("TTTATGT", all_frames=True), "FM")
+        self.assertEqual(smof.get_orf("ATGTGA", all_frames=False), "M*")
+        self.assertEqual(smof.get_orf("ATGTGA", all_frames=True), "M")
         self.assertEqual(
-            smof.translate_dna("ATGTGAT", all_frames=True), "CD"
+            smof.get_orf("ATGTGAT", all_frames=True), "CD"
         )  # match 2nd frame
         self.assertEqual(
-            smof.translate_dna("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF"
+            smof.get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF"
         )  # match in 3rd frame
 
     def test_require_start_and_all_frames(self):
         self.assertEqual(
-            smof.translate_dna(
+            smof.get_orf(
                 "ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True
             ),
             "MFFF",
         )  # match in 3rd frame
+
+    def test_get_cds(self):
+        self.assertEqual(
+            smof.get_orf(
+                "ATG", all_frames=True, from_start=True, translate=False
+            ),
+            "ATG",
+        )
+        self.assertEqual(
+            smof.get_orf(
+                "TATGTTTTGA", all_frames=True, from_start=True, translate=False
+            ),
+            "ATGTTT",
+        )
+        self.assertEqual(
+            smof.get_orf(
+                "TATGTTTTGA", all_frames=True, from_start=True, translate=False
+            ),
+            "ATGTTT",
+        )
 
 
 class TestUniq(unittest.TestCase):

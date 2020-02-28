@@ -1,7 +1,8 @@
-2.17.1 [2020-xx-xx]
+2.18.0 [2020-xx-xx]
 
   * allow lowercase 'X' to be replace with 'n' in clean standard function
   * raise warning when character type is not specified in clean standard function
+  * add `--cds` option to `translate` that returns DNA coding sequences
 
 2.17.0 [2019-12-31]
 

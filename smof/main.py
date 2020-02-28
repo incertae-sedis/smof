@@ -1045,45 +1045,66 @@ def ambiguous2perl(pattern):
     return "".join(perlpat)
 
 
-def translate_dna(dna, all_frames=False, from_start=False):
-    dna = dna.translate(FSeq.ungapper).upper()
-
-    if all_frames:
-        start_positions = [2, 3, 4]
-    else:
-        start_positions = [2]
-
-    # get full translations in 1 or 3 plus-sense frames
-    aas = []
-    for start_position in start_positions:
-        aa = []
-        for i in range(start_position, len(dna), 3):
+def find_max_orf(dna, from_start=False):
+    max_start = None
+    max_length = 0
+    for offset in [2, 3, 4]:
+        start = None
+        length = 0
+        for i in range(offset, len(dna), 3):
             codon = dna[i - 2 : i + 1]
-            if codon in FSeq.codon_table:
-                aa.append(FSeq.codon_table[codon])
-            else:
-                aa.append("X")
-        aas.append("".join(aa))
+            # if we encounter a STOP codon
+            if codon in Alphabet.STOP:
+                # if this ORF is the longest, record it
+                if start != None and ((length, max_start) > (max_length, start)):
+                    max_start, max_length = start, length
+                # reset the ORF
+                start, length = None, 0
+                continue
+            # if all ORFs are required to start with START codons, and if this
+            # is not a START codon, then do not start a new ORF
+            if from_start and start == None and not (codon in Alphabet.START):
+                continue
+            # if we are not currently in an ORF, initialize one
+            if not start != None:
+                start, length = i - 2, 0
+            # increment the length of the current ORF
+            length += 3
+        # if the final ORF is the longest, record it
+        # break ties by preferring the lower start position
+        if start != None and ((length, max_start) > (max_length, start)):
+          max_start, max_length = start, length
+    return (max_start, max_length)
 
-    trim = re.compile(r"^[^M]+")
 
-    # either find the longest translated product
-    if all_frames:
-        aa_candidates = chain.from_iterable([aa.split("*") for aa in aas])
-        # trim everything before the start codon in each possible product
-        if from_start:
-            aa_candidates = [re.sub(trim, "", aa) for aa in aa_candidates]
-        # find the single longest product (if from_start=True, this is the longest ORF)
-        aa_final = max(aa_candidates, key=len)
-    # or just find the first translated product
-    else:
-        aa_final = aas[0]
-        if from_start and not aa_final[0] == "M":
+def translate_dna(dna):
+    # remove gaps
+    dna = dna.translate(FSeq.ungapper).upper()
+    aa = []
+    for i in range(2, len(dna), 3):
+        codon = dna[i - 2 : i + 1]
+        if codon in FSeq.codon_table:
+            aa.append(FSeq.codon_table[codon])
+        else:
+            aa.append("X")
+    return ''.join(aa)
+
+
+def get_orf(dna, all_frames=False, from_start=False, translate=True):
+    if not all_frames:
+        aa = translate_dna(dna)
+        if from_start and not aa[0] == "M":
             err(
                 "In translation, a sequence did not start with an ATG (maybe add -f flag)"
             )
-
-    return aa_final
+        return aa
+    else:
+        cds_start, cds_length = find_max_orf(dna, from_start=from_start)
+        cds = dna[cds_start : cds_start + cds_length]
+        if translate:
+          return translate_dna(cds)
+        else:
+          return cds
 
 
 # ====================
@@ -1183,10 +1204,11 @@ class Clean(Subcommand):
             default=80,
         )
         parser.add_argument(
-            "-d", "--standardize",
+            "-d",
+            "--standardize",
             help="Convert 'X' in DNA to 'N' and '[._]' to '-' (for gaps)",
             action="store_true",
-            default=False
+            default=False,
         )
         parser.set_defaults(func=self.func)
 
@@ -1241,9 +1263,9 @@ class Clean(Subcommand):
 
             if args.standardize:
                 try:
-                  seq.seq = seq.seq.translate(standard_trans)
+                    seq.seq = seq.seq.translate(standard_trans)
                 except UnboundLocalError:
-                  err("Please provide a type argument (-t)")
+                    err("Please provide a type argument (-t)")
 
             # WARNING: order is important here, don't swap thoughtlesly
             # Remove all nonletters or wanted, otherwise just remove space
@@ -2293,15 +2315,22 @@ class Translate(Subcommand):
             action="store_true",
             default=False,
         )
+        parser.add_argument(
+            "-c",
+            "--cds",
+            help="Write the DNA coding sequence",
+            action="store_true",
+            default=False,
+        )
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
         """ Reverse each sequence """
         for seq in gen.next():
-            aaseq = translate_dna(
-                seq.seq, all_frames=args.all_frames, from_start=args.from_start
+            orf = get_orf(
+                seq.seq, all_frames=args.all_frames, from_start=args.from_start, translate=not args.cds
             )
-            yield FSeq(header=seq.header, seq=aaseq)
+            yield FSeq(header=seq.header, seq=orf)
 
 
 # ==============
