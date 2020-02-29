@@ -1046,6 +1046,7 @@ def ambiguous2perl(pattern):
 
 
 def find_max_orf(dna, from_start=False):
+    dna = dna.translate(FSeq.ungapper).upper()
     max_start = None
     max_length = 0
     for offset in [2, 3, 4]:
