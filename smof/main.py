@@ -1094,12 +1094,12 @@ def get_orf(dna, all_frames=False, from_start=False, translate=True):
     if not all_frames:
         aa = translate_dna(dna)
         if from_start and not aa[0] == "M":
-            err(
-                "In translation, a sequence did not start with an ATG (maybe add -f flag)"
-            )
+          aa = ""
         return aa
     else:
         cds_start, cds_length = find_max_orf(dna, from_start=from_start)
+        if cds_start is None:
+          return ""
         cds = dna[cds_start : cds_start + cds_length]
         if translate:
           return translate_dna(cds)
@@ -2292,8 +2292,10 @@ class Translate(Subcommand):
             description="""Only the standard gene code table is supported. Any
             codons with ambiguous characters will be translated as X. Trailing
             characters will be ignored. All gaps [_.-] will be removed. When -f
-            is True, then the longest product will be found. To resolve ties,
-            the first frame is preferred and then the position.""",
+            is True, then the longest product will be found. Ties are resolved
+            by comparing position (earlier positions are preferred) and then
+            frame (first frame is preferred). By default, translation starts at
+            the first nucleotide.""",
         )
         parser.add_argument(
             "fh",
