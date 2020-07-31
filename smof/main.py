@@ -3480,10 +3480,16 @@ class Uniq(Subcommand):
         )
         parser.add_argument(
             "-f",
-            "--final-header",
-            help="make headers unique by deleting all but the final entry with a given header (the sequence is ignored, so order matters, you may want to sort by sequence first for reproducibility)",
+            "--first-header",
+            help="remove entries with duplicate headers (keep only the first)",
             action="store_true",
             default=False,
+        )
+        parser.add_argument(
+            "--removed",
+            metavar="FILE",
+            help="With -f, store removed sequences in FILE",
+            type=argparse.FileType("w"),
         )
         parser.set_defaults(func=self.func)
 
@@ -3531,17 +3537,21 @@ class Uniq(Subcommand):
                 yield FSeq(header=header, seq=seq.seq)
 
     @staticmethod
-    def final_header_generator(args, gen):
+    def first_header_generator(args, gen):
         seqs = OrderedDict()
         for seq in gen.next():
-            seqs[seq.header] = seq.seq
+            if seq.header in seqs:
+                if args.removed:
+                  seq.print(color=False, out=args.removed)
+            else:
+                seqs[seq.header] = seq.seq
         for header, sequence in seqs.items():
             seq = FSeq(header=header, seq=sequence)
             yield seq
 
     def generator(self, args, gen):
-        if args.final_header:
-            g = self.final_header_generator
+        if args.first_header:
+            g = self.first_header_generator
         elif args.pack:
             g = self.pack_generator
         elif args.unpack:

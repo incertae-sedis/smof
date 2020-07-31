@@ -1431,7 +1431,7 @@ class TestUniq(unittest.TestCase):
         self.repeated = [">a", "CAT", ">b", "HAT", ">c", "A", ">b", "HAT", ">c", "A"]
         self.redundant = [">a", "CAT", ">b", "CAT", ">c", "CAT", ">d", "HAT"]
         self.packed = [">a|b|c", "CAT", ">d", "HAT"]
-        self.repeated_header = [">a", "CAT", ">d", "HAT", ">a", "MATH"]
+        self.repeated_header = [">a", "MATH", ">d", "HAT", ">a", "CAT"]
 
     def test_default(self):
         self.assertEqual(get_output(self.all_uniq, ["uniq"]), self.all_uniq)
