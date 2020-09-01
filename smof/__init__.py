@@ -84,6 +84,43 @@ def clean(
         yield seq
 
 
+def cut(gen, indicies, complement=False): 
+    i = 0
+    if complement:
+        for seq in gen.next():
+            if not i in indices:
+                yield seq
+            i += 1
+    else:
+        m = max(indices)
+        for seq in gen.next():
+            if i > m:
+                break
+            if i in indices:
+                yield seq
+            i += 1
+
+def consensus(gen, table=False):
+    seqs = [s for s in gen.next()]
+    imax = max([len(s.seq) for s in seqs])
+    try:
+        transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
+    except IndexError:
+        err("All sequences must be of equivalent length")
+
+    characters = list(set(("").join([s.seq for s in seqs])))
+
+    if table:
+        rows = []
+        for column in transpose:
+            c = Counter(column)
+            rows.append( [c[x] for x in characters] )
+        return (characters, rows)
+    else:
+        consensus = [Counter(c).most_common()[0][0] for c in transpose]
+        header = "Consensus"
+        return FSeq(header, "".join(consensus))
+
 # =================
 # UTILITY FUNCTIONS
 # =================

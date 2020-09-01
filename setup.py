@@ -20,6 +20,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    entry_points={"console_scripts": ["smof=smof.main:main"]},
+    entry_points={"console_scripts": ["smof=smof.ui:main"]},
     zip_safe=False,
 )

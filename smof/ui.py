@@ -1536,29 +1536,16 @@ class Consensus(Subcommand):
         raise NotImplementedError
 
     def write(self, args, gen, out=sys.stdout):
-        seqs = [s for s in gen.next()]
-        imax = max([len(s.seq) for s in seqs])
-        try:
-            transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
-        except IndexError:
-            err("All sequences must be of equivalent length")
-
-        counts = Counter(("").join([s.seq for s in seqs]))
-        characters = list(counts.keys())
+        result = consensus(gen, table=args.table)
 
         if args.table:
-            out.write("\t".join(characters))
+            out.write("\t".join(result[0]))
             out.write("\n")
-            for column in transpose:
-                c = Counter(column)
-                out.write("\t".join([str(c[x]) for x in characters]))
-                out.write("\n")
-
+            for row in transpose:
+              out.write("\t".join([str(x) for x in row]))
+              out.write("\n")
         else:
-            consensus = [Counter(c).most_common()[0][0] for c in transpose]
-            header = "Consensus"
-            FSeq(header, "".join(consensus)).print()
-
+            result.print()
 
 # ==============
 # UNIX EMULATORS
@@ -1612,20 +1599,7 @@ class Cut(Subcommand):
                 except ValueError:
                     err("Cannot parse '{}'".format(args.fields))
 
-        i = 0
-        if args.complement:
-            for seq in gen.next():
-                if not i in indices:
-                    yield seq
-                i += 1
-        else:
-            m = max(indices)
-            for seq in gen.next():
-                if i > m:
-                    break
-                if i in indices:
-                    yield seq
-                i += 1
+        cut(gen, indicies=indicies, complement=args.complement)
 
 
 class Head(Subcommand):
