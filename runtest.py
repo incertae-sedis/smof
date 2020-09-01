@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import smof.main as smof
+import smof.ui as smof
 import unittest
 import argparse
 import sys
