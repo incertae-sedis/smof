@@ -1621,3 +1621,43 @@ class GrepSearch:
                         yield seq
 
         return sgen
+
+
+def md5sum(
+    gen,
+    ignore_case=False,
+    each_sequence=False,
+    all_sequences=False,
+    all_headers=False,
+    replace_header=False,
+):
+    md5hash = md5()
+    # Hash the sequences only (in input order)
+    if all_sequences:
+        fun = lambda s, h: md5hash.update(s)
+    # Hash the headers only (in input order)
+    elif all_headers:
+        fun = lambda s, h: md5hash.update(h)
+    # DEFAULT: Hash headers and sequences (concatenated)
+    # Equivalent to:
+    # $ tr -d '\n>' < myfile.fa | md5sum
+    else:
+        fun = lambda s, h: md5hash.update(h + s)
+
+    for seq in gen.next():
+        if ignore_case:
+            seq.header_upper()
+            seq.seq_upper()
+        s = seq.seq.encode("ascii")
+        h = seq.header.encode("ascii")
+        # Write <header>\t<sequence hash> for each sequence
+        if replace_header:
+            yield FSeq(md5(s).hexdigest(), seq.seq)
+        elif each_sequence:
+            yield "{}\t{}".format(ParseHeader.firstword(seq.header), md5(s).hexdigest())
+        else:
+            fun(s, h)
+
+    # Print output hash for cumulative options
+    if not (each_sequence or replace_header):
+        yield md5hash.hexdigest()

@@ -10,7 +10,6 @@ from itertools import chain
 from collections import Counter
 from collections import defaultdict
 from collections import OrderedDict
-from hashlib import md5
 
 from smof import *
 from smof.version import __version__
@@ -401,38 +400,14 @@ class Md5sum(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        md5hash = md5()
-        # Hash the sequences only (in input order)
-        if args.all_sequences:
-            fun = lambda s, h: md5hash.update(s)
-        # Hash the headers only (in input order)
-        elif args.all_headers:
-            fun = lambda s, h: md5hash.update(h)
-        # DEFAULT: Hash headers and sequences (concatenated)
-        # Equivalent to:
-        # $ tr -d '\n>' < myfile.fa | md5sum
-        else:
-            fun = lambda s, h: md5hash.update(h + s)
-
-        for seq in gen.next():
-            if args.ignore_case:
-                seq.header_upper()
-                seq.seq_upper()
-            s = seq.seq.encode("ascii")
-            h = seq.header.encode("ascii")
-            # Write <header>\t<sequence hash> for each sequence
-            if args.replace_header:
-                yield FSeq(md5(s).hexdigest(), seq.seq)
-            elif args.each_sequence:
-                yield "{}\t{}".format(
-                    ParseHeader.firstword(seq.header), md5(s).hexdigest()
-                )
-            else:
-                fun(s, h)
-
-        # Print output hash for cumulative options
-        if not (args.each_sequence or args.replace_header):
-            yield md5hash.hexdigest()
+        return md5sum(
+            gen,
+            ignore_case=args.ignore_case,
+            each_sequence=args.each_sequence,
+            all_sequences=args.all_sequences,
+            all_headers=args.all_headers,
+            replace_header=args.replace_header,
+        )
 
 
 class Permute(Subcommand):
