@@ -2,8 +2,11 @@ import math
 import re
 import sys
 import string
+import os
 from hashlib import md5
 from collections import Counter
+from collections import OrderedDict
+from smof.version import __version__
 
 # ========
 # Commands
@@ -84,7 +87,7 @@ def clean(
         yield seq
 
 
-def cut(gen, indicies, complement=False): 
+def cut(gen, indicies, complement=False):
     i = 0
     if complement:
         for seq in gen.next():
@@ -100,6 +103,7 @@ def cut(gen, indicies, complement=False):
                 yield seq
             i += 1
 
+
 def consensus(gen, table=False):
     seqs = [s for s in gen.next()]
     imax = max([len(s.seq) for s in seqs])
@@ -114,12 +118,80 @@ def consensus(gen, table=False):
         rows = []
         for column in transpose:
             c = Counter(column)
-            rows.append( [c[x] for x in characters] )
+            rows.append([c[x] for x in characters])
         return (characters, rows)
     else:
         consensus = [Counter(c).most_common()[0][0] for c in transpose]
         header = "Consensus"
         return FSeq(header, "".join(consensus))
+
+
+class GrepOptions:
+    def __init__(
+        pattern=None,
+        match_sequence=False,
+        file=None,
+        files_without_match=False,
+        files_with_match=False,
+        wrap=None,
+        perl_regexp=False,
+        ambiguous_nucl=False,
+        case_sensitive=False,
+        invert_match=False,
+        only_matching=False,
+        before_context=False,
+        after_context=False,
+        context=False,
+        count=False,
+        count_matches=False,
+        line_regexp=False,
+        exact=False,
+        gapped=False,
+        both_strainds=False,
+        reverse_only=False,
+        no_color=False,
+        force_color=False,
+        preserve_color=False,
+        color="bold_red",
+        gff=False,
+        gff_type="regex_match",
+        fastain=None,
+    ):
+        self.pattern = pattern
+        self.match_sequence = match_sequence
+        self.file = file
+        self.files_without_match = files_without_match
+        self.files_with_match = files_with_match
+        self.wrap = wrap
+        self.perl_regexp = perl_regexp
+        self.ambiguous_nucl = ambiguous_nucl
+        self.case_sensitive = case_sensitive
+        self.invert_match = invert_match
+        self.only_matching = only_matching
+        self.before_context = before_context
+        self.after_context = after_context
+        self.context = context
+        self.count = count
+        self.count_matches = count_matches
+        self.line_regexp = line_regexp
+        self.exact = exact
+        self.gapped = gapped
+        self.both_strainds = both_strainds
+        self.reverse_only = reverse_only
+        self.no_color = no_color
+        self.force_color = force_color
+        self.preserve_color = preserve_color
+        self.color = color
+        self.gff = gff
+        self.gff_type = gff_type
+        self.fastain = fastain
+
+
+def grep(gen, **kwargs):
+    args = GrepOptions(**kwards)
+    src = GrepSearch(args)
+    return src.search(gen)
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -1109,3 +1181,443 @@ class StatFun:
             "N50": cls.N50(xs, issorted=True),
         }
         return out
+
+
+class GrepSearch:
+    def __init__(self, args):
+        self.clean_args = self._process_arguments(args)
+        pat, wrapper = self._get_pattern(self.clean_args)
+        self.matcher = self._create_matcher(self.clean_args, pat, wrapper)
+        self.generator = self._makegen(self.clean_args)
+
+    def search(self, gen):
+        for item in self.generator(gen, self.matcher):
+            yield item
+
+    @staticmethod
+    def _process_arguments(args):
+        # If the pattern is readable, it is probably meant to be an input, not
+        # a pattern
+        if args.pattern and os.access(args.pattern, os.R_OK):
+            args.fh = [args.pattern] + args.fh
+            args.pattern = None
+
+        # Stop if there are any incompatible options
+        if args.count_matches and args.invert_match:
+            err("--count-matches argument is incompatible with --invert-matches")
+
+        if args.line_regexp and (args.wrap):
+            err("--line_regexp is incompatible with --wrap")
+
+        if args.gff and (args.exact or args.line_regexp):
+            err("--gff is incompatible with --exact and --line_regexp")
+
+        if args.gff and (args.files_without_match or args.files_with_matches):
+            err("--gff is incompatible with -l and -L options")
+
+        if args.fastain:
+            args.match_sequence = True
+
+        if not args.match_sequence and (
+            args.both_strands or args.ambiguous_nucl or args.reverse_only
+        ):
+            err("If you want to search sequence, set -q flag")
+
+        if args.wrap and args.perl_regexp:
+            err(
+                "Patterns found in --wrap captures must be literal (-P and -w incompatible)"
+            )
+
+        if args.ambiguous_nucl:
+            args.perl_regexp = True
+
+        if args.force_color and args.no_color:
+            err("WTF? --force-color AND --no-color?")
+
+        if args.only_matching and (
+            args.exact or args.gff or args.count or args.count_matches
+        ):
+            args.only_matching = False
+
+        if args.only_matching and args.invert_match:
+            err("--only-matching is incompatible with --inver-match")
+
+        if (args.perl_regexp or args.ambiguous_nucl) and args.exact:
+            err("--exact works only with literal strings (incompatible with -P or -G")
+
+        # Some things just don't make sense in header searches ...
+        if args.gff or args.ambiguous_nucl:
+            args.match_sequence = True
+
+        # Decide when to color
+        if args.force_color or (sys.stdout.isatty() and not args.no_color):
+            args.color_output = True
+        else:
+            args.color_output = False
+
+        args.color = Colors.COLORS[args.color]
+
+        # Others don't make sense with color
+        if any(
+            (
+                args.gff,
+                args.count_matches,
+                args.only_matching,
+                args.line_regexp,
+                args.exact,
+                args.files_without_match,
+                args.files_with_matches,
+            )
+        ):
+            args.color_output = False
+
+        # gff overides certain other options
+        if args.gff:
+            args.count = False
+            args.count_matches = False
+        # -A and -B take priority over -C
+        args.before_context = (
+            args.before_context if args.before_context else args.context
+        )
+        args.after_context = args.after_context if args.after_context else args.context
+
+        return args
+
+    @staticmethod
+    def _get_pattern(args):
+        pat = set()
+        if args.fastain:
+            # read patterns from a fasta file
+            pat.update((s.seq for s in FSeqGenerator(args.fastain).next()))
+        if args.file:
+            # read patterns from a file (stripping whitespace from the end)
+            pat.update([l.rstrip("\n\t\r ") for l in args.file])
+        if args.pattern:
+            # read pattern from command line
+            pat.update([args.pattern])
+
+        if args.ambiguous_nucl:
+            apat = set()
+            for p in pat:
+                perlpat = ambiguous2perl(p)
+                apat.update([perlpat])
+            pat = apat
+
+        if not pat and not (args.fastain or args.file):
+            err("Please provide a pattern")
+
+        # TODO searching for perfect matches would be faster without using
+        # regex (just <str>.find(pat))
+        if not (args.perl_regexp or args.wrap or args.exact):
+            pat = [re.escape(p) for p in pat]
+
+        flags = re.IGNORECASE if not args.case_sensitive else 0
+
+        if args.wrap:
+            wrapper = re.compile(args.wrap, flags=flags)
+        else:
+            wrapper = None
+
+        if not (args.wrap or args.exact):
+            pat = set((re.compile(p, flags=flags) for p in pat))
+
+        return (pat, wrapper)
+
+    @staticmethod
+    def _create_matcher(args, pat, wrapper):
+
+        # Select a search space preparation function
+        if args.match_sequence:
+            if args.gapped:
+                gettext = lambda x: "".join(re.split(r"-+", x.seq))
+            else:
+                gettext = lambda x: x.seq
+        else:
+            gettext = lambda x: x.header
+
+        def context(func):
+            has_context = args.before_context or args.after_context
+            if has_context:
+
+                def inner(seq, **kw):
+                    text = gettext(seq)
+                    matches = []
+                    for m in func(text, **kw):
+                        m["pos"][0] = max(0, m["pos"][0] - args.before_context)
+                        m["pos"][1] = min(len(text), m["pos"][1] + args.after_context)
+                        matches.append(m)
+                    return matches
+
+            else:
+
+                def inner(seq, **kw):
+                    text = gettext(seq)
+                    return func(text, **kw)
+
+            return inner
+
+        def seqtotext(func):
+            def inner(seq, **kw):
+                text = gettext(seq)
+                return func(text, **kw)
+
+            return inner
+
+        # Check existence for matches to wrapper captures
+        @seqtotext
+        def swrpmatcher(text, **kw):
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    return True
+            return False
+
+        # Check existence of matches
+        @seqtotext
+        def spatmatcher(text, **kw):
+            for p in pat:
+                if re.search(p, text):
+                    return True
+            return False
+
+        # Check if pattern matches entire text
+        @seqtotext
+        def linematcher(text, **kw):
+            for p in pat:
+                m = re.match(p, text)
+                if m and m.end() == len(text):
+                    return True
+            return False
+
+        @seqtotext
+        def exactmatcher(text, **kw):
+            return text in pat
+
+        @context
+        def gwrpmatcher(text, strand="."):
+            pos = []
+            for m in re.finditer(wrapper, text):
+                if m.group(1) in pat:
+                    match = {"pos": [m.start(1), m.end(1)], "strand": strand}
+                    pos.append(match)
+            return pos
+
+        @context
+        def gpatmatcher(text, strand="."):
+            pos = []
+            for p in pat:
+                for m in re.finditer(p, text):
+                    match = {"pos": [m.start(), m.end()], "strand": strand}
+                    pos.append(match)
+            return pos
+
+        # the matchers are of two types:
+        # 1. boolean - is the pattern present in the given sequence?
+        # 2. position - where are the patterns located?
+        # this flag records which type of pattern is used
+        by_position = False
+
+        # Select a base regular expression function
+        if args.exact:
+            matcher = exactmatcher
+        elif args.line_regexp:
+            matcher = linematcher
+        elif args.gff or args.count_matches or args.color_output or args.only_matching:
+            matcher = gwrpmatcher if wrapper else gpatmatcher
+            by_position = True
+        else:
+            matcher = swrpmatcher if wrapper else spatmatcher
+
+        # Prepare gapped or ungapped search function
+        def search_function(matcher, **kw):
+            if not args.gapped or not by_position:
+
+                def inner(seq, **kw):  # ungapped
+                    return matcher(seq, **kw)
+
+            else:
+
+                def inner(seq, **kw):  # gapped
+                    """
+                    Maps from positions on an ungapped sequence to positions on a
+                    gapped sequence. For example, it can convert the ATA match to
+                    'GATACA' on (1,3), to the '-GA--TACA' match on (2,5).
+                    """
+                    matches = matcher(seq, **kw)
+                    gaps = list(re.finditer(r"-+", seq.seq))
+                    if not gaps:
+                        return matches
+                    for g in gaps:
+                        g0 = g.span()[0]
+                        g1 = g.span()[1]
+                        glen = g1 - g0
+                        for m in matches:
+                            if m["pos"][0] >= g0:
+                                m["pos"][0] += glen
+                                m["pos"][1] += glen
+                        for m in matches:
+                            if (m["pos"][0] < g0) and (m["pos"][1] > g0):
+                                m["pos"][1] += glen
+                    return matches
+
+            return inner
+
+        # Process functions that include reverse complements
+        def stranded_function(matcher, by_position):
+            if by_position:
+
+                def rev(matcher, seq):
+                    rmatch = []
+                    text_length = len(seq.seq) if args.gapped else len(gettext(seq))
+                    for d in matcher(FSeq.getrevcomp(seq), strand="-"):
+                        d["pos"] = text_length - d["pos"][1], text_length - d["pos"][0]
+                        rmatch.append(d)
+                    return rmatch
+
+                if args.reverse_only:
+
+                    def rmatcher(seq):
+                        return rev(matcher, seq)
+
+                else:
+
+                    def rmatcher(seq):
+                        fmatch = matcher(seq, strand="+")
+                        rmatch = rev(matcher, seq)
+                        return fmatch + rmatch
+
+            else:
+                f = lambda x: matcher(x, strand="+")
+                r = lambda x: matcher(FSeq.getrevcomp(x), strand="-")
+                if args.reverse_only:
+
+                    def rmatcher(seq):
+                        return r(seq)
+
+                else:
+
+                    def rmatcher(seq):
+                        return r(seq) or f(seq)
+
+            return rmatcher
+
+        matcher = search_function(matcher)
+
+        if args.reverse_only or args.both_strands:
+            matcher = stranded_function(matcher, by_position)
+
+        return matcher
+
+    @staticmethod
+    def _makegen(args):
+
+        if args.gff:
+
+            def sgen(gen, matcher):
+                source = "smof-{}".format(__version__)
+                gfftype = args.gff_type
+                row = [
+                    None,  # 1 seqid
+                    source,  # 2 source
+                    gfftype,  # 3 type
+                    None,  # 4 start
+                    None,  # 5 end
+                    ".",  # 6 score
+                    None,  # 7 strand
+                    ".",  # 8 phase
+                    ".",  # 9 attributes
+                ]
+                for seq in gen.next():
+                    row[0] = ParseHeader.firstword(seq.header)
+                    matches = list(matcher(seq))
+                    for m in matches:
+                        row[3] = m["pos"][0] + 1
+                        row[4] = m["pos"][1]
+                        row[6] = m["strand"]
+                        yield "\t".join([str(s) for s in row])
+
+        elif args.count or args.count_matches:
+
+            def sgen(gen, matcher):
+                seqcount = OrderedDict()
+                seqmatch = OrderedDict()
+                for seq in gen.next():
+                    m = matcher(seq)
+                    if seq.filename not in seqcount:
+                        seqcount[seq.filename] = 0
+                        seqmatch[seq.filename] = 0
+                    if m:
+                        try:
+                            seqmatch[seq.filename] += len(m)
+                            seqcount[seq.filename] += 1
+                        except TypeError:
+                            pass
+                for filename, count in seqcount.items():
+                    match = seqmatch[filename]
+                    if args.count or args.count_matches:
+                        if len(seqcount) > 1:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}\t{}".format(count, match, filename)
+                            elif args.count:
+                                yield "{}\t{}".format(count, filename)
+                            elif args.count_matches:
+                                yield "{}\t{}".format(match, filename)
+                        else:
+                            if args.count and args.count_matches:
+                                yield "{}\t{}".format(count, match)
+                            elif args.count:
+                                yield count
+                            elif args.count_matches:
+                                yield match
+
+        elif args.files_without_match or args.files_with_matches:
+
+            def sgen(gen, matcher):
+                seqmat = OrderedDict()
+                for seq in gen.next():
+                    matched = matcher(seq)
+                    if seq.filename not in seqmat:
+                        seqmat[seq.filename] = False
+                    if matched:
+                        seqmat[seq.filename] = True
+                for filename, matched in seqmat.items():
+                    if (not matched and args.files_without_match) or (
+                        matched and args.files_with_matches
+                    ):
+                        yield filename
+
+        elif args.only_matching:
+
+            def sgen(gen, matcher):
+                for seq in gen.next():
+                    matches = matcher(seq)
+                    text = seq.seq if args.match_sequence else seq.header
+                    for m in matches:
+                        match = text[m["pos"][0] : m["pos"][1]]
+                        if args.match_sequence:
+                            header = "%s|subseq(%d..%d) %s" % (
+                                ParseHeader.firstword(seq.header),
+                                m["pos"][0],
+                                m["pos"][1],
+                                ParseHeader.description(seq.header),
+                            )
+                            yield FSeq(header, match)
+                        else:
+                            yield match
+
+        else:
+
+            def sgen(gen, matcher):
+                for seq in gen.next(handle_color=args.preserve_color):
+                    matches = matcher(seq)
+                    if (matches and not args.invert_match) or (
+                        not matches and args.invert_match
+                    ):
+                        if args.color_output:
+                            for pos in [m["pos"] for m in matches]:
+                                if args.match_sequence:
+                                    seq.color_seq(*pos, col=args.color)
+                                else:
+                                    seq.color_header(*pos, col=args.color)
+                        yield seq
+
+        return sgen
