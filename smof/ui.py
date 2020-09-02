@@ -461,26 +461,13 @@ class Permute(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        import random
-
-        if args.seed:
-            random.seed(args.seed)
-        w = args.word_size
-        start = args.start_offset
-        end = args.end_offset
-        for seq in gen.next():
-            s = seq.seq
-            L = len(s)
-            prefix = s[0:start]
-            suffix = s[L - end : L]
-            rseq = s[start : L - end]
-            M = len(rseq)
-            words = list(rseq[i : i + w] for i in range(0, M - w + 1, w))
-            words.append(rseq[(M - M % w) : M])
-            random.shuffle(words)
-            out = "".join(prefix + "".join(words) + suffix)
-            header = ParseHeader.permute(seq.header, start, end, w)
-            yield FSeq(header, out)
+        return permute(
+            gen,
+            seed         = args.seed,
+            word_size    = args.word_size,
+            start_offset = args.start_offset,
+            end_offset   = args.end_offset,
+          )
 
 
 class Reverse(Subcommand):
@@ -1623,49 +1610,15 @@ class Head(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        i = 1
-        allbut = False
-
-        if args.entries:
-            if args.nseqs:
-                err("Please don't use nseqs with --entries")
-            try:
-                if args.entries[0] == "-":
-                    allbut = True
-                    nseqs = int(args.entries[1:])
-                else:
-                    nseqs = int(args.entries)
-            except AttributeError:
-                err("-n (--entries) must be a number")
-        elif args.nseqs:
-            # This resolve cases where there is a positional filename and no
-            # nseqs given.
-            # If the first positional argument is a readable filename, treat
-            # it as input. Otherwise, try to interpret it as a number
-            if os.access(args.nseqs, os.R_OK):
-                args.fh = [args.nseqs] + args.fh
-                nseqs = 1
-            else:
-                try:
-                    nseqs = int(re.match(r"-(\d+)", args.nseqs).group(1))
-                except AttributeError:
-                    err("N must be formatted as '-12'")
-        else:
-            nseqs = 1
-
-        if allbut:
-            seqs = list()
-            for seq in gen.next():
-                if i > nseqs:
-                    yield headtailtrunk(seqs.pop(0), args.first, args.last)
-                seqs.append(seq)
-                i += 1
-        else:
-            for seq in gen.next():
-                yield headtailtrunk(seq, args.first, args.last)
-                if i == nseqs:
-                    break
-                i += 1
+        return head(
+          gen,
+          entries = args.entries,
+          nseqs   = args.nseqs,
+          fh      = args.fh,
+          first   = args.first,
+          last    = args.last,
+        )
+        
 
 
 class Grep(Subcommand):
@@ -2201,10 +2154,10 @@ class Tail(Subcommand):
 
 
 def main():
-    if os.name is not "nt":
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    if os.name is "nt":
+    if os.name == "nt":
         os.system("color")  # allows ANSI color on windows
+    else:
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     args = parse()
     gen = FSeqGenerator(args)
     args.func(args, gen, out=sys.stdout)

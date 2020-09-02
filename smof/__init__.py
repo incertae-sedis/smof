@@ -192,6 +192,72 @@ def grep(gen, **kwargs):
     src = GrepSearch(args)
     return src.search(gen)
 
+def head (gen, entries, nseqs, fh, first, last):
+    i = 1
+    allbut = False
+
+    if entries:
+        if nseqs:
+            err("Please don't use nseqs with --entries")
+        try:
+            if entries[0] == "-":
+                allbut = True
+                nseqs = int(entries[1:])
+            else:
+                nseqs = int(entries)
+        except AttributeError:
+            err("-n (--entries) must be a number")
+    elif nseqs:
+        # This resolve cases where there is a positional filename and no
+        # nseqs given.
+        # If the first positional argument is a readable filename, treat
+        # it as input. Otherwise, try to interpret it as a number
+        if os.access(nseqs, os.R_OK):
+            fh = [nseqs] + fh
+            nseqs = 1
+        else:
+            try:
+                nseqs = int(re.match(r"-(\d+)", nseqs).group(1))
+            except AttributeError:
+                err("N must be formatted as '-12'")
+    else:
+        nseqs = 1
+
+    if allbut:
+        seqs = list()
+        for seq in gen.next():
+            if i > nseqs:
+                yield headtailtrunk(seqs.pop(0), first, last)
+            seqs.append(seq)
+            i += 1
+    else:
+        for seq in gen.next():
+            yield headtailtrunk(seq, first, last)
+            if i == nseqs:
+                break
+            i += 1
+
+def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
+    import random
+    if seed:
+        random.seed(seed)
+    w = word_size
+    start = start_offset
+    end = end_offset
+    for seq in gen.next():
+        s = seq.seq
+        L = len(s)
+        prefix = s[0:start]
+        suffix = s[L - end : L]
+        rseq = s[start : L - end]
+        M = len(rseq)
+        words = list(rseq[i : i + w] for i in range(0, M - w + 1, w))
+        words.append(rseq[(M - M % w) : M])
+        random.shuffle(words)
+        out = "".join(prefix + "".join(words) + suffix)
+        header = ParseHeader.permute(seq.header, start, end, w)
+        yield FSeq(header, out)
+
 
 # =================
 # UTILITY FUNCTIONS
