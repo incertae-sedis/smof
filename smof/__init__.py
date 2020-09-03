@@ -9,6 +9,14 @@ from collections import OrderedDict
 from itertools import chain
 from smof.version import __version__
 
+def open_fasta(xs):
+  """
+  Given a single fasta file or a list of fasta files, return a generator that
+  will yield individual entries. The returned object is the expected input to
+  all fasta processing functions in smof.
+  """
+  return FSeqGenerator(xs)
+
 # ========
 # Commands
 # ========
@@ -1373,29 +1381,19 @@ class FSeq:
 
 
 class FSeqGenerator:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, files):
+        if isinstance(files, list):
+          self.files = files
+        else:
+          self.files = [files]
 
     def next(self, *args, **kwargs):
-        # If no input is given,
-        # and if smof is not reading user input from stdin,
-        # assume piped input is from STDIN
-        try:
-            if not self.args.fh:
-                fh = [sys.stdin]
-            else:
-                fh = self.args.fh
-        # If args does not have a .fh argument, then try treating args itself
-        # as the input
-        except AttributeError:
-            fh = [self.args]
-
-        for fastafile in fh:
+        for fastafile in self.files:
             seq_list = []
             header = None
             # If there are multiple input files, store the filename
             # If there is only one, e.g. STDIN, don't store a name
-            filename = None if len(fh) == 1 else fastafile
+            filename = None if len(self.files) == 1 else fastafile
             try:
                 f = open(fastafile, "r")
             except TypeError:

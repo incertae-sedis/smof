@@ -1821,5 +1821,20 @@ def main():
     else:
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     args = parse()
-    gen = FSeqGenerator(args)
+
+    # If no input is given,
+    # and if smof is not reading user input from stdin,
+    # assume piped input is from STDIN
+    try:
+        if not args.fh:
+            files = [sys.stdin]
+        else:
+            files = args.fh
+    # If args does not have a .fh argument, then try treating args itself
+    # as the input
+    except AttributeError:
+        files = [args]
+
+    gen = FSeqGenerator(files)
+
     args.func(args, gen, out=sys.stdout)

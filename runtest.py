@@ -11,17 +11,12 @@ from collections import Counter
 from io import StringIO
 
 
-class dummy:
-    def __init__(self, fh):
-        self.fh = [fh]
-
-
 def get_output(seq, argv):
     argv = [str(s) for s in argv]
     out = StringIO()
     args = smof.parse(argv)
     args.fh = [seq]
-    gen = smof.FSeqGenerator(args)
+    gen = smof.FSeqGenerator([seq])
     args.func(args, gen, out=out)
     return out.getvalue().strip().split("\n")
 
@@ -553,8 +548,7 @@ class TestFSeqGenerator(unittest.TestCase):
         self.no_sequence = []
 
     def cmp_seqs(self, fh, exp_seqs):
-        seq = dummy(fh)
-        g = smof.FSeqGenerator(seq)
+        g = smof.FSeqGenerator([fh])
         obs_seqs = [s for s in g.next()]
         for obs, exp in zip(obs_seqs, exp_seqs):
             if (obs.header != exp.header) or (obs.seq != exp.seq):
@@ -563,9 +557,8 @@ class TestFSeqGenerator(unittest.TestCase):
         return True
 
     def is_valid(self, fh):
-        seq = dummy(fh)
         try:
-            g = smof.FSeqGenerator(seq)
+            g = smof.FSeqGenerator([fh])
             out = [s for s in g.next()]
             return True
         except BaseException:
