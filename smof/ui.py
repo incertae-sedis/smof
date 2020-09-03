@@ -518,33 +518,13 @@ class Reverse(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        """ Reverse each sequence """
-        self.force_color = args.force_color
-        if args.complement:
-
-            def f(s):
-                return FSeq.getrevcomp(s)
-
-        else:
-
-            def f(s):
-                s.reverse()
-                return s
-
-        if args.complement and not args.no_validate:
-
-            def func(s):
-                if s.get_moltype() == "dna":
-                    return f(s)
-                else:
-                    msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
-                    err(msg % ParseHeader.firstword(s.header))
-
-        else:
-            func = f
-
-        for seq in gen.next(handle_color=args.preserve_color):
-            yield func(seq)
+      self.force_color = args.force_color
+      return reverse(
+        gen,
+        complement=args.complement,
+        no_validate=args.no_validate,
+        preserve_color=args.preserve_color
+      )
 
 
 class Sniff(Subcommand):
@@ -660,69 +640,16 @@ class Sniff(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqsum = FileDescription()
-        for seq in gen.next():
-            seqsum.add_seq(seq)
-        yield seqsum
+        NotImplemented
 
     def write(self, args, gen, out=sys.stdout):
         """
         This function basically just formats and prints the information in a
         FileDescription object
         """
-        # The generator yields only this one item: a FileDescription object
-        seqsum = next(self.generator(args, gen))
+        seqsum = sniff(gen)
 
-        # Total number of sequences
-        nseqs = seqsum.get_nseqs()
-
-        # Print number of uniq and total sequences
-        if seqsum.count_degenerate_seqs():
-            uniq = nseqs - seqsum.count_degenerate_seqs()
-            out.write("{} uniq sequences ({} total)\n".format(uniq, nseqs))
-        else:
-            out.write("Total sequences: {}\n".format(nseqs))
-
-        # Warn if there are any duplicate headers
-        if seqsum.count_degenerate_headers():
-            uniq = nseqs - seqsum.count_degenerate_headers()
-            out.write("WARNING: headers are not unique ({}/{})\n".format(uniq, nseqs))
-
-        # Warn if there are any illegal characters
-        if seqsum.ntype["illegal"]:
-            out.write("WARNING: illegal characters found\n")
-
-        def write_dict(d, name, N):
-            # Print keys if value is greater than 0
-            uniq = [[k, v] for k, v in d.items() if v > 0]
-            # E.g. If all of the sequences are proteins, print 'All prot'
-            if len(uniq) == 1:
-                out.write("All {}\n".format(uniq[0][0]))
-            # Otherwise print the count and proportion of each represented type
-            else:
-                out.write("{}:\n".format(name))
-                for k, v in sorted(uniq, key=lambda x: -x[1]):
-                    out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ":", v, v / N))
-
-        def write_feat(d, text, N, drop=False):
-            # If no sequences are of this type (e.g. 'prot'), do nothing
-            if N == 0:
-                return
-            out.write("%s\n" % text)
-            # Sort the dictionary by value
-            for k, v in sorted(list(d.items()), key=lambda x: -x[1]):
-                # If the key is represented, print its count and proportion
-                if (drop and v != 0) or not drop:
-                    out.write("  {:<20} {:<10} {:>7.4%}\n".format(k + ":", v, v / N))
-
-        write_dict(seqsum.ntype, "Sequence types", nseqs)
-        write_dict(seqsum.ncase, "Sequences cases", nseqs)
-
-        nnucl = seqsum.ntype["dna"] + seqsum.ntype["rna"]
-        nprot = seqsum.ntype["prot"]
-        write_feat(seqsum.nfeat, "Nucleotide Features", nnucl, drop=True)
-        write_feat(seqsum.pfeat, "Protein Features:", nprot)
-        write_feat(seqsum.ufeat, "Universal Features:", nseqs)
+        out.write(str(seqsum))
 
 
 class Stat(Subcommand):

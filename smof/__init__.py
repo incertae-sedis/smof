@@ -259,6 +259,40 @@ def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
         yield FSeq(header, out)
 
 
+def reverse(gen, complement=False, no_validate=False, preserve_color=False):
+    """ Reverse each sequence """
+    if complement:
+
+        def f(s):
+            return FSeq.getrevcomp(s)
+
+    else:
+
+        def f(s):
+            s.reverse()
+            return s
+
+    if complement and not no_validate:
+
+        def func(s):
+            if s.get_moltype() == "dna":
+                return f(s)
+            else:
+                msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
+                err(msg % ParseHeader.firstword(s.header))
+
+    else:
+        func = f
+
+    for seq in gen.next(handle_color=preserve_color):
+        yield func(seq)
+
+def sniff(gen):
+    seqsum = FileDescription()
+    for seq in gen.next():
+        seqsum.add_seq(seq)
+    return seqsum
+
 # =================
 # UTILITY FUNCTIONS
 # =================
@@ -765,6 +799,64 @@ class FileDescription:
         stype = guess_type(counts)
         self.ntype[stype] += 1
         return stype
+
+    def __str__(self):
+        # Total number of sequences
+        nseqs = self.get_nseqs()
+
+        result = []
+
+        # Print number of uniq and total sequences
+        if self.count_degenerate_seqs():
+            uniq = nseqs - self.count_degenerate_seqs()
+            result.append("{} uniq sequences ({} total)".format(uniq, nseqs))
+        else:
+            result.append("Total sequences: {}".format(nseqs))
+
+        # Warn if there are any duplicate headers
+        if self.count_degenerate_headers():
+            uniq = nseqs - self.count_degenerate_headers()
+            result.append("WARNING: headers are not unique ({}/{})".format(uniq, nseqs))
+
+        # Warn if there are any illegal characters
+        if self.ntype["illegal"]:
+            result.append("WARNING: illegal characters found")
+
+        def write_dict(d, name, N):
+            # Print keys if value is greater than 0
+            uniq = [[k, v] for k, v in d.items() if v > 0]
+            # E.g. If all of the sequences are proteins, print 'All prot'
+            if len(uniq) == 1:
+                result.append("All {}".format(uniq[0][0]))
+            # Otherwise print the count and proportion of each represented type
+            else:
+                result.append("{}:".format(name))
+                for k, v in sorted(uniq, key=lambda x: -x[1]):
+                    result.append("  {:<20} {:<10} {:>7.4%}".format(k + ":", v, v / N))
+
+        def write_feat(d, text, N, drop=False):
+            # If no sequences are of this type (e.g. 'prot'), do nothing
+            if N == 0:
+                return
+            result.append("%s" % text)
+            # Sort the dictionary by value
+            for k, v in sorted(list(d.items()), key=lambda x: -x[1]):
+                # If the key is represented, print its count and proportion
+                if (drop and v != 0) or not drop:
+                    result.append("  {:<20} {:<10} {:>7.4%}".format(k + ":", v, v / N))
+
+        write_dict(self.ntype, "Sequence types", nseqs)
+        write_dict(self.ncase, "Sequences cases", nseqs)
+
+        nnucl = self.ntype["dna"] + self.ntype["rna"]
+        nprot = self.ntype["prot"]
+        write_feat(self.nfeat, "Nucleotide Features", nnucl, drop=True)
+        write_feat(self.pfeat, "Protein Features:", nprot)
+        write_feat(self.ufeat, "Universal Features:", nseqs)
+
+        result.append("")
+
+        return "\n".join(result)
 
 
 class FileStat:
