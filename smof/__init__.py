@@ -193,7 +193,8 @@ def grep(gen, **kwargs):
     src = GrepSearch(args)
     return src.search(gen)
 
-def head (gen, entries, nseqs, fh, first, last):
+
+def head(gen, entries, nseqs, fh, first, last):
     i = 1
     allbut = False
 
@@ -238,8 +239,10 @@ def head (gen, entries, nseqs, fh, first, last):
                 break
             i += 1
 
+
 def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
     import random
+
     if seed:
         random.seed(seed)
     w = word_size
@@ -288,22 +291,24 @@ def reverse(gen, complement=False, no_validate=False, preserve_color=False):
     for seq in gen.next(handle_color=preserve_color):
         yield func(seq)
 
+
 def sniff(gen):
     seqsum = FileDescription()
     for seq in gen.next():
         seqsum.add_seq(seq)
     return seqsum
 
+
 def stat_seq(
-  gen,
-  length=False,
-  counts=False,
-  proportion=False,
-  case_sensitive=False,
-  count_lower=False,
+    gen,
+    length=False,
+    counts=False,
+    proportion=False,
+    case_sensitive=False,
+    count_lower=False,
 ):
-    if not (counts or proportion or case_sensitive or count_lower): 
-      length = True
+    if not (counts or proportion or case_sensitive or count_lower):
+        length = True
 
     seqlist = []
     charset = set()
@@ -328,9 +333,7 @@ def stat_seq(
 
         count_offset = length + count_lower + 1
         for q in seqlist:
-            line = q.aslist(
-                charset=charset, header_fun=ParseHeader.firstword, **kwargs
-            )
+            line = q.aslist(charset=charset, header_fun=ParseHeader.firstword, **kwargs)
             if counts:
                 out = line
             elif proportion:
@@ -339,11 +342,126 @@ def stat_seq(
                 out = chain(line[0:count_offset], props)
             yield out
 
+
 def stat_file(gen, count_characters=False):
     g = FileStat()
     for seq in gen.next():
         g.add_seq(SeqStat(seq, count=count_characters))
     return g
+
+def subseq(gen, a, b, color=None):
+    for seq in gen.next(handle_color=True):
+        start, end = sorted([a, b])
+        end = min(end, len(seq.seq))
+
+        # Check boundaries
+        if start > len(seq.seq):
+            err("Start position must be less than seq length")
+
+        if color:
+            c = Colors.COLORS[color]
+            seq.colseq.colorpos(start - 1, end, c)
+            outseq = seq
+        else:
+            outseq = seq.subseq(start - 1, end)
+            if (a > b) and seq.get_moltype() == "dna":
+                outseq = FSeq.getrevcomp(outseq)
+        yield outseq
+
+def gff_subseq(gen, gff_file, keep=False, color=None):
+    subseqs = defaultdict(list)
+    for line in gff_file:
+        row = line.split("\t")
+        try:
+            a, b = int(row[3]), int(row[4])
+            if row[6] == "-":
+                subseqs[row[0]].append({"start": max(a, b), "end": min(a, b)})
+            else:
+                subseqs[row[0]].append({"start": a, "end": b})
+        except IndexError:
+            err("Improper gff3 file")
+        except ValueError:
+            err("gff bounds must be integers")
+
+    for seq in gen.next(handle_color=True):
+        seqid = ParseHeader.firstword(seq.header)
+        try:
+            if seqid not in subseqs.keys():
+                raise KeyError
+        except KeyError:
+            if keep:
+                yield seq
+            continue
+
+        if color:
+            for s in subseqs[seqid]:
+                seq = subseq(seq, s["start"], s["end"], color)
+            yield seq
+        else:
+            for s in subseqs[seqid]:
+                yield subseq(seq, s["start"], s["end"])
+
+def translate(gen, all_frames=False, from_start=False, cds=False):
+    for seq in gen.next():
+        orf = get_orf(
+            seq.seq,
+            all_frames=all_frames,
+            from_start=from_start,
+            translate=not cds,
+        )
+        yield FSeq(header=seq.header, seq=orf)
+
+def uniq(gen, repeated=False, uniq=False, count=False):
+    seqs = OrderedDict()
+    for seq in gen.next():
+        try:
+            seqs[seq] += 1
+        except KeyError:
+            seqs[seq] = 1
+
+    if repeated:
+        sgen = ((k, v) for k, v in seqs.items() if v > 1)
+    elif uniq:
+        sgen = ((k, v) for k, v in seqs.items() if v == 1)
+    else:
+        sgen = seqs.items()
+
+    if count:
+        for k, v in sgen:
+            yield "{}\t{}".format(v, k.header)
+    else:
+        for k, v in sgen:
+            yield k
+
+def pack(gen, sep):
+    seqs = OrderedDict()
+    for seq in gen.next():
+        if seq.seq in seqs:
+            seqs[seq.seq].append(seq.header)
+        else:
+            seqs[seq.seq] = [seq.header]
+    for q, h in seqs.items():
+        seq = FSeq(header=sep.join(h), seq=q)
+        yield seq
+
+def unpack(gen, sep):
+    for seq in gen.next():
+        headers = seq.header.split(sep)
+        for header in headers:
+            yield FSeq(header=header, seq=seq.seq)
+
+def uniq_headers(gen, removed=False):
+    seqs = OrderedDict()
+    for seq in gen.next():
+        if seq.header in seqs:
+            if removed:
+                seq.print(color=False, out=args.removed)
+        else:
+            seqs[seq.header] = seq.seq
+    for header, sequence in seqs.items():
+        seq = FSeq(header=header, seq=sequence)
+        yield seq
+
 
 # =================
 # UTILITY FUNCTIONS
@@ -1006,12 +1124,12 @@ class FileStat:
         return "\n".join(lines)
 
     def get_count(
-      self,
-      count_lower    = False,
-      case_sensitive = False,
-      type           = False,
-      counts         = False,
-      proportion     = False
+        self,
+        count_lower=False,
+        case_sensitive=False,
+        type=False,
+        counts=False,
+        proportion=False,
     ):
         lines = []
         lower = sum_lower(self.counts) if count_lower else None
@@ -1040,7 +1158,6 @@ class FileStat:
         if count_lower:
             lines.append("{:10s} {} ({:.1%})".format("lower:", lower, lower / N))
         return "\n".join(lines)
-
 
 
 class FSeq:

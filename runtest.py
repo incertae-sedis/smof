@@ -1331,24 +1331,31 @@ class TestStatSeqFun(unittest.TestCase):
         self.assertEqual(get_output(self.fna, ["stat", "-q"]), ["A\t1", "B\t8", "C\t4"])
 
     def test_stat_seq_characters(self):
-        self.assertEqual(get_output(self.fna, ["stat", "-q", "-c", "-d", ","]),
-              ["seqid,A,C,G,N,T,Y",
-              "A,1,0,0,0,0,0",
-              "B,2,2,2,0,2,0",
-              "C,1,0,0,1,1,1",]
-          )
+        self.assertEqual(
+            get_output(self.fna, ["stat", "-q", "-c", "-d", ","]),
+            ["seqid,A,C,G,N,T,Y", "A,1,0,0,0,0,0", "B,2,2,2,0,2,0", "C,1,0,0,1,1,1",],
+        )
 
-        self.assertEqual(get_output(self.fna, ["stat", "-q", "-p", "-d", ","]),
-              ["seqid,A,C,G,N,T,Y",
-              "A,1.0,0.0,0.0,0.0,0.0,0.0",
-              "B,0.25,0.25,0.25,0.0,0.25,0.0",
-              "C,0.25,0.0,0.0,0.25,0.25,0.25",])
+        self.assertEqual(
+            get_output(self.fna, ["stat", "-q", "-p", "-d", ","]),
+            [
+                "seqid,A,C,G,N,T,Y",
+                "A,1.0,0.0,0.0,0.0,0.0,0.0",
+                "B,0.25,0.25,0.25,0.0,0.25,0.0",
+                "C,0.25,0.0,0.0,0.25,0.25,0.25",
+            ],
+        )
 
-        self.assertEqual(get_output(self.fna, ["stat", "-qlcmd", ","]),
-              ["seqid,length,masked,A,C,G,N,T,Y",
-              "A,1,0,1,0,0,0,0,0",
-              "B,8,0,2,2,2,0,2,0",
-              "C,4,0,1,0,0,1,1,1",])
+        self.assertEqual(
+            get_output(self.fna, ["stat", "-qlcmd", ","]),
+            [
+                "seqid,length,masked,A,C,G,N,T,Y",
+                "A,1,0,1,0,0,0,0,0",
+                "B,8,0,2,2,2,0,2,0",
+                "C,4,0,1,0,0,1,1,1",
+            ],
+        )
+
 
 class TestStatFileFun(unittest.TestCase):
     def setUp(self):
@@ -1360,14 +1367,18 @@ class TestStatFileFun(unittest.TestCase):
             ">C",
             "ATNY",
         ]
+
     def test_stat_file_basic(self):
-        self.assertEqual(get_output(self.fna, ["stat"]),
-            [ "nseq:      3",
-              "nchars:    13",
-              "5sum:      1 2 4 6 8",
-              "mean(sd):  4 (4)",
-              "N50:       8",
-            ])
+        self.assertEqual(
+            get_output(self.fna, ["stat"]),
+            [
+                "nseq:      3",
+                "nchars:    13",
+                "5sum:      1 2 4 6 8",
+                "mean(sd):  4 (4)",
+                "N50:       8",
+            ],
+        )
 
 
 class TestSubseq(unittest.TestCase):

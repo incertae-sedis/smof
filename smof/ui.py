@@ -6,7 +6,6 @@ import string
 import os
 import signal
 import textwrap
-from itertools import chain
 from collections import Counter
 from collections import defaultdict
 from collections import OrderedDict
@@ -463,11 +462,11 @@ class Permute(Subcommand):
     def generator(self, args, gen):
         return permute(
             gen,
-            seed         = args.seed,
-            word_size    = args.word_size,
-            start_offset = args.start_offset,
-            end_offset   = args.end_offset,
-          )
+            seed=args.seed,
+            word_size=args.word_size,
+            start_offset=args.start_offset,
+            end_offset=args.end_offset,
+        )
 
 
 class Reverse(Subcommand):
@@ -518,13 +517,13 @@ class Reverse(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-      self.force_color = args.force_color
-      return reverse(
-        gen,
-        complement=args.complement,
-        no_validate=args.no_validate,
-        preserve_color=args.preserve_color
-      )
+        self.force_color = args.force_color
+        return reverse(
+            gen,
+            complement=args.complement,
+            no_validate=args.no_validate,
+            preserve_color=args.preserve_color,
+        )
 
 
 class Sniff(Subcommand):
@@ -759,31 +758,37 @@ class Stat(Subcommand):
         args = self._process_args(args)
         if args.byseq:
             g = stat_seq(
-                  gen,
-                  length         = args.length,
-                  counts         = args.counts,
-                  proportion     = args.proportion,
-                  case_sensitive = args.case_sensitive,
-                  count_lower    = args.count_lower,
-              )
+                gen,
+                length=args.length,
+                counts=args.counts,
+                proportion=args.proportion,
+                case_sensitive=args.case_sensitive,
+                count_lower=args.count_lower,
+            )
 
             for item in g:
                 yield args.delimiter.join([str(i) for i in item])
         else:
             # Do I need to count the characters? (much faster if I don't)
             need_count = any(
-                (args.counts, args.proportion, args.count_lower, args.type, args.aa_profile)
+                (
+                    args.counts,
+                    args.proportion,
+                    args.count_lower,
+                    args.type,
+                    args.aa_profile,
+                )
             )
 
             g = stat_file(gen, count_characters=need_count)
 
             if need_count:
                 yield g.get_count(
-                   count_lower    = args.count_lower,
-                   case_sensitive = args.case_sensitive,
-                   type           = args.type,
-                   counts         = args.counts,
-                   proportion     = args.proportion,
+                    count_lower=args.count_lower,
+                    case_sensitive=args.case_sensitive,
+                    type=args.type,
+                    counts=args.counts,
+                    proportion=args.proportion,
                 )
 
             if args.length:
@@ -926,71 +931,14 @@ class Subseq(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    @staticmethod
-    def _subseq(seq, a, b, color=None):
-        start, end = sorted([a, b])
-        end = min(end, len(seq.seq))
-
-        # Check boundaries
-        if start > len(seq.seq):
-            err("Start position must be less than seq length")
-
-        if color:
-            c = Colors.COLORS[color]
-            seq.colseq.colorpos(start - 1, end, c)
-            outseq = seq
-        else:
-            outseq = seq.subseq(start - 1, end)
-            if (a > b) and seq.get_moltype() == "dna":
-                outseq = FSeq.getrevcomp(outseq)
-        return outseq
-
-    def _gff_generator(self, args, gen):
-        subseqs = defaultdict(list)
-        for line in args.gff:
-            row = line.split("\t")
-            try:
-                a, b = int(row[3]), int(row[4])
-                if row[6] == "-":
-                    subseqs[row[0]].append({"start": max(a, b), "end": min(a, b)})
-                else:
-                    subseqs[row[0]].append({"start": a, "end": b})
-            except IndexError:
-                err("Improper gff3 file")
-            except ValueError:
-                err("gff bounds must be integers")
-
-        for seq in gen.next(handle_color=True):
-            seqid = ParseHeader.firstword(seq.header)
-            try:
-                if seqid not in subseqs.keys():
-                    raise KeyError
-            except KeyError:
-                if args.keep:
-                    yield seq
-                continue
-
-            if args.color:
-                for s in subseqs[seqid]:
-                    seq = self._subseq(seq, s["start"], s["end"], args.color)
-                yield seq
-            else:
-                for s in subseqs[seqid]:
-                    yield self._subseq(seq, s["start"], s["end"])
-
-    def _bound_generator(self, args, gen):
-        for seq in gen.next(handle_color=True):
-            yield self._subseq(seq, *args.bounds, color=args.color)
-
     def generator(self, args, gen):
         self.force_color = args.force_color
         if args.gff:
-            sgen = self._gff_generator
+            sgen = gff_subseq(gen, gff_file=args.gff, color=args.color)
         else:
-            sgen = self._bound_generator
+            sgen = subseq(gen, a=args.bounds[0], b=args.bounds[1], color=args.color)
 
-        for item in sgen(args, gen):
-            yield item
+        return sgen
 
 
 class Translate(Subcommand):
@@ -1038,15 +986,12 @@ class Translate(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        """ Reverse each sequence """
-        for seq in gen.next():
-            orf = get_orf(
-                seq.seq,
-                all_frames=args.all_frames,
-                from_start=args.from_start,
-                translate=not args.cds,
-            )
-            yield FSeq(header=seq.header, seq=orf)
+        return translate(
+          gen,
+          all_frames=args.all_frames,
+          from_start=args.from_start,
+          cds=args.cds
+        )
 
 
 # ==============
@@ -1391,14 +1336,13 @@ class Head(Subcommand):
 
     def generator(self, args, gen):
         return head(
-          gen,
-          entries = args.entries,
-          nseqs   = args.nseqs,
-          fh      = args.fh,
-          first   = args.first,
-          last    = args.last,
+            gen,
+            entries=args.entries,
+            nseqs=args.nseqs,
+            fh=args.fh,
+            first=args.first,
+            last=args.last,
         )
-        
 
 
 class Grep(Subcommand):
@@ -1711,74 +1655,15 @@ class Uniq(Subcommand):
         )
         parser.set_defaults(func=self.func)
 
-    @staticmethod
-    def standard_generator(args, gen):
-
-        seqs = OrderedDict()
-        for seq in gen.next():
-            try:
-                seqs[seq] += 1
-            except KeyError:
-                seqs[seq] = 1
-
-        if args.repeated:
-            sgen = ((k, v) for k, v in seqs.items() if v > 1)
-        elif args.uniq:
-            sgen = ((k, v) for k, v in seqs.items() if v == 1)
-        else:
-            sgen = seqs.items()
-
-        if args.count:
-            for k, v in sgen:
-                yield "{}\t{}".format(v, k.header)
-        else:
-            for k, v in sgen:
-                yield k
-
-    @staticmethod
-    def pack_generator(args, gen):
-        seqs = OrderedDict()
-        for seq in gen.next():
-            if seq.seq in seqs:
-                seqs[seq.seq].append(seq.header)
-            else:
-                seqs[seq.seq] = [seq.header]
-        for q, h in seqs.items():
-            seq = FSeq(header=args.pack_sep.join(h), seq=q)
-            yield seq
-
-    @staticmethod
-    def unpack_generator(args, gen):
-        for seq in gen.next():
-            headers = seq.header.split(args.pack_sep)
-            for header in headers:
-                yield FSeq(header=header, seq=seq.seq)
-
-    @staticmethod
-    def first_header_generator(args, gen):
-        seqs = OrderedDict()
-        for seq in gen.next():
-            if seq.header in seqs:
-                if args.removed:
-                    seq.print(color=False, out=args.removed)
-            else:
-                seqs[seq.header] = seq.seq
-        for header, sequence in seqs.items():
-            seq = FSeq(header=header, seq=sequence)
-            yield seq
-
     def generator(self, args, gen):
         if args.first_header:
-            g = self.first_header_generator
+            return uniq_headers(gen, removed=args.removed)
         elif args.pack:
-            g = self.pack_generator
+            return pack(gen, sep=args.pack_sep)
         elif args.unpack:
-            g = self.unpack_generator
+            return unpack(gen, sep=args.pack_sep)
         else:
-            g = self.standard_generator
-
-        for a in g(args, gen):
-            yield a
+            return uniq(gen, repeated=args.repeated, uniq=args.uniq, count=args.count)
 
 
 class Wc(Subcommand):
