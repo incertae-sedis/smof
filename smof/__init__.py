@@ -349,6 +349,7 @@ def stat_file(gen, count_characters=False):
         g.add_seq(SeqStat(seq, count=count_characters))
     return g
 
+
 def subseq(gen, a, b, color=None):
     for seq in gen.next(handle_color=True):
         start, end = sorted([a, b])
@@ -367,6 +368,7 @@ def subseq(gen, a, b, color=None):
             if (a > b) and seq.get_moltype() == "dna":
                 outseq = FSeq.getrevcomp(outseq)
         yield outseq
+
 
 def gff_subseq(gen, gff_file, keep=False, color=None):
     subseqs = defaultdict(list)
@@ -401,15 +403,14 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
             for s in subseqs[seqid]:
                 yield subseq(seq, s["start"], s["end"])
 
+
 def translate(gen, all_frames=False, from_start=False, cds=False):
     for seq in gen.next():
         orf = get_orf(
-            seq.seq,
-            all_frames=all_frames,
-            from_start=from_start,
-            translate=not cds,
+            seq.seq, all_frames=all_frames, from_start=from_start, translate=not cds,
         )
         yield FSeq(header=seq.header, seq=orf)
+
 
 def uniq(gen, repeated=False, uniq=False, count=False):
     seqs = OrderedDict()
@@ -433,6 +434,7 @@ def uniq(gen, repeated=False, uniq=False, count=False):
         for k, v in sgen:
             yield k
 
+
 def pack(gen, sep):
     seqs = OrderedDict()
     for seq in gen.next():
@@ -444,11 +446,13 @@ def pack(gen, sep):
         seq = FSeq(header=sep.join(h), seq=q)
         yield seq
 
+
 def unpack(gen, sep):
     for seq in gen.next():
         headers = seq.header.split(sep)
         for header in headers:
             yield FSeq(header=header, seq=seq.seq)
+
 
 def uniq_headers(gen, removed=False):
     seqs = OrderedDict()

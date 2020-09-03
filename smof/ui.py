@@ -987,10 +987,7 @@ class Translate(Subcommand):
 
     def generator(self, args, gen):
         return translate(
-          gen,
-          all_frames=args.all_frames,
-          from_start=args.from_start,
-          cds=args.cds
+            gen, all_frames=args.all_frames, from_start=args.from_start, cds=args.cds
         )
 
 
