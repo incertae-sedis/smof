@@ -712,14 +712,15 @@ class TestClean(unittest.TestCase):
         )
 
     def test_nonstandard_dna(self):
-      self.assertEqual(
-          get_output(self.nonstandard_dna, ["clean", "-d", "-t", "n"])[1], "---NnCAT"
-      )
+        self.assertEqual(
+            get_output(self.nonstandard_dna, ["clean", "-d", "-t", "n"])[1], "---NnCAT"
+        )
 
     def test_nonstandard_pro(self):
-      self.assertEqual(
-          get_output(self.nonstandard_pro, ["clean", "-d", "-t", "p"])[1], "---GANDALF"
-      )
+        self.assertEqual(
+            get_output(self.nonstandard_pro, ["clean", "-d", "-t", "p"])[1],
+            "---GANDALF",
+        )
 
     def test_wrap(self):
         self.assertEqual(get_output(self.longseq, ["clean", "-w", "30"])[1], "A" * 30)
@@ -1315,6 +1316,60 @@ class TestSort(unittest.TestCase):
         )
 
 
+class TestStatSeqFun(unittest.TestCase):
+    def setUp(self):
+        self.fna = [
+            ">A",
+            "A",
+            ">B",
+            "ATGCATGC",
+            ">C",
+            "ATNY",
+        ]
+
+    def test_stat_seq_basic(self):
+        self.assertEqual(get_output(self.fna, ["stat", "-q"]), ["A\t1", "B\t8", "C\t4"])
+
+    def test_stat_seq_characters(self):
+        self.assertEqual(get_output(self.fna, ["stat", "-q", "-c", "-d", ","]),
+              ["seqid,A,C,G,N,T,Y",
+              "A,1,0,0,0,0,0",
+              "B,2,2,2,0,2,0",
+              "C,1,0,0,1,1,1",]
+          )
+
+        self.assertEqual(get_output(self.fna, ["stat", "-q", "-p", "-d", ","]),
+              ["seqid,A,C,G,N,T,Y",
+              "A,1.0,0.0,0.0,0.0,0.0,0.0",
+              "B,0.25,0.25,0.25,0.0,0.25,0.0",
+              "C,0.25,0.0,0.0,0.25,0.25,0.25",])
+
+        self.assertEqual(get_output(self.fna, ["stat", "-qlcmd", ","]),
+              ["seqid,length,masked,A,C,G,N,T,Y",
+              "A,1,0,1,0,0,0,0,0",
+              "B,8,0,2,2,2,0,2,0",
+              "C,4,0,1,0,0,1,1,1",])
+
+class TestStatFileFun(unittest.TestCase):
+    def setUp(self):
+        self.fna = [
+            ">A",
+            "A",
+            ">B",
+            "ATGCATGC",
+            ">C",
+            "ATNY",
+        ]
+    def test_stat_file_basic(self):
+        self.assertEqual(get_output(self.fna, ["stat"]),
+            [ "nseq:      3",
+              "nchars:    13",
+              "5sum:      1 2 4 6 8",
+              "mean(sd):  4 (4)",
+              "N50:       8",
+            ])
+
+
 class TestSubseq(unittest.TestCase):
     def setUp(self):
         self.seq = [">a", "GATACA"]
@@ -1348,8 +1403,12 @@ class TestTranslateDNA(unittest.TestCase):
         self.assertEqual(smof.find_max_orf("taaatgatgtag", from_start=True), (3, 6))
         self.assertEqual(smof.find_max_orf("AATG", from_start=True), (1, 3))
         self.assertEqual(smof.find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9))
-        self.assertEqual(smof.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15))
-        self.assertEqual(smof.find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15))
+        self.assertEqual(
+            smof.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15)
+        )
+        self.assertEqual(
+            smof.find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15)
+        )
         self.assertEqual(smof.find_max_orf("ATG", from_start=False), (0, 3))
         self.assertEqual(smof.find_max_orf("TAAATG", from_start=False), (1, 3))
         self.assertEqual(smof.find_max_orf("TAAATGTAG", from_start=False), (1, 6))
@@ -1392,22 +1451,18 @@ class TestTranslateDNA(unittest.TestCase):
 
     def test_require_start_and_all_frames(self):
         self.assertEqual(
-            smof.get_orf(
-                "ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True
-            ),
+            smof.get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True),
             "MFFF",
         )  # match in 3rd frame
 
     def test_get_cds(self):
-        self.assertEqual( smof.get_orf(""), "")
-        self.assertEqual( smof.get_orf("T"), "")
-        self.assertEqual( smof.get_orf("TT"), "")
-        self.assertEqual( smof.get_orf("TTTTTT", from_start=True), "")
+        self.assertEqual(smof.get_orf(""), "")
+        self.assertEqual(smof.get_orf("T"), "")
+        self.assertEqual(smof.get_orf("TT"), "")
+        self.assertEqual(smof.get_orf("TTTTTT", from_start=True), "")
 
         self.assertEqual(
-            smof.get_orf(
-                "ATG", all_frames=True, from_start=True, translate=False
-            ),
+            smof.get_orf("ATG", all_frames=True, from_start=True, translate=False),
             "ATG",
         )
         self.assertEqual(

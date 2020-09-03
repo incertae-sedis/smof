@@ -6,6 +6,7 @@ import os
 from hashlib import md5
 from collections import Counter
 from collections import OrderedDict
+from itertools import chain
 from smof.version import __version__
 
 # ========
@@ -292,6 +293,57 @@ def sniff(gen):
     for seq in gen.next():
         seqsum.add_seq(seq)
     return seqsum
+
+def stat_seq(
+  gen,
+  length=False,
+  counts=False,
+  proportion=False,
+  case_sensitive=False,
+  count_lower=False,
+):
+    if not (counts or proportion or case_sensitive or count_lower): 
+      length = True
+
+    seqlist = []
+    charset = set()
+    if length and not (counts or proportion):
+        for seq in gen.next():
+            seqid = ParseHeader.firstword(seq.header)
+            yield [seqid, len(seq.seq)]
+    else:
+        for seq in gen.next():
+            seqstat = SeqStat(seq)
+            seqlist.append(seqstat)
+            charset.update(seqstat.counts)
+
+        ignorecase = not case_sensitive
+        kwargs = {
+            "masked": count_lower,
+            "length": length,
+            "ignorecase": ignorecase,
+        }
+
+        yield SeqStat.getheader(charset, **kwargs)
+
+        count_offset = length + count_lower + 1
+        for q in seqlist:
+            line = q.aslist(
+                charset=charset, header_fun=ParseHeader.firstword, **kwargs
+            )
+            if counts:
+                out = line
+            elif proportion:
+                total = sum(line[count_offset:])
+                props = [c / total for c in line[count_offset:]]
+                out = chain(line[0:count_offset], props)
+            yield out
+
+def stat_file(gen, count_characters=False):
+    g = FileStat()
+    for seq in gen.next():
+        g.add_seq(SeqStat(seq, count=count_characters))
+    return g
 
 # =================
 # UTILITY FUNCTIONS
@@ -870,6 +922,125 @@ class FileStat:
             self.counts += stat.counts
         self.nseqs += 1
         self.lengths.append(stat.length)
+
+    def get_length(self):
+        lines = []
+        total = sum(self.lengths)
+        N = len(self.lengths)
+        if N > 1:
+            s = StatFun.summary(self.lengths)
+
+            # Yield total number of sequences
+            lines.append("{:10s} {}".format("nseq:", len(self.lengths)))
+
+            # lines.append totla number of letters
+            lines.append("{:10s} {}".format("nchars:", sum(self.lengths)))
+
+            # lines.append five number summary of sequence lengths
+            fivesum = [
+                round(s[x]) for x in ("min", "1st_qu", "median", "3rd_qu", "max")
+            ]
+            fivesum_str = "{:10s} {} {} {} {} {}"
+            lines.append(fivesum_str.format("5sum:", *fivesum))
+
+            # lines.append mean and standard deviation
+            meansd_str = "{:10s} {:d} ({:d})"
+            lines.append(
+                meansd_str.format("mean(sd):", round(s["mean"]), round(s["sd"]))
+            )
+
+            # lines.append N50
+            lines.append("{:10s} {}".format("N50:", s["N50"]))
+        else:
+            lstr = ", ".join([str(x) for x in sorted(self.lengths)])
+            lines.append("nchars: {}".format(lstr))
+        return "\n".join(lines)
+
+    def get_hist(self, title=None, height=10, width=60, log=False):
+        lines = []
+        try:
+            import numpy
+        except ImportError:
+            err("Please install numpy (needed for histograms)")
+
+        if title:
+            lines.append("")
+            lines.append(title)
+
+        if log:
+            lengths = [math.log(x, 2) for x in self.lengths]
+        else:
+            lengths = self.lengths
+
+        y = numpy.histogram(lengths, bins=width)[0]
+        y = [height * x / max(y) for x in y]
+
+        for row in reversed(range(height)):
+            out = "".join([ascii_histchar(h - row) for h in y])
+            lines.append("|{}|".format(out))
+        return "\n".join(lines)
+
+    def get_aaprofile(self, title=None, height=10, case_sensitive=False):
+        lines = []
+        if title:
+            lines.append("")
+            lines.append(title)
+
+        colorAA = ColorAA()
+        aacols = []
+        for chars, group, color in colorAA.group:
+            for c in chars:
+                if not case_sensitive and c.islower():
+                    continue
+                cheight = height * self.counts[c] / max(self.counts.values())
+                aacols.append([c, cheight, color])
+        # Draw histogram
+        for row in reversed(range(height)):
+            out = "".join(
+                [c + ascii_histchar(y - row, chars=" .:'|") for l, y, c in aacols]
+            )
+            out = "{}{}".format(out, Colors.OFF)
+            lines.append(out)
+        names = "".join([l for l, y, c in aacols])
+        lines.append(names + Colors.OFF)
+        return "\n".join(lines)
+
+    def get_count(
+      self,
+      count_lower    = False,
+      case_sensitive = False,
+      type           = False,
+      counts         = False,
+      proportion     = False
+    ):
+        lines = []
+        lower = sum_lower(self.counts) if count_lower else None
+        if not case_sensitive:
+            self.counts = counter_caser(self.counts)
+
+        if type:
+            lines.append(guess_type(self.counts))
+
+        N = sum(self.lengths)
+        slen = str(len(str(max(self.counts.values()))) + 2)
+        count_iter = sorted(self.counts.items(), key=lambda x: -x[1])
+        if counts ^ proportion:
+            for k, v in count_iter:
+                val = v / N if proportion else v
+                if counts:
+                    exp = "{}{:>%sd}" % slen
+                else:
+                    exp = "{}{:>11.5%}"
+                lines.append(exp.format(k, val))
+        elif counts and proportion:
+            for k, v in count_iter:
+                outstr = "{}{:>" + slen + "d}{:>11.5%}"
+                lines.append(outstr.format(k, v, v / N))
+
+        if count_lower:
+            lines.append("{:10s} {} ({:.1%})".format("lower:", lower, lower / N))
+        return "\n".join(lines)
+
 
 
 class FSeq:
