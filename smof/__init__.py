@@ -14,6 +14,8 @@ from smof.functions import (
     GrepOptions,
     GrepSearch,
     # function exports
+    to_pair,
+    from_pairs,
     ambiguous2perl,
     clean,
     consensus,

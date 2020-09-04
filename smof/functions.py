@@ -8,6 +8,17 @@ import collections
 import itertools
 from smof.version import __version__
 
+def to_pair(seq):
+    """
+    Convert a FastaEntry object to a simple header/sequence pair 
+    """
+    return (seq.header, seq.seq)
+
+def from_pairs(pairs):
+    """ 
+    Convert a list of header/sequence pairs to a Fasta object
+    """
+    return Fasta(pairs=pairs)
 
 def open_fasta(xs):
     """
@@ -148,11 +159,12 @@ def consensus(gen, table=False):
 
 class GrepOptions:
     def __init__(
+        self,
         pattern=None,
         match_sequence=False,
         file=None,
         files_without_match=False,
-        files_with_match=False,
+        files_with_matches=False,
         wrap=None,
         perl_regexp=False,
         ambiguous_nucl=False,
@@ -167,7 +179,7 @@ class GrepOptions:
         line_regexp=False,
         exact=False,
         gapped=False,
-        both_strainds=False,
+        both_strands=False,
         reverse_only=False,
         no_color=False,
         force_color=False,
@@ -181,7 +193,7 @@ class GrepOptions:
         self.match_sequence = match_sequence
         self.file = file
         self.files_without_match = files_without_match
-        self.files_with_match = files_with_match
+        self.files_with_matches = files_with_matches
         self.wrap = wrap
         self.perl_regexp = perl_regexp
         self.ambiguous_nucl = ambiguous_nucl
@@ -196,7 +208,7 @@ class GrepOptions:
         self.line_regexp = line_regexp
         self.exact = exact
         self.gapped = gapped
-        self.both_strainds = both_strainds
+        self.both_strands = both_strands
         self.reverse_only = reverse_only
         self.no_color = no_color
         self.force_color = force_color
@@ -208,7 +220,7 @@ class GrepOptions:
 
 
 def grep(gen, **kwargs):
-    args = GrepOptions(**kwards)
+    args = GrepOptions(**kwargs)
     src = GrepSearch(args)
     return src.search(gen)
 
@@ -1447,13 +1459,19 @@ class FastaEntry:
 
 
 class Fasta:
-    def __init__(self, files):
+    def __init__(self, files, pairs=[]):
+        self.pairs = pairs
         if isinstance(files, list):
             self.files = files
         else:
             self.files = [files]
 
     def next(self, *args, **kwargs):
+        for pair in self.pairs:
+            try:
+              yield FastaEntry(pair[0], pair[1], filename=None, *args, *kwargs)
+            except:
+              _err("Malformed pair, expected a pair of strings, 1 header and 1 sequence")
         for fastafile in self.files:
             seq_list = []
             header = None
