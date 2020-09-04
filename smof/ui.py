@@ -10,7 +10,8 @@ from collections import Counter
 from collections import defaultdict
 from collections import OrderedDict
 
-from smof import *
+from smof.functions import *
+from smof.functions import _headtailtrunk
 from smof.version import __version__
 
 # =============
@@ -105,15 +106,15 @@ def parse(argv=None):
 
     # handle attempted access to deprecated subcommands
     if argv[0] in ["rename", "fasta2csv"]:
-        err("{} is deprecated".format(argv[0]))
+        _err("{} is deprecated".format(argv[0]))
     if argv[0] in ["idsearch", "retrieve", "search", "rmfields"]:
-        err("{} is deprecated, use 'smof grep'".format(argv[0]))
+        _err("{} is deprecated, use 'smof grep'".format(argv[0]))
     if argv[0] == "winnow":
-        err("`winnow` is deprecated, use `smof filter`")
+        _err("`winnow` is deprecated, use `smof filter`")
     if argv[0] == "chksum":
-        err("`winnow` is deprecated, use `smof md5sum`")
+        _err("`winnow` is deprecated, use `smof md5sum`")
     if argv[0] == "perm":
-        err("`perm` is deprecated, use `smof permute`")
+        _err("`perm` is deprecated, use `smof permute`")
 
     # parse arguments, the default function that will ultimately be run is
     # selected according to tthe user-chosen subcommand
@@ -230,10 +231,10 @@ class Clean(Subcommand):
     @staticmethod
     def _process_args(args):
         if (args.mask_lowercase or args.mask_irregular) and not args.type:
-            err("Please provide sequence type (--type)")
+            _err("Please provide sequence type (--type)")
 
         if args.tolower and args.toupper:
-            err("Err, you want me to convert to lower AND upper?")
+            _err("Err, you want me to convert to lower AND upper?")
 
     def generator(self, args, gen):
         # Catches illegal combinations of arguments
@@ -312,12 +313,12 @@ class Filter(Subcommand):
             try:
                 ch, sign, per = args.composition.split()
             except:
-                err(
+                _err(
                     'The argument for --composition must be three space separated values, e.g. "GC > .5"'
                 )
             legal_signs = ("<", "<=", ">=", ">", "==", "=", "!=")
             if not sign in legal_signs:
-                err(
+                _err(
                     "Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=', '!=')"
                 )
             if sign == "=":
@@ -325,9 +326,9 @@ class Filter(Subcommand):
             try:
                 per = float(per)
             except ValueError:
-                err("Third value must be a float")
+                _err("Third value must be a float")
             if not 0 <= per <= 1:
-                err("Third value must be between 0 and 1")
+                _err("Third value must be between 0 and 1")
             ch = set(str(ch))
 
             def evaluate(s):
@@ -863,7 +864,7 @@ class Split(Subcommand):
             fnum = i // N if args.seqs else i % N
             outfile = "%s%s.fasta" % (p, str(fnum))
             if not outfile in used and os.path.isfile(outfile):
-                err('Split refuses to overwrite "%s"' % outfile)
+                _err('Split refuses to overwrite "%s"' % outfile)
             used.add(outfile)
             with open(outfile, "a") as fo:
                 fo.write(seq.get_pretty_string() + "\n")
@@ -1104,7 +1105,7 @@ class Sort(Subcommand):
         seqs = [s for s in gen.next()]
 
         if args.numeric_sort and not args.regex:
-            err("--numeric does nothing unless with --regex")
+            _err("--numeric does nothing unless with --regex")
 
         # Set type of order determining variable
         if args.numeric_sort:
@@ -1113,7 +1114,7 @@ class Sort(Subcommand):
                 try:
                     return float(x)
                 except ValueError:
-                    err("'{}' cannot be numerically sorted".format(x))
+                    _err("'{}' cannot be numerically sorted".format(x))
 
         else:
 
@@ -1129,9 +1130,9 @@ class Sort(Subcommand):
                     capture = re.search(r, x.header).groups()[0]
                     return typer(capture)
                 except AttributeError:
-                    err("No match for regex '{}'".format(args.regex))
+                    _err("No match for regex '{}'".format(args.regex))
                 except IndexError:
-                    err("Nothing was captured in regex '{}'".format(args.regex))
+                    _err("Nothing was captured in regex '{}'".format(args.regex))
 
         elif args.key:
             try:
@@ -1141,7 +1142,7 @@ class Sort(Subcommand):
                     try:
                         return typer(x.header.split(args.field_separator)[key])
                     except IndexError:
-                        err("Cannot sort by column '{}', two few columns".format(key))
+                        _err("Cannot sort by column '{}', two few columns".format(key))
 
             except:
                 key = args.key
@@ -1158,13 +1159,13 @@ class Sort(Subcommand):
                         try:
                             d = {k: v for k, v in xs}
                         except ValueError as e:
-                            err(str(e))
+                            _err(str(e))
                     try:
                         return typer(d[key])
                     except KeyError:
-                        err("Could not find key '{}'".format(key))
+                        _err("Could not find key '{}'".format(key))
                     except Exception as e:
-                        err(str(e))
+                        _err(str(e))
 
         elif args.random_sort:
             import random
@@ -1276,13 +1277,13 @@ class Cut(Subcommand):
                     try:
                         indices |= set(range(int(s) - 1, int(t)))
                     except TypeError:
-                        err(
+                        _err(
                             "'{}-{}' does not specify a valid range".format(
                                 str(s), str(t)
                             )
                         )
                 except ValueError:
-                    err("Cannot parse '{}'".format(args.fields))
+                    _err("Cannot parse '{}'".format(args.fields))
 
         cut(gen, indicies=indicies, complement=args.complement)
 
@@ -1771,7 +1772,7 @@ class Tail(Subcommand):
             pass
 
         if args.nseqs and args.entries:
-            err("ERROR: do not use -n along with positional number argument")
+            _err("ERROR: do not use -n along with positional number argument")
 
         if not nstring:
             if args.entries:
@@ -1788,13 +1789,13 @@ class Tail(Subcommand):
             try:
                 nstring = int(nstring)
             except ValueError:
-                err("N must be formatted as '[+-]12'")
+                _err("N must be formatted as '[+-]12'")
 
         if fromtop:
             i = 1
             for seq in gen.next():
                 if i >= nstring:
-                    yield headtailtrunk(seq, args.first, args.last)
+                    yield _headtailtrunk(seq, args.first, args.last)
                 i += 1
         else:
             from collections import deque
@@ -1802,12 +1803,12 @@ class Tail(Subcommand):
             try:
                 lastseqs = deque(maxlen=nstring)
             except ValueError:
-                err("--nseqs argument must be positive")
+                _err("--nseqs argument must be positive")
             for seq in gen.next():
                 lastseqs.append(seq)
 
             for s in lastseqs:
-                yield headtailtrunk(s, args.first, args.last)
+                yield _headtailtrunk(s, args.first, args.last)
 
 
 # =======

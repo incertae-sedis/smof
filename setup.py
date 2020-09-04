@@ -21,5 +21,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     entry_points={"console_scripts": ["smof=smof.ui:main"]},
+    py_modules=["smof"],
     zip_safe=False,
 )
