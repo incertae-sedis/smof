@@ -23,6 +23,7 @@ from smof.functions import (
     head,
     md5sum,
     open_fasta,
+    print_fasta,
     pack,
     permute,
     reverse,

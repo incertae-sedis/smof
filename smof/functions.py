@@ -11,12 +11,22 @@ from smof.version import __version__
 
 def open_fasta(xs):
     """
-  Given a single fasta file or a list of fasta files, return a generator that
-  will yield individual entries. The returned object is the expected input to
-  all fasta processing functions in smof.
-  """
+    Given a single fasta file or a list of fasta files, return a generator that
+    will yield individual entries. The returned object is the expected input to
+    all fasta processing functions in smof.
+    """
     return Fasta(xs)
 
+def print_fasta(xs, *args, **kwargs):
+    """
+    Print all entries in a fasta stream 
+    """
+    if isinstance(xs, Fasta):
+        for seq in xs.next():
+            seq.print(*args, **kwargs)
+    else:
+        for seq in xs:
+            seq.print(*args, **kwargs)
 
 # ========
 # Commands
