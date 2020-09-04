@@ -1,19 +1,18 @@
 from smof.functions import (
-    # class exports
+    # main fasta classes
+    Fasta,
+    FastaEntry,
+    FastaDescription,
+    FastaStat,
+    FastaEntryStat,
+    # data classes
     Alphabet,
     ColorAA,
     ColorString,
     Colors,
-    FSeq,
-    FSeqGenerator,
-    FileDescription,
-    FileStat,
+    # utility classes
     GrepOptions,
     GrepSearch,
-    Maps,
-    ParseHeader,
-    SeqStat,
-    StatFun,
     # function exports
     ambiguous2perl,
     clean,

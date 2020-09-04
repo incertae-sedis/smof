@@ -144,7 +144,7 @@ class Subcommand:
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
-            if isinstance(output, FSeq):
+            if isinstance(output, FastaEntry):
                 color = sys.stdout.isatty() or self.force_color
                 output.print(color=color, out=out)
             else:
@@ -645,7 +645,7 @@ class Sniff(Subcommand):
     def write(self, args, gen, out=sys.stdout):
         """
         This function basically just formats and prints the information in a
-        FileDescription object
+        FastaDescription object
         """
         seqsum = sniff(gen)
 
@@ -1836,6 +1836,6 @@ def main():
     except AttributeError:
         files = [args]
 
-    gen = FSeqGenerator(files)
+    gen = Fasta(files)
 
     args.func(args, gen, out=sys.stdout)

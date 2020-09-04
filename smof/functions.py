@@ -15,7 +15,7 @@ def open_fasta(xs):
   will yield individual entries. The returned object is the expected input to
   all fasta processing functions in smof.
   """
-    return FSeqGenerator(xs)
+    return Fasta(xs)
 
 
 # ========
@@ -69,7 +69,7 @@ def clean(
 
     for seq in gen.next(purge_color=True):
         if reduce_header:
-            seq.header = ParseHeader.firstword(seq.header, delimiter=" \t|")
+            seq.header = _parse_header_firstword(seq.header, delimiter=" \t|")
 
         if standardize:
             try:
@@ -133,7 +133,7 @@ def consensus(gen, table=False):
     else:
         consensus = [collections.Counter(c).most_common()[0][0] for c in transpose]
         header = "Consensus"
-        return FSeq(header, "".join(consensus))
+        return FastaEntry(header, "".join(consensus))
 
 
 class GrepOptions:
@@ -268,8 +268,8 @@ def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
         words.append(rseq[(M - M % w) : M])
         random.shuffle(words)
         out = "".join(prefix + "".join(words) + suffix)
-        header = ParseHeader.permute(seq.header, start, end, w)
-        yield FSeq(header, out)
+        header = _parse_header_permute(seq.header, start, end, w)
+        yield FastaEntry(header, out)
 
 
 def reverse(gen, complement=False, no_validate=False, preserve_color=False):
@@ -277,7 +277,7 @@ def reverse(gen, complement=False, no_validate=False, preserve_color=False):
     if complement:
 
         def f(s):
-            return FSeq.getrevcomp(s)
+            return FastaEntry.getrevcomp(s)
 
     else:
 
@@ -292,7 +292,7 @@ def reverse(gen, complement=False, no_validate=False, preserve_color=False):
                 return f(s)
             else:
                 msg = "Cannot take reverse complement of the sequence '%s' since it does not appear to DNA"
-                _err(msg % ParseHeader.firstword(s.header))
+                _err(msg % _parse_header_firstword(s.header))
 
     else:
         func = f
@@ -302,7 +302,7 @@ def reverse(gen, complement=False, no_validate=False, preserve_color=False):
 
 
 def sniff(gen):
-    seqsum = FileDescription()
+    seqsum = FastaDescription()
     for seq in gen.next():
         seqsum.add_seq(seq)
     return seqsum
@@ -323,22 +323,22 @@ def stat_seq(
     charset = set()
     if length and not (counts or proportion):
         for seq in gen.next():
-            seqid = ParseHeader.firstword(seq.header)
+            seqid = _parse_header_firstword(seq.header)
             yield [seqid, len(seq.seq)]
     else:
         for seq in gen.next():
-            seqstat = SeqStat(seq)
+            seqstat = FastaEntryStat(seq)
             seqlist.append(seqstat)
             charset.update(seqstat.counts)
 
         ignorecase = not case_sensitive
         kwargs = {"masked": count_lower, "length": length, "ignorecase": ignorecase}
 
-        yield SeqStat.getheader(charset, **kwargs)
+        yield FastaEntryStat.getheader(charset, **kwargs)
 
         count_offset = length + count_lower + 1
         for q in seqlist:
-            line = q.aslist(charset=charset, header_fun=ParseHeader.firstword, **kwargs)
+            line = q.aslist(charset=charset, header_fun=_parse_header_firstword, **kwargs)
             if counts:
                 out = line
             elif proportion:
@@ -349,9 +349,9 @@ def stat_seq(
 
 
 def stat_file(gen, count_characters=False):
-    g = FileStat()
+    g = FastaStat()
     for seq in gen.next():
-        g.add_seq(SeqStat(seq, count=count_characters))
+        g.add_seq(FastaEntryStat(seq, count=count_characters))
     return g
 
 
@@ -371,7 +371,7 @@ def subseq(gen, a, b, color=None):
         else:
             outseq = seq.subseq(start - 1, end)
             if (a > b) and seq.get_moltype() == "dna":
-                outseq = FSeq.getrevcomp(outseq)
+                outseq = FastaEntry.getrevcomp(outseq)
         yield outseq
 
 
@@ -391,7 +391,7 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
             _err("gff bounds must be integers")
 
     for seq in gen.next(handle_color=True):
-        seqid = ParseHeader.firstword(seq.header)
+        seqid = _parse_header_firstword(seq.header)
         try:
             if seqid not in subseqs.keys():
                 raise KeyError
@@ -410,7 +410,7 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
 
 
 def _find_max_orf(dna, from_start=False):
-    dna = dna.translate(FSeq.ungapper).upper()
+    dna = dna.translate(FastaEntry.ungapper).upper()
     max_start = None
     max_length = 0
     for offset in [2, 3, 4]:
@@ -464,7 +464,7 @@ def translate(gen, all_frames=False, from_start=False, cds=False):
         orf = _get_orf(
             seq.seq, all_frames=all_frames, from_start=from_start, translate=not cds
         )
-        yield FSeq(header=seq.header, seq=orf)
+        yield FastaEntry(header=seq.header, seq=orf)
 
 
 def uniq(gen, repeated=False, uniq=False, count=False):
@@ -498,7 +498,7 @@ def pack(gen, sep):
         else:
             seqs[seq.seq] = [seq.header]
     for q, h in seqs.items():
-        seq = FSeq(header=sep.join(h), seq=q)
+        seq = FastaEntry(header=sep.join(h), seq=q)
         yield seq
 
 
@@ -506,7 +506,7 @@ def unpack(gen, sep):
     for seq in gen.next():
         headers = seq.header.split(sep)
         for header in headers:
-            yield FSeq(header=header, seq=seq.seq)
+            yield FastaEntry(header=header, seq=seq.seq)
 
 
 def uniq_headers(gen, removed=False):
@@ -518,7 +518,7 @@ def uniq_headers(gen, removed=False):
         else:
             seqs[seq.header] = seq.seq
     for header, sequence in seqs.items():
-        seq = FSeq(header=header, seq=sequence)
+        seq = FastaEntry(header=header, seq=sequence)
         yield seq
 
 
@@ -559,7 +559,7 @@ def _guess_type(counts):
     """
     if isinstance(counts, str):
         counts = collections.Counter(counts)
-    elif isinstance(counts, FSeq):
+    elif isinstance(counts, FastaEntry):
         counts = collections.Counter(counts.seq)
 
     # Convert all to upper case
@@ -606,20 +606,20 @@ def _headtailtrunk(seq, first=None, last=None):
     This function is used by the Head and Tail classes to portray partial
     sections of sequences.
     """
-    outseq = FSeq(seq.header, seq.seq)
+    outseq = FastaEntry(seq.header, seq.seq)
     if first and last:
         if first + last < len(seq.seq):
-            outseq.header = ParseHeader.firstword(
+            outseq.header = _parse_header_firstword(
                 seq.header
             ) + "|TRUNCATED:first-{}_last-{}".format(first, last)
             outseq.seq = "{}{}{}".format(seq.seq[0:first], "...", seq.seq[-last:])
     elif first:
-        outseq.header = ParseHeader.firstword(
+        outseq.header = _parse_header_firstword(
             seq.header
         ) + "|TRUNCATED:first-{}".format(first)
         outseq.seq = seq.seq[0:first]
     elif last:
-        outseq.header = ParseHeader.firstword(seq.header) + "|TRUNCATED:last-{}".format(
+        outseq.header = _parse_header_firstword(seq.header) + "|TRUNCATED:last-{}".format(
             last
         )
         outseq.seq = seq.seq[-last:]
@@ -646,11 +646,24 @@ def _err(msg):
 
 
 def ambiguous2perl(pattern):
+    DNA_AMB = {
+        "R": "AG",
+        "Y": "CT",
+        "S": "GC",
+        "W": "AT",
+        "K": "GT",
+        "M": "AC",
+        "B": "CGT",
+        "D": "AGT",
+        "H": "ACT",
+        "V": "ACG",
+        "N": "ACGT",
+    }
     perlpat = []
     in_bracket = False
     escaped = False
     for c in pattern:
-        amb = c in Maps.DNA_AMB
+        amb = c in DNA_AMB
         if c == "\\":
             escaped = True
             continue
@@ -658,7 +671,7 @@ def ambiguous2perl(pattern):
             c = c if amb else "\\" + c
             escaped = False
         elif amb:
-            v = Maps.DNA_AMB[c]
+            v = DNA_AMB[c]
             c = v if in_bracket else "[%s]" % v
         elif c == "[":
             in_bracket = True
@@ -670,15 +683,53 @@ def ambiguous2perl(pattern):
 
 def translate_dna(dna):
     # remove gaps
-    dna = dna.translate(FSeq.ungapper).upper()
+    dna = dna.translate(FastaEntry.ungapper).upper()
     aa = []
     for i in range(2, len(dna), 3):
         codon = dna[i - 2 : i + 1]
-        if codon in FSeq.codon_table:
-            aa.append(FSeq.codon_table[codon])
+        if codon in FastaEntry.codon_table:
+            aa.append(FastaEntry.codon_table[codon])
         else:
             aa.append("X")
     return "".join(aa)
+
+
+def _parse_header_firstword(h, delimiter=" \t"):
+    return re.sub("^([^%s]+).*" % delimiter, "\\1", h)
+
+def _parse_header_description(h):
+    return re.sub(r"^\S+\s*", "", h)
+
+def _parse_header_add_suffix(h, suffix):
+    return re.sub(r"^(\S+)(.*)", "\\1|%s\\2" % suffix, h)
+
+def _parse_header_add_tag(h, tag, value):
+    return re.sub(r"^(\S+)(.*)", "\\1 %s=%s\\2" % (tag, value), h)
+
+def _parse_header_subseq(h, a, b):
+    header = "%s|subseq(%d..%d) %s" % (
+        _parse_header_firstword(h),
+        a,
+        b,
+        _parse_header_description(h),
+    )
+    return header.strip()
+
+def _parse_header_permute(h, start, end, wordsize):
+    header = "%s|permutation:start=%d;end=%d;word_size=%d %s" % (
+        _parse_header_firstword(h),
+        start,
+        end,
+        wordsize,
+        _parse_header_description(h),
+    )
+    return header.strip()
+
+def _parse_header_ncbi_format(h, fields):
+    raise NotImplementedError
+
+def _parse_header_regex_group(h, regex):
+    raise NotImplementedError
 
 
 # =================
@@ -769,7 +820,7 @@ class ColorString:
 
     def append(self, thing, bg=None):
         bg = bg if bg else Colors.OFF
-        if isinstance(thing, FSeq):
+        if isinstance(thing, FastaEntry):
             thing = thing.colseq
         if isinstance(thing, ColorString):
             newcind = thing.cind
@@ -798,7 +849,9 @@ class ColorString:
             if newcind and not newcind[-1][1]:
                 newcind[-1][1] = len(thing)
         else:
-            _err("ColorString can only append strings, FSeq, or ColorString objects")
+            _err(
+                "ColorString can only append strings, FastaEntry, or ColorString objects"
+            )
         self.cind += [
             [b + len(self.cind), e + len(self.cind), c] for b, e, c in newcind
         ]
@@ -859,7 +912,7 @@ class ColorString:
         return new_obj
 
 
-class FileDescription:
+class FastaDescription:
     def __init__(self):
         self.seqs = set()
         self.headers = set()
@@ -879,7 +932,7 @@ class FileDescription:
     def add_seq(self, seq):
         """
         Calculates properties for one sequence
-        @type seq: FSeq object
+        @type seq: FastaEntry object
         """
         # Add md5 hashes of sequences and headers to respective sets
         self.seqs.update([hashlib.md5(bytes(seq.seq, "ascii")).digest()])
@@ -1044,7 +1097,7 @@ class FileDescription:
         return "\n".join(result)
 
 
-class FileStat:
+class FastaStat:
     def __init__(self):
         self.counts = collections.Counter()
         self.nseqs = 0
@@ -1061,7 +1114,7 @@ class FileStat:
         total = sum(self.lengths)
         N = len(self.lengths)
         if N > 1:
-            s = StatFun.summary(self.lengths)
+            s = _summary(self.lengths)
 
             # Yield total number of sequences
             lines.append("{:10s} {}".format("nseq:", len(self.lengths)))
@@ -1175,7 +1228,7 @@ class FileStat:
         return "\n".join(lines)
 
 
-class FSeq:
+class FastaEntry:
     # The translator for taking reverse complements
     # Extended alphabet:
     # W = [AT]  <--> S = [GC]
@@ -1305,8 +1358,8 @@ class FSeq:
         self.colheader.colorpos(*args, **kwargs)
 
     def ungap(self):
-        self.seq = self.seq.translate(FSeq.ungapper)
-        self.header = ParseHeader.add_suffix(self.header, "ungapped")
+        self.seq = self.seq.translate(FastaEntry.ungapper)
+        self.header = _parse_header_add_suffix(self.header, "ungapped")
 
     def print(self, col_width=80, color=True, out=sys.stdout):
         out.write(">")
@@ -1346,8 +1399,8 @@ class FSeq:
         self.header = self.header.upper()
 
     def subseq(self, a, b):
-        header = ParseHeader.subseq(self.header, a + 1, b)
-        newseq = FSeq(header, self.seq[a:b])
+        header = _parse_header_subseq(self.header, a + 1, b)
+        newseq = FastaEntry(header, self.seq[a:b])
         if self.colseq:
             newseq.colseq = self.colseq.copy()
             newseq.colseq.subseq(a, b)
@@ -1355,7 +1408,7 @@ class FSeq:
 
     def add_filename(self):
         if self.filename:
-            self.header = ParseHeader.add_tag(
+            self.header = _parse_header_add_tag(
                 h=self.header, tag="filename", value=self.filename
             )
             self.colheader = None
@@ -1364,16 +1417,16 @@ class FSeq:
         self.seq = self.seq[::-1]
         if self.handle_color:
             self.colseq.reverse(len(self.seq))
-        self.header = ParseHeader.add_suffix(self.header, "reverse")
+        self.header = _parse_header_add_suffix(self.header, "reverse")
 
     @classmethod
     def getrevcomp(cls, seq):
-        trans = lambda s: s[::-1].translate(FSeq.revtrans)
+        trans = lambda s: s[::-1].translate(FastaEntry.revtrans)
         if isinstance(seq, str):
             return trans(seq)
-        elif isinstance(seq, FSeq):
-            newheader = ParseHeader.add_suffix(seq.header, "revcom")
-            newseq = FSeq(newheader, trans(seq.seq))
+        elif isinstance(seq, FastaEntry):
+            newheader = _parse_header_add_suffix(seq.header, "revcom")
+            newseq = FastaEntry(newheader, trans(seq.seq))
             if seq.colseq:
                 newseq.colseq = seq.colseq
                 newseq.colseq.reverse(len(seq.seq))
@@ -1383,7 +1436,7 @@ class FSeq:
             return newseq
 
 
-class FSeqGenerator:
+class Fasta:
     def __init__(self, files):
         if isinstance(files, list):
             self.files = files
@@ -1410,7 +1463,7 @@ class FSeqGenerator:
                     continue
                 if line[0] == ">":
                     if seq_list:
-                        yield FSeq(
+                        yield FastaEntry(
                             header,
                             "".join(seq_list),
                             filename=filename,
@@ -1420,7 +1473,7 @@ class FSeqGenerator:
                     elif header:
                         # NOTE: yields an empty sequence! This is usually
                         # a BAD THING, but it can happen in the wild
-                        yield FSeq(header, "", filename=filename, *args, **kwargs)
+                        yield FastaEntry(header, "", filename=filename, *args, **kwargs)
                     seq_list = []
                     header = line[1:]
                 # '' is valid for a header
@@ -1431,12 +1484,12 @@ class FSeqGenerator:
             # process the last sequence
             if header is not None:
                 if seq_list:
-                    yield FSeq(
+                    yield FastaEntry(
                         header, "".join(seq_list), filename=filename, *args, **kwargs
                     )
                 else:
                     # NOTE: yields empty sequence!
-                    yield FSeq(header, "", filename=filename, *args, **kwargs)
+                    yield FastaEntry(header, "", filename=filename, *args, **kwargs)
 
             try:
                 f.close()
@@ -1444,70 +1497,7 @@ class FSeqGenerator:
                 pass
 
 
-class Maps:
-    DNA_AMB = {
-        "R": "AG",
-        "Y": "CT",
-        "S": "GC",
-        "W": "AT",
-        "K": "GT",
-        "M": "AC",
-        "B": "CGT",
-        "D": "AGT",
-        "H": "ACT",
-        "V": "ACG",
-        "N": "ACGT",
-    }
-
-
-class ParseHeader:
-    @staticmethod
-    def firstword(h, delimiter=" \t"):
-        return re.sub("^([^%s]+).*" % delimiter, "\\1", h)
-
-    @staticmethod
-    def description(h):
-        return re.sub(r"^\S+\s*", "", h)
-
-    @staticmethod
-    def add_suffix(h, suffix):
-        return re.sub(r"^(\S+)(.*)", "\\1|%s\\2" % suffix, h)
-
-    @staticmethod
-    def add_tag(h, tag, value):
-        return re.sub(r"^(\S+)(.*)", "\\1 %s=%s\\2" % (tag, value), h)
-
-    @staticmethod
-    def subseq(h, a, b):
-        header = "%s|subseq(%d..%d) %s" % (
-            ParseHeader.firstword(h),
-            a,
-            b,
-            ParseHeader.description(h),
-        )
-        return header.strip()
-
-    @staticmethod
-    def permute(h, start, end, wordsize):
-        header = "%s|permutation:start=%d;end=%d;word_size=%d %s" % (
-            ParseHeader.firstword(h),
-            start,
-            end,
-            wordsize,
-            ParseHeader.description(h),
-        )
-        return header.strip()
-
-    @staticmethod
-    def ncbi_format(h, fields):
-        raise NotImplementedError
-
-    @staticmethod
-    def regex_group(h, regex):
-        raise NotImplementedError
-
-
-class SeqStat:
+class FastaEntryStat:
     def __init__(self, seq, count=True):
         self.counts = collections.Counter(seq.seq) if count else None
         self.header = seq.header
@@ -1562,76 +1552,69 @@ class SeqStat:
         return header
 
 
-class StatFun:
-    @classmethod
-    def N50(cls, xs, issorted=False):
-        xs = sorted(xs) if not issorted else xs
-        N = sum(xs)
-        total = 0
-        for i in range(len(xs) - 1, -1, -1):
-            total += xs[i]
-            if total > N / 2:
-                return xs[i]
+def _N50(xs, issorted=False):
+    xs = sorted(xs) if not issorted else xs
+    N = sum(xs)
+    total = 0
+    for i in range(len(xs) - 1, -1, -1):
+        total += xs[i]
+        if total > N / 2:
+            return xs[i]
 
-    @classmethod
-    def mean(cls, xs):
-        if not xs:
-            mu = float("nan")
-        else:
-            mu = sum(xs) / len(xs)
-        return mu
+def _mean(xs):
+    if not xs:
+        mu = float("nan")
+    else:
+        mu = sum(xs) / len(xs)
+    return mu
 
-    @classmethod
-    def median(cls, xs, issorted=False):
-        return cls.quantile(xs, 0.5, issorted=issorted)
+def _median(xs, issorted=False):
+    return _quantile(xs, 0.5, issorted=issorted)
 
-    @classmethod
-    def sd(cls, xs):
-        if len(xs) < 2:
-            stdev = float("nan")
-        else:
-            mean = sum(xs) / len(xs)
-            stdev = (sum((y - mean) ** 2 for y in xs) / (len(xs) - 1)) ** 0.5
-        return stdev
+def _sd(xs):
+    if len(xs) < 2:
+        stdev = float("nan")
+    else:
+        mean = sum(xs) / len(xs)
+        stdev = (sum((y - mean) ** 2 for y in xs) / (len(xs) - 1)) ** 0.5
+    return stdev
 
-    @classmethod
-    def quantile(cls, xs, q, issorted=False):
-        """
-        Calculates quantile as the weighted average between indices
-        """
-        # Die if out of bounds
-        if not 0 <= q <= 1:
-            _err("quantile must be between 0 and 1")
+def _quantile(xs, q, issorted=False):
+    """
+    Calculates quantile as the weighted average between indices
+    """
+    # Die if out of bounds
+    if not 0 <= q <= 1:
+        _err("quantile must be between 0 and 1")
 
-        # Ensure the vector is sorted
-        xs = sorted(xs) if not issorted else xs
+    # Ensure the vector is sorted
+    xs = sorted(xs) if not issorted else xs
 
-        # Return max or min for q = 1 or 0
-        if q == 1:
-            return xs[-1]
-        elif q == 0:
-            return xs[0]
+    # Return max or min for q = 1 or 0
+    if q == 1:
+        return xs[-1]
+    elif q == 0:
+        return xs[0]
 
-        v = (len(xs) - 1) * q
-        r = v % 1
-        i = math.floor(v)
-        quantile = xs[i] * (1 - r) + xs[i + 1] * r
-        return quantile
+    v = (len(xs) - 1) * q
+    r = v % 1
+    i = math.floor(v)
+    quantile = xs[i] * (1 - r) + xs[i + 1] * r
+    return quantile
 
-    @classmethod
-    def summary(cls, xs):
-        xs = sorted(xs)
-        out = {
-            "min": xs[0],
-            "max": xs[-1],
-            "1st_qu": cls.quantile(xs, 0.25, issorted=True),
-            "median": cls.quantile(xs, 0.50, issorted=True),
-            "3rd_qu": cls.quantile(xs, 0.75, issorted=True),
-            "mean": cls.mean(xs),
-            "sd": cls.sd(xs),
-            "N50": cls.N50(xs, issorted=True),
-        }
-        return out
+def _summary(xs):
+    xs = sorted(xs)
+    out = {
+        "min": xs[0],
+        "max": xs[-1],
+        "1st_qu": _quantile(xs, 0.25, issorted=True),
+        "median": _quantile(xs, 0.50, issorted=True),
+        "3rd_qu": _quantile(xs, 0.75, issorted=True),
+        "mean": _mean(xs),
+        "sd": _sd(xs),
+        "N50": _N50(xs, issorted=True),
+    }
+    return out
 
 
 class GrepSearch:
@@ -1739,7 +1722,7 @@ class GrepSearch:
         pat = set()
         if args.fastain:
             # read patterns from a fasta file
-            pat.update((s.seq for s in FSeqGenerator(args.fastain).next()))
+            pat.update((s.seq for s in Fasta(args.fastain).next()))
         if args.file:
             # read patterns from a file (stripping whitespace from the end)
             pat.update([l.rstrip("\n\t\r ") for l in args.file])
@@ -1919,7 +1902,7 @@ class GrepSearch:
                 def rev(matcher, seq):
                     rmatch = []
                     text_length = len(seq.seq) if args.gapped else len(gettext(seq))
-                    for d in matcher(FSeq.getrevcomp(seq), strand="-"):
+                    for d in matcher(FastaEntry.getrevcomp(seq), strand="-"):
                         d["pos"] = text_length - d["pos"][1], text_length - d["pos"][0]
                         rmatch.append(d)
                     return rmatch
@@ -1938,7 +1921,7 @@ class GrepSearch:
 
             else:
                 f = lambda x: matcher(x, strand="+")
-                r = lambda x: matcher(FSeq.getrevcomp(x), strand="-")
+                r = lambda x: matcher(FastaEntry.getrevcomp(x), strand="-")
                 if args.reverse_only:
 
                     def rmatcher(seq):
@@ -1978,7 +1961,7 @@ class GrepSearch:
                     ".",  # 9 attributes
                 ]
                 for seq in gen.next():
-                    row[0] = ParseHeader.firstword(seq.header)
+                    row[0] = _parse_header_firstword(seq.header)
                     matches = list(matcher(seq))
                     for m in matches:
                         row[3] = m["pos"][0] + 1
@@ -2046,12 +2029,12 @@ class GrepSearch:
                         match = text[m["pos"][0] : m["pos"][1]]
                         if args.match_sequence:
                             header = "%s|subseq(%d..%d) %s" % (
-                                ParseHeader.firstword(seq.header),
+                                _parse_header_firstword(seq.header),
                                 m["pos"][0],
                                 m["pos"][1],
-                                ParseHeader.description(seq.header),
+                                _parse_header_description(seq.header),
                             )
-                            yield FSeq(header, match)
+                            yield FastaEntry(header, match)
                         else:
                             yield match
 
@@ -2103,10 +2086,10 @@ def md5sum(
         h = seq.header.encode("ascii")
         # Write <header>\t<sequence hash> for each sequence
         if replace_header:
-            yield FSeq(hashlib.md5(s).hexdigest(), seq.seq)
+            yield FastaEntry(hashlib.md5(s).hexdigest(), seq.seq)
         elif each_sequence:
             yield "{}\t{}".format(
-                ParseHeader.firstword(seq.header), hashlib.md5(s).hexdigest()
+                _parse_header_firstword(seq.header), hashlib.md5(s).hexdigest()
             )
         else:
             fun(s, h)
