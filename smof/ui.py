@@ -12,6 +12,8 @@ from collections import OrderedDict
 
 from smof.functions import *
 from smof.functions import _headtailtrunk
+from smof.functions import _stream_entries
+from smof.functions import _err
 from smof.version import __version__
 
 # =============
@@ -338,7 +340,7 @@ class Filter(Subcommand):
 
             tests.append(evaluate)
 
-        for seq in gen.next():
+        for seq in gen:
             accept = all([x(seq.seq) for x in tests])
             if accept:
                 yield seq
@@ -519,12 +521,7 @@ class Reverse(Subcommand):
 
     def generator(self, args, gen):
         self.force_color = args.force_color
-        return reverse(
-            gen,
-            complement=args.complement,
-            no_validate=args.no_validate,
-            preserve_color=args.preserve_color,
-        )
+        return reverse(gen, complement=args.complement, no_validate=args.no_validate)
 
 
 class Sniff(Subcommand):
@@ -853,7 +850,7 @@ class Split(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for s in gen.next():
+        for s in gen:
             yield s
 
     def write(self, args, gen, out=None):
@@ -1034,7 +1031,7 @@ class Sample(Subcommand):
 
         if args.seed:
             random.seed(args.seed)
-        seqs = [s for s in gen.next()]
+        seqs = [s for s in gen]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.number))
         for i in sample_indices:
             yield seqs[i]
@@ -1102,7 +1099,7 @@ class Sort(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqs = [s for s in gen.next()]
+        seqs = [s for s in gen]
 
         if args.numeric_sort and not args.regex:
             _err("--numeric does nothing unless with --regex")
@@ -1333,14 +1330,27 @@ class Head(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        return head(
-            gen,
-            entries=args.entries,
-            nseqs=args.nseqs,
-            fh=args.fh,
-            first=args.first,
-            last=args.last,
-        )
+        allbut = False
+        if args.entries:
+            if args.nseqs:
+                _err("Please don't use nseqs with --entries")
+            try:
+                if args.entries[0] == "-":
+                    allbut = True
+                    nseqs = int(args.entries[1:])
+                else:
+                    nseqs = int(args.entries)
+            except AttributeError:
+                _err("-n (--entries) must be a number")
+        elif args.nseqs:
+            try:
+                nseqs = int(re.match(r"-(\d+)", args.nseqs).group(1))
+            except AttributeError:
+                _err("N must be formatted as '-12'")
+        else:
+            nseqs = 1
+
+        return head(gen, nseqs=nseqs, first=args.first, last=args.last, allbut=allbut)
 
 
 class Grep(Subcommand):
@@ -1698,7 +1708,7 @@ class Wc(Subcommand):
 
     def generator(self, args, gen):
         nchars, nseqs = 0, 0
-        for seq in gen.next():
+        for seq in gen:
             nchars += len(seq.seq)
             nseqs += 1
         yield nseqs
@@ -1793,7 +1803,7 @@ class Tail(Subcommand):
 
         if fromtop:
             i = 1
-            for seq in gen.next():
+            for seq in gen:
                 if i >= nstring:
                     yield _headtailtrunk(seq, args.first, args.last)
                 i += 1
@@ -1804,7 +1814,7 @@ class Tail(Subcommand):
                 lastseqs = deque(maxlen=nstring)
             except ValueError:
                 _err("--nseqs argument must be positive")
-            for seq in gen.next():
+            for seq in gen:
                 lastseqs.append(seq)
 
             for s in lastseqs:
@@ -1823,6 +1833,16 @@ def main():
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     args = parse()
 
+    # This is only relevant to Head and Tail
+    if args.nseqs:
+        # This resolve cases where there is a positional filename and no
+        # nseqs given.
+        # If the first positional argument is a readable filename, treat
+        # it as input. Otherwise, try to interpret it as a number
+        if os.access(args.nseqs, os.R_OK):
+            args.fh = [args.nseqs] + args.fh
+            args.nseqs = None
+
     # If no input is given,
     # and if smof is not reading user input from stdin,
     # assume piped input is from STDIN
@@ -1836,6 +1856,8 @@ def main():
     except AttributeError:
         files = [args]
 
-    gen = Fasta(files)
+    handle_color = ("preserve_color" in args) and bool(args.preserve_color)
+
+    gen = _stream_entries(files, handle_color=handle_color)
 
     args.func(args, gen, out=sys.stdout)

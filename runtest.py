@@ -17,7 +17,7 @@ def get_output(seq, argv):
     out = StringIO()
     args = smof.parse(argv)
     args.fh = [seq]
-    gen = smof.Fasta([seq])
+    gen = smof_base._stream_entries(smof_base.read_fasta_str(seq))
     args.func(args, gen, out=out)
     return out.getvalue().strip().split("\n")
 
@@ -36,10 +36,14 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(smof_base._parse_header_add_suffix("abc", "s"), "abc|s")
 
     def test_add_suffix_without_desc(self):
-        self.assertEqual(smof_base._parse_header_add_suffix("abc xyz", "s"), "abc|s xyz")
+        self.assertEqual(
+            smof_base._parse_header_add_suffix("abc xyz", "s"), "abc|s xyz"
+        )
 
     def test_subseq_with_desc(self):
-        self.assertEqual(smof_base._parse_header_subseq("abc", 1, 10), "abc|subseq(1..10)")
+        self.assertEqual(
+            smof_base._parse_header_subseq("abc", 1, 10), "abc|subseq(1..10)"
+        )
 
     def test_subseq_without_desc(self):
         self.assertEqual(
@@ -562,19 +566,19 @@ class TestFasta(unittest.TestCase):
         self.funky_header = [">seq1|asdf:!@(*#& !@#$%^&*())_+", "ACGT", "A"]
         self.no_sequence = []
 
-    def cmp_seqs(self, fh, exp_seqs):
-        g = smof.Fasta([fh])
-        obs_seqs = [s for s in g.next()]
+    def cmp_seqs(self, lines, exp_seqs):
+        g = smof_base._stream_entries(smof_base.read_fasta_str(lines))
+        obs_seqs = [s for s in g]
         for obs, exp in zip(obs_seqs, exp_seqs):
             if (obs.header != exp.header) or (obs.seq != exp.seq):
                 print([obs.header, exp.header])
                 return False
         return True
 
-    def is_valid(self, fh):
+    def is_valid(self, lines):
         try:
-            g = smof.Fasta([fh])
-            out = [s for s in g.next()]
+            g = smof_base._stream_entries(smof_base.read_fasta_str(lines))
+            out = [s for s in g]
             return True
         except BaseException:
             return False
@@ -1068,21 +1072,22 @@ class TestSequenceGrep(unittest.TestCase):
     def test_fastain(self):
         f = tempfile.NamedTemporaryFile(delete=False)
         f.write(b">a\nGAT")
+        filename = f.name
         f.close()
         self.assertEqual(
-            get_output(self.seqs, ["grep", "-y", "--fastain", f.name]),
+            get_output(self.seqs, ["grep", "-y", "--fastain", filename]),
             [">a", "AAGATACA"],
         )
         self.assertEqual(
-            get_output(self.seqs, ["grep", "-yo", "--fastain", f.name])[1], "GAT"
+            get_output(self.seqs, ["grep", "-yo", "--fastain", filename])[1], "GAT"
         )
         self.assertEqual(
-            get_output(self.seqs, ["grep", "--gff", "--fastain", f.name])[0].split(
+            get_output(self.seqs, ["grep", "--gff", "--fastain", filename])[0].split(
                 "\t"
             )[3:5],
             ["3", "5"],
         )
-        os.unlink(f.name)
+        os.unlink(filename)
 
 
 class TestGrepBadCombinations(unittest.TestCase):

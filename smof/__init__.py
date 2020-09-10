@@ -1,6 +1,5 @@
 from smof.functions import (
     # main fasta classes
-    Fasta,
     FastaEntry,
     FastaDescription,
     FastaStat,
@@ -15,7 +14,6 @@ from smof.functions import (
     GrepSearch,
     # function exports
     to_pair,
-    from_pairs,
     ambiguous2perl,
     clean,
     consensus,

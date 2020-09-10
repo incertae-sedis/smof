@@ -3,10 +3,12 @@ import re
 import sys
 import string
 import os
+import io
 import hashlib
 import collections
 import itertools
 from smof.version import __version__
+
 
 def to_pair(seq):
     """
@@ -14,11 +16,6 @@ def to_pair(seq):
     """
     return (seq.header, seq.seq)
 
-def from_pairs(pairs):
-    """ 
-    Convert a list of header/sequence pairs to a Fasta object
-    """
-    return Fasta(pairs=pairs)
 
 def open_fasta(xs):
     """
@@ -26,18 +23,66 @@ def open_fasta(xs):
     will yield individual entries. The returned object is the expected input to
     all fasta processing functions in smof.
     """
-    return Fasta(xs)
+    return _stream_entries(xs)
+
 
 def print_fasta(xs, *args, **kwargs):
     """
-    Print all entries in a fasta stream 
+    Print all entries in a fasta stream
     """
-    if isinstance(xs, Fasta):
-        for seq in xs.next():
-            seq.print(*args, **kwargs)
+    for seq in _stream_entries(xs):
+        seq.print(*args, **kwargs)
+
+
+def read_fasta_str(lines, *args, **kwargs):
+    """
+    text: an iterator of strings
+    """
+    seq_list = []
+    header = None
+
+    for line in lines:
+        line = line.strip()
+        if line == "" or line[0] == "#":
+            continue
+        if line[0] == ">":
+            if seq_list:
+                yield FastaEntry(header, "".join(seq_list), *args, **kwargs)
+            elif header:
+                # NOTE: yields an empty sequence! This is usually
+                # a BAD THING, but it can happen in the wild
+                yield FastaEntry(header, "", *args, **kwargs)
+            seq_list = []
+            header = line[1:]
+        # '' is valid for a header
+        elif header is not None:
+            seq_list.append(line)
+        else:
+            _err("First fasta line must begin with '>'")
+
+    # process the last sequence
+    if header is not None:
+        if seq_list:
+            yield FastaEntry(header, "".join(seq_list), *args, **kwargs)
+        else:
+            # NOTE: yields empty sequence!
+            yield FastaEntry(header, "", *args, **kwargs)
+
+
+def read_fasta(fastafile, *args, **kwargs):
+    """
+    fastafile may be a filename or a file object
+    """
+    if isinstance(fastafile, str):
+        f = open(fastafile, "r")
     else:
-        for seq in xs:
-            seq.print(*args, **kwargs)
+        f = fastafile
+
+    for seq in read_fasta_str(f, *args, **kwargs):
+        yield seq
+
+    f.close()
+
 
 # ========
 # Commands
@@ -88,7 +133,8 @@ def clean(
         if irr:
             trans = str.maketrans(a, b)
 
-    for seq in gen.next(purge_color=True):
+    for seq in gen:
+
         if reduce_header:
             seq.header = _parse_header_firstword(seq.header, delimiter=" \t|")
 
@@ -121,13 +167,13 @@ def clean(
 def cut(gen, indicies, complement=False):
     i = 0
     if complement:
-        for seq in gen.next():
+        for seq in gen:
             if not i in indices:
                 yield seq
             i += 1
     else:
         m = max(indices)
-        for seq in gen.next():
+        for seq in gen:
             if i > m:
                 break
             if i in indices:
@@ -136,7 +182,7 @@ def cut(gen, indicies, complement=False):
 
 
 def consensus(gen, table=False):
-    seqs = [s for s in gen.next()]
+    seqs = [s for s in gen]
     imax = max([len(s.seq) for s in seqs])
     try:
         transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
@@ -225,46 +271,17 @@ def grep(gen, **kwargs):
     return src.search(gen)
 
 
-def head(gen, entries, nseqs, fh, first, last):
+def head(gen, nseqs, first, last, allbut):
     i = 1
-    allbut = False
-
-    if entries:
-        if nseqs:
-            _err("Please don't use nseqs with --entries")
-        try:
-            if entries[0] == "-":
-                allbut = True
-                nseqs = int(entries[1:])
-            else:
-                nseqs = int(entries)
-        except AttributeError:
-            _err("-n (--entries) must be a number")
-    elif nseqs:
-        # This resolve cases where there is a positional filename and no
-        # nseqs given.
-        # If the first positional argument is a readable filename, treat
-        # it as input. Otherwise, try to interpret it as a number
-        if os.access(nseqs, os.R_OK):
-            fh = [nseqs] + fh
-            nseqs = 1
-        else:
-            try:
-                nseqs = int(re.match(r"-(\d+)", nseqs).group(1))
-            except AttributeError:
-                _err("N must be formatted as '-12'")
-    else:
-        nseqs = 1
-
     if allbut:
         seqs = list()
-        for seq in gen.next():
+        for seq in gen:
             if i > nseqs:
                 yield _headtailtrunk(seqs.pop(0), first, last)
             seqs.append(seq)
             i += 1
     else:
-        for seq in gen.next():
+        for seq in gen:
             yield _headtailtrunk(seq, first, last)
             if i == nseqs:
                 break
@@ -279,7 +296,7 @@ def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
     w = word_size
     start = start_offset
     end = end_offset
-    for seq in gen.next():
+    for seq in gen:
         s = seq.seq
         L = len(s)
         prefix = s[0:start]
@@ -294,7 +311,7 @@ def permute(gen, seed=42, word_size=1, start_offset=0, end_offset=0):
         yield FastaEntry(header, out)
 
 
-def reverse(gen, complement=False, no_validate=False, preserve_color=False):
+def reverse(gen, complement=False, no_validate=False):
     """ Reverse each sequence """
     if complement:
 
@@ -319,13 +336,13 @@ def reverse(gen, complement=False, no_validate=False, preserve_color=False):
     else:
         func = f
 
-    for seq in gen.next(handle_color=preserve_color):
+    for seq in gen:
         yield func(seq)
 
 
 def sniff(gen):
     seqsum = FastaDescription()
-    for seq in gen.next():
+    for seq in gen:
         seqsum.add_seq(seq)
     return seqsum
 
@@ -344,11 +361,11 @@ def stat_seq(
     seqlist = []
     charset = set()
     if length and not (counts or proportion):
-        for seq in gen.next():
+        for seq in gen:
             seqid = _parse_header_firstword(seq.header)
             yield [seqid, len(seq.seq)]
     else:
-        for seq in gen.next():
+        for seq in gen:
             seqstat = FastaEntryStat(seq)
             seqlist.append(seqstat)
             charset.update(seqstat.counts)
@@ -360,7 +377,9 @@ def stat_seq(
 
         count_offset = length + count_lower + 1
         for q in seqlist:
-            line = q.aslist(charset=charset, header_fun=_parse_header_firstword, **kwargs)
+            line = q.aslist(
+                charset=charset, header_fun=_parse_header_firstword, **kwargs
+            )
             if counts:
                 out = line
             elif proportion:
@@ -372,13 +391,13 @@ def stat_seq(
 
 def stat_file(gen, count_characters=False):
     g = FastaStat()
-    for seq in gen.next():
+    for seq in gen:
         g.add_seq(FastaEntryStat(seq, count=count_characters))
     return g
 
 
 def subseq(gen, a, b, color=None):
-    for seq in gen.next(handle_color=True):
+    for seq in gen:
         start, end = sorted([a, b])
         end = min(end, len(seq.seq))
 
@@ -412,7 +431,7 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
         except ValueError:
             _err("gff bounds must be integers")
 
-    for seq in gen.next(handle_color=True):
+    for seq in gen:
         seqid = _parse_header_firstword(seq.header)
         try:
             if seqid not in subseqs.keys():
@@ -482,7 +501,7 @@ def _get_orf(dna, all_frames=False, from_start=False, translate=True):
 
 
 def translate(gen, all_frames=False, from_start=False, cds=False):
-    for seq in gen.next():
+    for seq in gen:
         orf = _get_orf(
             seq.seq, all_frames=all_frames, from_start=from_start, translate=not cds
         )
@@ -491,7 +510,7 @@ def translate(gen, all_frames=False, from_start=False, cds=False):
 
 def uniq(gen, repeated=False, uniq=False, count=False):
     seqs = collections.OrderedDict()
-    for seq in gen.next():
+    for seq in gen:
         try:
             seqs[seq] += 1
         except KeyError:
@@ -514,7 +533,7 @@ def uniq(gen, repeated=False, uniq=False, count=False):
 
 def pack(gen, sep):
     seqs = collections.OrderedDict()
-    for seq in gen.next():
+    for seq in gen:
         if seq.seq in seqs:
             seqs[seq.seq].append(seq.header)
         else:
@@ -525,7 +544,7 @@ def pack(gen, sep):
 
 
 def unpack(gen, sep):
-    for seq in gen.next():
+    for seq in gen:
         headers = seq.header.split(sep)
         for header in headers:
             yield FastaEntry(header=header, seq=seq.seq)
@@ -533,7 +552,7 @@ def unpack(gen, sep):
 
 def uniq_headers(gen, removed=False):
     seqs = collections.OrderedDict()
-    for seq in gen.next():
+    for seq in gen:
         if seq.header in seqs:
             if removed:
                 seq.print(color=False, out=args.removed)
@@ -641,9 +660,9 @@ def _headtailtrunk(seq, first=None, last=None):
         ) + "|TRUNCATED:first-{}".format(first)
         outseq.seq = seq.seq[0:first]
     elif last:
-        outseq.header = _parse_header_firstword(seq.header) + "|TRUNCATED:last-{}".format(
-            last
-        )
+        outseq.header = _parse_header_firstword(
+            seq.header
+        ) + "|TRUNCATED:last-{}".format(last)
         outseq.seq = seq.seq[-last:]
     elif first == 0 and last == 0:
         _err("Illegal empty sequence, dying ...")
@@ -719,14 +738,18 @@ def translate_dna(dna):
 def _parse_header_firstword(h, delimiter=" \t"):
     return re.sub("^([^%s]+).*" % delimiter, "\\1", h)
 
+
 def _parse_header_description(h):
     return re.sub(r"^\S+\s*", "", h)
+
 
 def _parse_header_add_suffix(h, suffix):
     return re.sub(r"^(\S+)(.*)", "\\1|%s\\2" % suffix, h)
 
+
 def _parse_header_add_tag(h, tag, value):
     return re.sub(r"^(\S+)(.*)", "\\1 %s=%s\\2" % (tag, value), h)
+
 
 def _parse_header_subseq(h, a, b):
     header = "%s|subseq(%d..%d) %s" % (
@@ -736,6 +759,7 @@ def _parse_header_subseq(h, a, b):
         _parse_header_description(h),
     )
     return header.strip()
+
 
 def _parse_header_permute(h, start, end, wordsize):
     header = "%s|permutation:start=%d;end=%d;word_size=%d %s" % (
@@ -747,8 +771,10 @@ def _parse_header_permute(h, start, end, wordsize):
     )
     return header.strip()
 
+
 def _parse_header_ncbi_format(h, fields):
     raise NotImplementedError
+
 
 def _parse_header_regex_group(h, regex):
     raise NotImplementedError
@@ -1458,71 +1484,33 @@ class FastaEntry:
             return newseq
 
 
-class Fasta:
-    def __init__(self, files, pairs=[]):
-        self.pairs = pairs
-        if isinstance(files, list):
-            self.files = files
+def _stream_entries(entries, *args, **kwargs):
+    if (
+        not hasattr(entries, "__iter__")
+        or isinstance(entries, str)
+        or isinstance(entries, io.TextIOWrapper)
+    ):
+        entries = [entries]
+    else:
+        entries = entries
+
+    for entry in entries:
+        if isinstance(entry, tuple):
+            # if this is a pair, create a FastaEntry object
+            yield FastaEntry(entry[0], entry[1], filename=None, *args, *kwargs)
+
+        # if this is a single entry, yield it
+        elif isinstance(entry, FastaEntry):
+            yield entry
+
+        # maybe it is a fasta file?
+        elif isinstance(entry, str) or isinstance(entry, io.TextIOWrapper):
+            for seq in read_fasta(entry, *args, **kwargs):
+                yield seq
+
         else:
-            self.files = [files]
-
-    def next(self, *args, **kwargs):
-        for pair in self.pairs:
-            try:
-              yield FastaEntry(pair[0], pair[1], filename=None, *args, *kwargs)
-            except:
-              _err("Malformed pair, expected a pair of strings, 1 header and 1 sequence")
-        for fastafile in self.files:
-            seq_list = []
-            header = None
-            # If there are multiple input files, store the filename
-            # If there is only one, e.g. STDIN, don't store a name
-            filename = None if len(self.files) == 1 else fastafile
-            try:
-                f = open(fastafile, "r")
-            except TypeError:
-                f = fastafile
-            except FileNotFoundError:
-                _err("File '%s' not found" % fastafile)
-
-            for line in f:
-                line = line.strip()
-                if not line or line[0] == "#":
-                    continue
-                if line[0] == ">":
-                    if seq_list:
-                        yield FastaEntry(
-                            header,
-                            "".join(seq_list),
-                            filename=filename,
-                            *args,
-                            **kwargs
-                        )
-                    elif header:
-                        # NOTE: yields an empty sequence! This is usually
-                        # a BAD THING, but it can happen in the wild
-                        yield FastaEntry(header, "", filename=filename, *args, **kwargs)
-                    seq_list = []
-                    header = line[1:]
-                # '' is valid for a header
-                elif header is not None:
-                    seq_list.append(line)
-                else:
-                    _err("First fasta line must begin with '>'")
-            # process the last sequence
-            if header is not None:
-                if seq_list:
-                    yield FastaEntry(
-                        header, "".join(seq_list), filename=filename, *args, **kwargs
-                    )
-                else:
-                    # NOTE: yields empty sequence!
-                    yield FastaEntry(header, "", filename=filename, *args, **kwargs)
-
-            try:
-                f.close()
-            except AttributeError:
-                pass
+            print("Can't handle this type:" + str(type(entry)), file=sys.stderr)
+            raise ShitInput
 
 
 class FastaEntryStat:
@@ -1589,6 +1577,7 @@ def _N50(xs, issorted=False):
         if total > N / 2:
             return xs[i]
 
+
 def _mean(xs):
     if not xs:
         mu = float("nan")
@@ -1596,8 +1585,10 @@ def _mean(xs):
         mu = sum(xs) / len(xs)
     return mu
 
+
 def _median(xs, issorted=False):
     return _quantile(xs, 0.5, issorted=issorted)
+
 
 def _sd(xs):
     if len(xs) < 2:
@@ -1606,6 +1597,7 @@ def _sd(xs):
         mean = sum(xs) / len(xs)
         stdev = (sum((y - mean) ** 2 for y in xs) / (len(xs) - 1)) ** 0.5
     return stdev
+
 
 def _quantile(xs, q, issorted=False):
     """
@@ -1629,6 +1621,7 @@ def _quantile(xs, q, issorted=False):
     i = math.floor(v)
     quantile = xs[i] * (1 - r) + xs[i + 1] * r
     return quantile
+
 
 def _summary(xs):
     xs = sorted(xs)
@@ -1750,7 +1743,7 @@ class GrepSearch:
         pat = set()
         if args.fastain:
             # read patterns from a fasta file
-            pat.update((s.seq for s in Fasta(args.fastain).next()))
+            pat.update((s.seq for s in read_fasta(args.fastain)))
         if args.file:
             # read patterns from a file (stripping whitespace from the end)
             pat.update([l.rstrip("\n\t\r ") for l in args.file])
@@ -1988,7 +1981,7 @@ class GrepSearch:
                     ".",  # 8 phase
                     ".",  # 9 attributes
                 ]
-                for seq in gen.next():
+                for seq in gen:
                     row[0] = _parse_header_firstword(seq.header)
                     matches = list(matcher(seq))
                     for m in matches:
@@ -2002,7 +1995,7 @@ class GrepSearch:
             def sgen(gen, matcher):
                 seqcount = collections.OrderedDict()
                 seqmatch = collections.OrderedDict()
-                for seq in gen.next():
+                for seq in gen:
                     m = matcher(seq)
                     if seq.filename not in seqcount:
                         seqcount[seq.filename] = 0
@@ -2035,7 +2028,7 @@ class GrepSearch:
 
             def sgen(gen, matcher):
                 seqmat = collections.OrderedDict()
-                for seq in gen.next():
+                for seq in gen:
                     matched = matcher(seq)
                     if seq.filename not in seqmat:
                         seqmat[seq.filename] = False
@@ -2050,7 +2043,7 @@ class GrepSearch:
         elif args.only_matching:
 
             def sgen(gen, matcher):
-                for seq in gen.next():
+                for seq in gen:
                     matches = matcher(seq)
                     text = seq.seq if args.match_sequence else seq.header
                     for m in matches:
@@ -2069,7 +2062,7 @@ class GrepSearch:
         else:
 
             def sgen(gen, matcher):
-                for seq in gen.next(handle_color=args.preserve_color):
+                for seq in gen:
                     matches = matcher(seq)
                     if (matches and not args.invert_match) or (
                         not matches and args.invert_match
@@ -2106,7 +2099,7 @@ def md5sum(
     else:
         fun = lambda s, h: md5hash.update(h + s)
 
-    for seq in gen.next():
+    for seq in gen:
         if ignore_case:
             seq.header_upper()
             seq.seq_upper()
