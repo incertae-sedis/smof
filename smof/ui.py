@@ -1834,7 +1834,7 @@ def main():
     args = parse()
 
     # This is only relevant to Head and Tail
-    if args.nseqs:
+    if "nseqs" in args:
         # This resolve cases where there is a positional filename and no
         # nseqs given.
         # If the first positional argument is a readable filename, treat
