@@ -921,6 +921,13 @@ class Subseq(Subcommand):
             default=None,
         )
         parser.add_argument(
+            "-a",
+            "--annotate",
+            help="Append the subsequence interval to the defline",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
             "-Y",
             "--force-color",
             help="print in color even to non-tty (DANGEROUS)",
@@ -934,7 +941,13 @@ class Subseq(Subcommand):
         if args.gff:
             sgen = gff_subseq(gen, gff_file=args.gff, color=args.color)
         else:
-            sgen = subseq(gen, a=args.bounds[0], b=args.bounds[1], color=args.color)
+            sgen = subseq(
+                gen,
+                a=args.bounds[0],
+                b=args.bounds[1],
+                color=args.color,
+                annotate=args.annotate,
+            )
 
         return sgen
 

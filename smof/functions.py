@@ -396,7 +396,7 @@ def stat_file(gen, count_characters=False):
     return g
 
 
-def subseq(gen, a, b, color=None):
+def subseq(gen, a, b, color=None, annotate=False):
     for seq in gen:
         start, end = sorted([a, b])
         end = min(end, len(seq.seq))
@@ -410,7 +410,7 @@ def subseq(gen, a, b, color=None):
             seq.colseq.colorpos(start - 1, end, c)
             outseq = seq
         else:
-            outseq = seq.subseq(start - 1, end)
+            outseq = seq.subseq(start - 1, end, annotate=annotate)
             if (a > b) and seq.get_moltype() == "dna":
                 outseq = FastaEntry.getrevcomp(outseq)
         yield outseq
@@ -1446,8 +1446,11 @@ class FastaEntry:
     def header_upper(self):
         self.header = self.header.upper()
 
-    def subseq(self, a, b):
-        header = _parse_header_subseq(self.header, a + 1, b)
+    def subseq(self, a, b, annotate=True):
+        if annotate:
+            header = _parse_header_subseq(self.header, a + 1, b)
+        else:
+            header = self.header
         newseq = FastaEntry(header, self.seq[a:b])
         if self.colseq:
             newseq.colseq = self.colseq.copy()
