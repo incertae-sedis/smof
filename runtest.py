@@ -1404,32 +1404,32 @@ class TestSubseq(unittest.TestCase):
 
 class TestTranslateDNA(unittest.TestCase):
     def test_find_max_orf(self):
-        self.assertEqual(smof_base._find_max_orf("", from_start=True), (None, 0))
-        self.assertEqual(smof_base._find_max_orf("T", from_start=True), (None, 0))
-        self.assertEqual(smof_base._find_max_orf("ATG", from_start=True), (0, 3))
-        self.assertEqual(smof_base._find_max_orf("TAAATG", from_start=True), (3, 3))
-        self.assertEqual(smof_base._find_max_orf("TAAATGTAG", from_start=True), (3, 3))
+        self.assertEqual(smof_base.find_max_orf("", from_start=True), (None, 0))
+        self.assertEqual(smof_base.find_max_orf("T", from_start=True), (None, 0))
+        self.assertEqual(smof_base.find_max_orf("ATG", from_start=True), (0, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATG", from_start=True), (3, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATGTAG", from_start=True), (3, 3))
         self.assertEqual(
-            smof_base._find_max_orf("TAAATGATGTAG", from_start=True), (3, 6)
+            smof_base.find_max_orf("TAAATGATGTAG", from_start=True), (3, 6)
         )
         self.assertEqual(
-            smof_base._find_max_orf("taaatgatgtag", from_start=True), (3, 6)
+            smof_base.find_max_orf("taaatgatgtag", from_start=True), (3, 6)
         )
-        self.assertEqual(smof_base._find_max_orf("AATG", from_start=True), (1, 3))
+        self.assertEqual(smof_base.find_max_orf("AATG", from_start=True), (1, 3))
         self.assertEqual(
-            smof_base._find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9)
-        )
-        self.assertEqual(
-            smof_base._find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15)
+            smof_base.find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9)
         )
         self.assertEqual(
-            smof_base._find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15)
+            smof_base.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15)
         )
-        self.assertEqual(smof_base._find_max_orf("ATG", from_start=False), (0, 3))
-        self.assertEqual(smof_base._find_max_orf("TAAATG", from_start=False), (1, 3))
-        self.assertEqual(smof_base._find_max_orf("TAAATGTAG", from_start=False), (1, 6))
         self.assertEqual(
-            smof_base._find_max_orf("TAAATGATGTAG", from_start=False), (2, 9)
+            smof_base.find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15)
+        )
+        self.assertEqual(smof_base.find_max_orf("ATG", from_start=False), (0, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATG", from_start=False), (1, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATGTAG", from_start=False), (1, 6))
+        self.assertEqual(
+            smof_base.find_max_orf("TAAATGATGTAG", from_start=False), (2, 9)
         )
 
     def test_simple(self):
