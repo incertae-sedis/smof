@@ -33,6 +33,7 @@ from smof.functions import (
     subseq,
     translate,
     translate_dna,
+    find_max_orf,
     uniq,
     uniq_headers,
     unpack,

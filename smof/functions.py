@@ -450,7 +450,7 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
                 yield subseq(seq, s["start"], s["end"])
 
 
-def _find_max_orf(dna, from_start=False):
+def find_max_orf(dna, from_start=False):
     dna = dna.translate(FastaEntry.ungapper).upper()
     max_start = None
     max_length = 0
@@ -485,7 +485,7 @@ def _find_max_orf(dna, from_start=False):
 
 def _get_orf(dna, all_frames=False, from_start=False, translate=True):
     if all_frames:
-        cds_start, cds_length = _find_max_orf(dna, from_start=from_start)
+        cds_start, cds_length = find_max_orf(dna, from_start=from_start)
         if cds_start is None:
             return ""
         cds = dna[cds_start : cds_start + cds_length]
