@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import smof.ui as smof
+import smof.functions as smof_base
 import unittest
 import argparse
 import sys
@@ -11,76 +12,75 @@ from collections import Counter
 from io import StringIO
 
 
-class dummy:
-    def __init__(self, fh):
-        self.fh = [fh]
-
-
 def get_output(seq, argv):
     argv = [str(s) for s in argv]
     out = StringIO()
     args = smof.parse(argv)
     args.fh = [seq]
-    gen = smof.FSeqGenerator(args)
+    gen = smof_base._stream_entries(smof_base.read_fasta_str(seq))
     args.func(args, gen, out=out)
     return out.getvalue().strip().split("\n")
 
 
 class TestParseHeader(unittest.TestCase):
     def test_firstword(self):
-        self.assertEqual(smof.ParseHeader.firstword("abc xyz"), "abc")
+        self.assertEqual(smof_base._parse_header_firstword("abc xyz"), "abc")
 
     def test_description_present(self):
-        self.assertEqual(smof.ParseHeader.description("abc xyz"), "xyz")
+        self.assertEqual(smof_base._parse_header_description("abc xyz"), "xyz")
 
     def test_description_absent(self):
-        self.assertEqual(smof.ParseHeader.description("abc"), "")
+        self.assertEqual(smof_base._parse_header_description("abc"), "")
 
     def test_add_suffix_with_desc(self):
-        self.assertEqual(smof.ParseHeader.add_suffix("abc", "s"), "abc|s")
+        self.assertEqual(smof_base._parse_header_add_suffix("abc", "s"), "abc|s")
 
     def test_add_suffix_without_desc(self):
-        self.assertEqual(smof.ParseHeader.add_suffix("abc xyz", "s"), "abc|s xyz")
+        self.assertEqual(
+            smof_base._parse_header_add_suffix("abc xyz", "s"), "abc|s xyz"
+        )
 
     def test_subseq_with_desc(self):
-        self.assertEqual(smof.ParseHeader.subseq("abc", 1, 10), "abc|subseq(1..10)")
+        self.assertEqual(
+            smof_base._parse_header_subseq("abc", 1, 10), "abc|subseq(1..10)"
+        )
 
     def test_subseq_without_desc(self):
         self.assertEqual(
-            smof.ParseHeader.subseq("abc xyz", 1, 10), "abc|subseq(1..10) xyz"
+            smof_base._parse_header_subseq("abc xyz", 1, 10), "abc|subseq(1..10) xyz"
         )
 
     def test_permute_with_desc(self):
         self.assertEqual(
-            smof.ParseHeader.permute("abc", 1, 2, 3),
+            smof_base._parse_header_permute("abc", 1, 2, 3),
             "abc|permutation:start=1;end=2;word_size=3",
         )
 
     def test_permute_without_desc(self):
         self.assertEqual(
-            smof.ParseHeader.permute("abc xyz", 1, 2, 3),
+            smof_base._parse_header_permute("abc xyz", 1, 2, 3),
             "abc|permutation:start=1;end=2;word_size=3 xyz",
         )
 
 
-class TestFSeq(unittest.TestCase):
+class TestFastaEntry(unittest.TestCase):
     def test_subseq(self):
         header = "seq1 description"
         seq = "AcGGNttt"
-        seqobj = smof.FSeq(header, seq)
+        seqobj = smof.FastaEntry(header, seq)
         sq = seqobj.subseq(1, 5)
         self.assertEqual(sq.seq, "cGGN")
         self.assertEqual(sq.header, "seq1|subseq(2..5) description")
 
     def test_getrevcomp_fromStringInput(self):
         seq = "ACGTT"
-        self.assertEqual(smof.FSeq.getrevcomp(seq), "AACGT")
+        self.assertEqual(smof.FastaEntry.getrevcomp(seq), "AACGT")
 
-    def test_getrevcomp_fromFSeqInput(self):
+    def test_getrevcomp_fromFastaEntryInput(self):
         header = "seq1"
         seq = "ACGTT"
-        seqobj = smof.FSeq(header, seq)
-        rc = smof.FSeq.getrevcomp(seqobj)
+        seqobj = smof.FastaEntry(header, seq)
+        rc = smof.FastaEntry.getrevcomp(seqobj)
         self.assertEqual(rc.seq, "AACGT")
         self.assertEqual(rc.header, "seq1|revcom")
 
@@ -88,25 +88,25 @@ class TestFSeq(unittest.TestCase):
         # test uracil and unknown
         f = "ACGTUNacgtun"
         r = "naacgtNAACGT"
-        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+        self.assertEqual(smof.FastaEntry.getrevcomp(f), r)
 
         # W = [AT] <--> S = [GC]
         # M = [AC] <--> K = [GT]
         # R = [AG] <--> Y = [CT]
         f = "wmrWMRskySKY"
         r = "RMWrmwYKSyks"
-        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+        self.assertEqual(smof.FastaEntry.getrevcomp(f), r)
 
         # B = [GTC] <--> V = [ACG]
         # D = [AGT] <--> H = [ACT]
         f = "BDVHbdvh"
         r = "dbhvDBHV"
-        self.assertEqual(smof.FSeq.getrevcomp(f), r)
+        self.assertEqual(smof.FastaEntry.getrevcomp(f), r)
 
     def test_ungap(self):
         header = "seq1"
         seq = "A.C-G_T"
-        seqobj = smof.FSeq(header, seq)
+        seqobj = smof.FastaEntry(header, seq)
         seqobj.ungap()
         self.assertEqual(seqobj.seq, "ACGT")
         self.assertEqual(seqobj.header, "seq1|ungapped")
@@ -114,7 +114,7 @@ class TestFSeq(unittest.TestCase):
     def test_reverse(self):
         header = "seq1"
         seq = "ACGTT"
-        seqobj = smof.FSeq(header, seq)
+        seqobj = smof.FastaEntry(header, seq)
         seqobj.reverse()
         self.assertEqual(seqobj.seq, "TTGCA")
         self.assertEqual(seqobj.header, "seq1|reverse")
@@ -122,24 +122,24 @@ class TestFSeq(unittest.TestCase):
 
 class TestStatFun(unittest.TestCase):
     def test_N50(self):
-        self.assertEqual(smof.StatFun.N50([1, 2, 3.1]), 3.1)
+        self.assertEqual(smof_base._N50([1, 2, 3.1]), 3.1)
 
     def test_mean(self):
-        self.assertEqual(smof.StatFun.mean([1, 2, 3]), 2)
+        self.assertEqual(smof_base._mean([1, 2, 3]), 2)
 
     def test_median(self):
-        self.assertEqual(smof.StatFun.median([1, 2, 3]), 2)
+        self.assertEqual(smof_base._median([1, 2, 3]), 2)
 
     def test_sd(self):
-        self.assertEqual(smof.StatFun.sd([1, 2, 3]), 1)
-        self.assertTrue(math.isnan(smof.StatFun.sd([1])))
+        self.assertEqual(smof_base._sd([1, 2, 3]), 1)
+        self.assertTrue(math.isnan(smof_base._sd([1])))
 
     def test_quantile(self):
-        self.assertEqual(smof.StatFun.quantile([1, 2, 3], 0.5), 2)
+        self.assertEqual(smof_base._quantile([1, 2, 3], 0.5), 2)
 
     def test_summary_values(self):
         x = list(range(-5, 11))
-        o = smof.StatFun.summary(x)
+        o = smof_base._summary(x)
         self.assertEqual(o["min"], -5)
         self.assertEqual(o["1st_qu"], -1.25)
         self.assertEqual(o["median"], 2.5)
@@ -147,7 +147,7 @@ class TestStatFun(unittest.TestCase):
         self.assertEqual(o["max"], 10)
 
 
-class TestFileDescription(unittest.TestCase):
+class TestFastaDescription(unittest.TestCase):
     def setUp(self):
         self.seqs = {
             "p-normal": "SMIF",
@@ -182,9 +182,9 @@ class TestFileDescription(unittest.TestCase):
         }
 
     def _prep_fd(self, keys):
-        fd = smof.FileDescription()
+        fd = smof.FastaDescription()
         for key in keys:
-            seq = smof.FSeq(header=key, seq=self.seqs[key])
+            seq = smof.FastaEntry(header=key, seq=self.seqs[key])
             fd.add_seq(seq)
         return fd
 
@@ -200,7 +200,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_normal(self):
         fd_test = self._prep_fd(["p-normal"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
 
@@ -209,7 +209,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_selenocysteine(self):
         fd_test = self._prep_fd(["p-selenocysteine"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.pfeat["selenocysteine"] += 1
@@ -219,7 +219,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_unknown(self):
         fd_test = self._prep_fd(["p-unknown"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.ufeat["unknown"] += 1
@@ -229,7 +229,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_ambiguous(self):
         fd_test = self._prep_fd(["p-ambiguous"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.ufeat["ambiguous"] += 1
@@ -239,7 +239,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_illegal(self):
         fd_test = self._prep_fd(["p-illegal"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["illegal"] += 1
         fd_true.ncase["uppercase"] += 1
 
@@ -248,7 +248,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_terminal_stop(self):
         fd_test = self._prep_fd(["p-terminal-stop"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.pfeat["terminal-stop"] += 1
@@ -258,7 +258,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_internal_stop(self):
         fd_test = self._prep_fd(["p-internal-stop"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.pfeat["internal-stop"] += 1
@@ -268,7 +268,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_initial_met(self):
         fd_test = self._prep_fd(["p-initial-Met"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.pfeat["initial-Met"] += 1
@@ -278,7 +278,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_lowercase(self):
         fd_test = self._prep_fd(["p-lowercase"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["lowercase"] += 1
 
@@ -287,7 +287,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_mixedcase(self):
         fd_test = self._prep_fd(["p-mixedcase"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["mixedcase"] += 1
 
@@ -296,7 +296,7 @@ class TestFileDescription(unittest.TestCase):
     def test_prot_gapped(self):
         fd_test = self._prep_fd(["p-gapped"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["prot"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.ufeat["gapped"] += 1
@@ -306,7 +306,7 @@ class TestFileDescription(unittest.TestCase):
     def test_nucl_gapped(self):
         fd_test = self._prep_fd(["n-gapped"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["dna"] += 1
         fd_true.ncase["uppercase"] += 1
         fd_true.ufeat["gapped"] += 1
@@ -317,21 +317,21 @@ class TestFileDescription(unittest.TestCase):
     def test_illegal(self):
         fd_test = self._prep_fd(["illegal"])
 
-        fd_true = smof.FileDescription()
+        fd_true = smof.FastaDescription()
         fd_true.ntype["illegal"] += 1
         fd_true.ncase["uppercase"] += 1
 
         self.assertTrue(self._equal_counts(fd_true, fd_test))
 
     def test_has_start(self):
-        start = lambda s: smof.FileDescription._has_start(s)
+        start = lambda s: smof.FastaDescription._has_start(s)
         self.assertTrue(start("ATGGGT"))
         self.assertFalse(start("GGTATG"))
         self.assertFalse(start("GATGG"))
         self.assertFalse(start("GGGGG"))
 
     def test_has_stop(self):
-        stop = lambda s: smof.FileDescription._has_stop(s)
+        stop = lambda s: smof.FastaDescription._has_stop(s)
         for codon in ("TAA", "TAG", "TGA"):
             self.assertTrue(stop("GGG%s" % codon))
             self.assertTrue(stop("GG%s" % codon))
@@ -341,7 +341,7 @@ class TestFileDescription(unittest.TestCase):
         self.assertTrue(stop("TAAgTGA"))
 
     def test_is_sense(self):
-        sense = lambda s: smof.FileDescription._is_sense(s)
+        sense = lambda s: smof.FastaDescription._is_sense(s)
         self.assertTrue(sense("ATGGGGCCCTAA"))
         self.assertTrue(sense("CCCGGGCCCAAA"))
         self.assertTrue(sense("CCCGGGCCCTAA"))
@@ -351,7 +351,7 @@ class TestFileDescription(unittest.TestCase):
         self.assertFalse(sense("ATGCCCTAATAA"))
 
     def test_is_triple(self):
-        triple = lambda s: smof.FileDescription._is_triple(s)
+        triple = lambda s: smof.FastaDescription._is_triple(s)
         self.assertTrue(triple("ATG"))
         self.assertTrue(triple("ATGGGG"))
         self.assertFalse(triple("ATGGGGg"))
@@ -370,67 +370,69 @@ class TestFileDescription(unittest.TestCase):
 
 class TestUtilities(unittest.TestCase):
     def setUp(self):
-        self.seq = smof.FSeq("seq", "ACDEFSTVWY")
+        self.seq = smof.FastaEntry("seq", "ACDEFSTVWY")
 
     def test_counter_caser(self):
-        self.assertEqual(smof.counter_caser(Counter("Aaa")), {"A": 3})
-        self.assertEqual(smof.counter_caser(Counter("Aaa"), True), {"a": 3})
+        self.assertEqual(smof_base._counter_caser(Counter("Aaa")), {"A": 3})
+        self.assertEqual(smof_base._counter_caser(Counter("Aaa"), True), {"a": 3})
 
     def test_sum_lower(self):
-        self.assertEqual(smof.sum_lower(Counter("AaaFf")), 3)
-        self.assertEqual(smof.sum_lower(Counter("AAAFF")), 0)
-        self.assertEqual(smof.sum_lower(Counter("AaaF.{")), 2)
+        self.assertEqual(smof_base._sum_lower(Counter("AaaFf")), 3)
+        self.assertEqual(smof_base._sum_lower(Counter("AAAFF")), 0)
+        self.assertEqual(smof_base._sum_lower(Counter("AaaF.{")), 2)
 
     def test_guess_type_input(self):
         # String input
-        self.assertEqual(smof.guess_type("FFFF"), "prot")
+        self.assertEqual(smof_base._guess_type("FFFF"), "prot")
         # Counter object input
-        self.assertEqual(smof.guess_type(Counter("FFFF")), "prot")
-        # FSeq object input
-        self.assertEqual(smof.guess_type(smof.FSeq("s1", "FFFF")), "prot")
+        self.assertEqual(smof_base._guess_type(Counter("FFFF")), "prot")
+        # FastaEntry object input
+        self.assertEqual(smof_base._guess_type(smof.FastaEntry("s1", "FFFF")), "prot")
         # Gaps should be ignored
-        self.assertEqual(smof.guess_type(smof.FSeq("s1", "F-F_F.F")), "prot")
+        self.assertEqual(
+            smof_base._guess_type(smof.FastaEntry("s1", "F-F_F.F")), "prot"
+        )
         # Case should be ignored
-        self.assertEqual(smof.guess_type(smof.FSeq("s1", "ffff")), "prot")
+        self.assertEqual(smof_base._guess_type(smof.FastaEntry("s1", "ffff")), "prot")
 
     def test_guess_type_dna(self):
-        self.assertEqual(smof.guess_type("GATACA"), "dna")
-        self.assertEqual(smof.guess_type("GATACANNN"), "dna")
-        self.assertEqual(smof.guess_type("NNNNNN"), "dna")
+        self.assertEqual(smof_base._guess_type("GATACA"), "dna")
+        self.assertEqual(smof_base._guess_type("GATACANNN"), "dna")
+        self.assertEqual(smof_base._guess_type("NNNNNN"), "dna")
 
     def test_guess_type_rna(self):
-        self.assertEqual(smof.guess_type("GAUACA"), "rna")
+        self.assertEqual(smof_base._guess_type("GAUACA"), "rna")
 
     def test_guess_type_prot(self):
-        self.assertEqual(smof.guess_type("FAMNX"), "prot")
-        self.assertEqual(smof.guess_type("XXXXX"), "prot")
+        self.assertEqual(smof_base._guess_type("FAMNX"), "prot")
+        self.assertEqual(smof_base._guess_type("XXXXX"), "prot")
 
     def test_guess_type_illegal(self):
-        self.assertEqual(smof.guess_type("DAMO"), "illegal")
-        self.assertEqual(smof.guess_type("DAM!"), "illegal")
+        self.assertEqual(smof_base._guess_type("DAMO"), "illegal")
+        self.assertEqual(smof_base._guess_type("DAM!"), "illegal")
         # A nucleotide sequence can't have both U and T
-        self.assertEqual(smof.guess_type("GATU"), "illegal")
+        self.assertEqual(smof_base._guess_type("GATU"), "illegal")
         # Space is illegal
-        self.assertEqual(smof.guess_type("DAM "), "illegal")
+        self.assertEqual(smof_base._guess_type("DAM "), "illegal")
         # Gaps should NOT be counted as illegal
-        self.assertNotEqual(smof.guess_type("D.A-M_"), "illegal")
+        self.assertNotEqual(smof_base._guess_type("D.A-M_"), "illegal")
         # * should not be illegal (indicates STOP in protein sequence)
-        self.assertNotEqual(smof.guess_type("DA*M*"), "illegal")
+        self.assertNotEqual(smof_base._guess_type("DA*M*"), "illegal")
 
     def test_guess_type_ambiguous(self):
-        self.assertEqual(smof.guess_type("A"), "ambiguous")
-        self.assertEqual(smof.guess_type("AT"), "ambiguous")
-        self.assertNotEqual(smof.guess_type("ATG"), "ambiguous")
-        self.assertNotEqual(smof.guess_type("AUG"), "ambiguous")
+        self.assertEqual(smof_base._guess_type("A"), "ambiguous")
+        self.assertEqual(smof_base._guess_type("AT"), "ambiguous")
+        self.assertNotEqual(smof_base._guess_type("ATG"), "ambiguous")
+        self.assertNotEqual(smof_base._guess_type("AUG"), "ambiguous")
         # Greater than 80% nucleotide characters with ambiguous is dna
-        self.assertEqual(smof.guess_type("ATGGR"), "ambiguous")
-        self.assertEqual(smof.guess_type("ATGGGR"), "dna")
+        self.assertEqual(smof_base._guess_type("ATGGR"), "ambiguous")
+        self.assertEqual(smof_base._guess_type("ATGGGR"), "dna")
         # Sequences containing only ambiguous nucleotides (could be dna or
         # protein) are counted as ambiguous regardless of lenght
-        self.assertEqual(smof.guess_type("WYS"), "ambiguous")
-        self.assertEqual(smof.guess_type("RYSWKMDBHV"), "ambiguous")
+        self.assertEqual(smof_base._guess_type("WYS"), "ambiguous")
+        self.assertEqual(smof_base._guess_type("RYSWKMDBHV"), "ambiguous")
         # But if one unambiguous aa is added ('F')
-        self.assertEqual(smof.guess_type("FRYSWKMDBHV"), "prot")
+        self.assertEqual(smof_base._guess_type("FRYSWKMDBHV"), "prot")
 
     def test_counting_number(self):
         import argparse
@@ -451,36 +453,48 @@ class TestUtilities(unittest.TestCase):
 
     def test_headtailtrunk_first(self):
         # Note: argparse will only allow positive integers
-        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=1, last=0).seq, "A")
-        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=5, last=0).seq, "ACDEF")
         self.assertEqual(
-            smof.headtailtrunk(seq=self.seq, first=20, last=0).seq, "ACDEFSTVWY"
+            smof_base._headtailtrunk(seq=self.seq, first=1, last=0).seq, "A"
+        )
+        self.assertEqual(
+            smof_base._headtailtrunk(seq=self.seq, first=5, last=0).seq, "ACDEF"
+        )
+        self.assertEqual(
+            smof_base._headtailtrunk(seq=self.seq, first=20, last=0).seq, "ACDEFSTVWY"
         )
 
     def test_headtailtrunk_last(self):
-        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=0, last=1).seq, "Y")
-        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=0, last=5).seq, "STVWY")
         self.assertEqual(
-            smof.headtailtrunk(seq=self.seq, first=0, last=20).seq, "ACDEFSTVWY"
+            smof_base._headtailtrunk(seq=self.seq, first=0, last=1).seq, "Y"
+        )
+        self.assertEqual(
+            smof_base._headtailtrunk(seq=self.seq, first=0, last=5).seq, "STVWY"
+        )
+        self.assertEqual(
+            smof_base._headtailtrunk(seq=self.seq, first=0, last=20).seq, "ACDEFSTVWY"
         )
 
     def test_headtailtrunk_firstandlast(self):
-        self.assertEqual(smof.headtailtrunk(seq=self.seq, first=1, last=1).seq, "A...Y")
         self.assertEqual(
-            smof.headtailtrunk(seq=self.seq, first=2, last=3).seq, "AC...VWY"
+            smof_base._headtailtrunk(seq=self.seq, first=1, last=1).seq, "A...Y"
         )
         self.assertEqual(
-            smof.headtailtrunk(seq=self.seq, first=5, last=5).seq, "ACDEFSTVWY"
+            smof_base._headtailtrunk(seq=self.seq, first=2, last=3).seq, "AC...VWY"
         )
         self.assertEqual(
-            smof.headtailtrunk(seq=self.seq, first=6, last=6).seq, "ACDEFSTVWY"
+            smof_base._headtailtrunk(seq=self.seq, first=5, last=5).seq, "ACDEFSTVWY"
+        )
+        self.assertEqual(
+            smof_base._headtailtrunk(seq=self.seq, first=6, last=6).seq, "ACDEFSTVWY"
         )
 
     def test_headtailtrunk_doublezero(self):
-        self.assertRaises(SystemExit, smof.headtailtrunk, seq=self.seq, first=0, last=0)
+        self.assertRaises(
+            SystemExit, smof_base._headtailtrunk, seq=self.seq, first=0, last=0
+        )
 
     def test_headtailtrunk_doublenone(self):
-        self.assertEqual(smof.headtailtrunk(seq=self.seq).seq, "ACDEFSTVWY")
+        self.assertEqual(smof_base._headtailtrunk(seq=self.seq).seq, "ACDEFSTVWY")
 
 
 class TestAmbiguous2Perl(unittest.TestCase):
@@ -499,14 +513,14 @@ class TestAmbiguous2Perl(unittest.TestCase):
         self.assertEqual(smof.ambiguous2perl("[\[Y\]]"), "[\[CT\]]")
 
 
-class TestFSeqGenerator(unittest.TestCase):
+class TestFasta(unittest.TestCase):
     def setUp(self):
-        self.seq1 = smof.FSeq(header="seq1", seq="ACGTA")
-        self.seq2 = smof.FSeq(header="seq2", seq="GGTT")
-        self.seq1_spaced = smof.FSeq(header="seq1", seq="AC GTA")
-        self.seq2_spaced = smof.FSeq(header="seq2", seq="GGTT")
-        self.seq1_weird = smof.FSeq(header="seq1 >weirdness", seq="ACGTA")
-        self.seq1_funky = smof.FSeq(
+        self.seq1 = smof.FastaEntry(header="seq1", seq="ACGTA")
+        self.seq2 = smof.FastaEntry(header="seq2", seq="GGTT")
+        self.seq1_spaced = smof.FastaEntry(header="seq1", seq="AC GTA")
+        self.seq2_spaced = smof.FastaEntry(header="seq2", seq="GGTT")
+        self.seq1_weird = smof.FastaEntry(header="seq1 >weirdness", seq="ACGTA")
+        self.seq1_funky = smof.FastaEntry(
             header="seq1|asdf:!@(*#& !@#$%^&*())_+", seq="ACGTA"
         )
 
@@ -552,21 +566,19 @@ class TestFSeqGenerator(unittest.TestCase):
         self.funky_header = [">seq1|asdf:!@(*#& !@#$%^&*())_+", "ACGT", "A"]
         self.no_sequence = []
 
-    def cmp_seqs(self, fh, exp_seqs):
-        seq = dummy(fh)
-        g = smof.FSeqGenerator(seq)
-        obs_seqs = [s for s in g.next()]
+    def cmp_seqs(self, lines, exp_seqs):
+        g = smof_base._stream_entries(smof_base.read_fasta_str(lines))
+        obs_seqs = [s for s in g]
         for obs, exp in zip(obs_seqs, exp_seqs):
             if (obs.header != exp.header) or (obs.seq != exp.seq):
                 print([obs.header, exp.header])
                 return False
         return True
 
-    def is_valid(self, fh):
-        seq = dummy(fh)
+    def is_valid(self, lines):
         try:
-            g = smof.FSeqGenerator(seq)
-            out = [s for s in g.next()]
+            g = smof_base._stream_entries(smof_base.read_fasta_str(lines))
+            out = [s for s in g]
             return True
         except BaseException:
             return False
@@ -1060,21 +1072,22 @@ class TestSequenceGrep(unittest.TestCase):
     def test_fastain(self):
         f = tempfile.NamedTemporaryFile(delete=False)
         f.write(b">a\nGAT")
+        filename = f.name
         f.close()
         self.assertEqual(
-            get_output(self.seqs, ["grep", "-y", "--fastain", f.name]),
+            get_output(self.seqs, ["grep", "-y", "--fastain", filename]),
             [">a", "AAGATACA"],
         )
         self.assertEqual(
-            get_output(self.seqs, ["grep", "-yo", "--fastain", f.name])[1], "GAT"
+            get_output(self.seqs, ["grep", "-yo", "--fastain", filename])[1], "GAT"
         )
         self.assertEqual(
-            get_output(self.seqs, ["grep", "--gff", "--fastain", f.name])[0].split(
+            get_output(self.seqs, ["grep", "--gff", "--fastain", filename])[0].split(
                 "\t"
             )[3:5],
             ["3", "5"],
         )
-        os.unlink(f.name)
+        os.unlink(filename)
 
 
 class TestGrepBadCombinations(unittest.TestCase):
@@ -1318,14 +1331,7 @@ class TestSort(unittest.TestCase):
 
 class TestStatSeqFun(unittest.TestCase):
     def setUp(self):
-        self.fna = [
-            ">A",
-            "A",
-            ">B",
-            "ATGCATGC",
-            ">C",
-            "ATNY",
-        ]
+        self.fna = [">A", "A", ">B", "ATGCATGC", ">C", "ATNY"]
 
     def test_stat_seq_basic(self):
         self.assertEqual(get_output(self.fna, ["stat", "-q"]), ["A\t1", "B\t8", "C\t4"])
@@ -1333,7 +1339,7 @@ class TestStatSeqFun(unittest.TestCase):
     def test_stat_seq_characters(self):
         self.assertEqual(
             get_output(self.fna, ["stat", "-q", "-c", "-d", ","]),
-            ["seqid,A,C,G,N,T,Y", "A,1,0,0,0,0,0", "B,2,2,2,0,2,0", "C,1,0,0,1,1,1",],
+            ["seqid,A,C,G,N,T,Y", "A,1,0,0,0,0,0", "B,2,2,2,0,2,0", "C,1,0,0,1,1,1"],
         )
 
         self.assertEqual(
@@ -1359,14 +1365,7 @@ class TestStatSeqFun(unittest.TestCase):
 
 class TestStatFileFun(unittest.TestCase):
     def setUp(self):
-        self.fna = [
-            ">A",
-            "A",
-            ">B",
-            "ATGCATGC",
-            ">C",
-            "ATNY",
-        ]
+        self.fna = [">A", "A", ">B", "ATGCATGC", ">C", "ATNY"]
 
     def test_stat_file_basic(self):
         self.assertEqual(
@@ -1405,25 +1404,33 @@ class TestSubseq(unittest.TestCase):
 
 class TestTranslateDNA(unittest.TestCase):
     def test_find_max_orf(self):
-        self.assertEqual(smof.find_max_orf("", from_start=True), (None, 0))
-        self.assertEqual(smof.find_max_orf("T", from_start=True), (None, 0))
-        self.assertEqual(smof.find_max_orf("ATG", from_start=True), (0, 3))
-        self.assertEqual(smof.find_max_orf("TAAATG", from_start=True), (3, 3))
-        self.assertEqual(smof.find_max_orf("TAAATGTAG", from_start=True), (3, 3))
-        self.assertEqual(smof.find_max_orf("TAAATGATGTAG", from_start=True), (3, 6))
-        self.assertEqual(smof.find_max_orf("taaatgatgtag", from_start=True), (3, 6))
-        self.assertEqual(smof.find_max_orf("AATG", from_start=True), (1, 3))
-        self.assertEqual(smof.find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9))
+        self.assertEqual(smof_base.find_max_orf("", from_start=True), (None, 0))
+        self.assertEqual(smof_base.find_max_orf("T", from_start=True), (None, 0))
+        self.assertEqual(smof_base.find_max_orf("ATG", from_start=True), (0, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATG", from_start=True), (3, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATGTAG", from_start=True), (3, 3))
         self.assertEqual(
-            smof.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15)
+            smof_base.find_max_orf("TAAATGATGTAG", from_start=True), (3, 6)
         )
         self.assertEqual(
-            smof.find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15)
+            smof_base.find_max_orf("taaatgatgtag", from_start=True), (3, 6)
         )
-        self.assertEqual(smof.find_max_orf("ATG", from_start=False), (0, 3))
-        self.assertEqual(smof.find_max_orf("TAAATG", from_start=False), (1, 3))
-        self.assertEqual(smof.find_max_orf("TAAATGTAG", from_start=False), (1, 6))
-        self.assertEqual(smof.find_max_orf("TAAATGATGTAG", from_start=False), (2, 9))
+        self.assertEqual(smof_base.find_max_orf("AATG", from_start=True), (1, 3))
+        self.assertEqual(
+            smof_base.find_max_orf("AAAAATGATGTTTTAA", from_start=True), (4, 9)
+        )
+        self.assertEqual(
+            smof_base.find_max_orf("AAAAATGATGTTTTAA", from_start=False), (0, 15)
+        )
+        self.assertEqual(
+            smof_base.find_max_orf("aaaaatgatgttttaa", from_start=False), (0, 15)
+        )
+        self.assertEqual(smof_base.find_max_orf("ATG", from_start=False), (0, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATG", from_start=False), (1, 3))
+        self.assertEqual(smof_base.find_max_orf("TAAATGTAG", from_start=False), (1, 6))
+        self.assertEqual(
+            smof_base.find_max_orf("TAAATGATGTAG", from_start=False), (2, 9)
+        )
 
     def test_simple(self):
         self.assertEqual(smof.translate_dna(""), "")
@@ -1449,41 +1456,45 @@ class TestTranslateDNA(unittest.TestCase):
         self.assertEqual(smof.translate_dna("-AT---GT_..TT-"), "MF")
 
     def test_all_frames(self):
-        self.assertEqual(smof.get_orf("TTTATGT", all_frames=True), "FM")
-        self.assertEqual(smof.get_orf("ATGTGA", all_frames=False), "M*")
-        self.assertEqual(smof.get_orf("aTgtGa", all_frames=False), "M*")
-        self.assertEqual(smof.get_orf("ATGTGA", all_frames=True), "M")
+        self.assertEqual(smof_base._get_orf("TTTATGT", all_frames=True), "FM")
+        self.assertEqual(smof_base._get_orf("ATGTGA", all_frames=False), "M*")
+        self.assertEqual(smof_base._get_orf("aTgtGa", all_frames=False), "M*")
+        self.assertEqual(smof_base._get_orf("ATGTGA", all_frames=True), "M")
         self.assertEqual(
-            smof.get_orf("ATGTGAT", all_frames=True), "CD"
+            smof_base._get_orf("ATGTGAT", all_frames=True), "CD"
         )  # match 2nd frame
         self.assertEqual(
-            smof.get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF"
+            smof_base._get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF"
         )  # match in 3rd frame
 
     def test_require_start_and_all_frames(self):
         self.assertEqual(
-            smof.get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True),
+            smof_base._get_orf(
+                "ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True
+            ),
             "MFFF",
         )  # match in 3rd frame
 
     def test_get_cds(self):
-        self.assertEqual(smof.get_orf(""), "")
-        self.assertEqual(smof.get_orf("T"), "")
-        self.assertEqual(smof.get_orf("TT"), "")
-        self.assertEqual(smof.get_orf("TTTTTT", from_start=True), "")
+        self.assertEqual(smof_base._get_orf(""), "")
+        self.assertEqual(smof_base._get_orf("T"), "")
+        self.assertEqual(smof_base._get_orf("TT"), "")
+        self.assertEqual(smof_base._get_orf("TTTTTT", from_start=True), "")
 
         self.assertEqual(
-            smof.get_orf("ATG", all_frames=True, from_start=True, translate=False),
+            smof_base._get_orf(
+                "ATG", all_frames=True, from_start=True, translate=False
+            ),
             "ATG",
         )
         self.assertEqual(
-            smof.get_orf(
+            smof_base._get_orf(
                 "TATGTTTTGA", all_frames=True, from_start=True, translate=False
             ),
             "ATGTTT",
         )
         self.assertEqual(
-            smof.get_orf(
+            smof_base._get_orf(
                 "TATGTTTTGA", all_frames=True, from_start=True, translate=False
             ),
             "ATGTTT",

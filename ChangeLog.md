@@ -1,3 +1,8 @@
+2.20.0 [2020-09-xx]
+
+  * modularize functions for import into other Python packages
+  * make the subseq annotation optional ("|subseq(i..j)")
+
 2.19.0 [2020-07-29]
 
   * change `smof uniq --final-header` to `--first-header` and keep first header

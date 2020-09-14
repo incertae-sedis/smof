@@ -10,7 +10,10 @@ from collections import Counter
 from collections import defaultdict
 from collections import OrderedDict
 
-from smof import *
+from smof.functions import *
+from smof.functions import _headtailtrunk
+from smof.functions import _stream_entries
+from smof.functions import _err
 from smof.version import __version__
 
 # =============
@@ -105,15 +108,15 @@ def parse(argv=None):
 
     # handle attempted access to deprecated subcommands
     if argv[0] in ["rename", "fasta2csv"]:
-        err("{} is deprecated".format(argv[0]))
+        _err("{} is deprecated".format(argv[0]))
     if argv[0] in ["idsearch", "retrieve", "search", "rmfields"]:
-        err("{} is deprecated, use 'smof grep'".format(argv[0]))
+        _err("{} is deprecated, use 'smof grep'".format(argv[0]))
     if argv[0] == "winnow":
-        err("`winnow` is deprecated, use `smof filter`")
+        _err("`winnow` is deprecated, use `smof filter`")
     if argv[0] == "chksum":
-        err("`winnow` is deprecated, use `smof md5sum`")
+        _err("`winnow` is deprecated, use `smof md5sum`")
     if argv[0] == "perm":
-        err("`perm` is deprecated, use `smof permute`")
+        _err("`perm` is deprecated, use `smof permute`")
 
     # parse arguments, the default function that will ultimately be run is
     # selected according to tthe user-chosen subcommand
@@ -143,7 +146,7 @@ class Subcommand:
 
     def write(self, args, gen, out=sys.stdout):
         for output in self.generator(args, gen):
-            if isinstance(output, FSeq):
+            if isinstance(output, FastaEntry):
                 color = sys.stdout.isatty() or self.force_color
                 output.print(color=color, out=out)
             else:
@@ -230,10 +233,10 @@ class Clean(Subcommand):
     @staticmethod
     def _process_args(args):
         if (args.mask_lowercase or args.mask_irregular) and not args.type:
-            err("Please provide sequence type (--type)")
+            _err("Please provide sequence type (--type)")
 
         if args.tolower and args.toupper:
-            err("Err, you want me to convert to lower AND upper?")
+            _err("Err, you want me to convert to lower AND upper?")
 
     def generator(self, args, gen):
         # Catches illegal combinations of arguments
@@ -312,12 +315,12 @@ class Filter(Subcommand):
             try:
                 ch, sign, per = args.composition.split()
             except:
-                err(
+                _err(
                     'The argument for --composition must be three space separated values, e.g. "GC > .5"'
                 )
             legal_signs = ("<", "<=", ">=", ">", "==", "=", "!=")
             if not sign in legal_signs:
-                err(
+                _err(
                     "Middle term must be a comparison symbol ('<', '<=', '>=', '>', '==', '=', '!=')"
                 )
             if sign == "=":
@@ -325,9 +328,9 @@ class Filter(Subcommand):
             try:
                 per = float(per)
             except ValueError:
-                err("Third value must be a float")
+                _err("Third value must be a float")
             if not 0 <= per <= 1:
-                err("Third value must be between 0 and 1")
+                _err("Third value must be between 0 and 1")
             ch = set(str(ch))
 
             def evaluate(s):
@@ -337,7 +340,7 @@ class Filter(Subcommand):
 
             tests.append(evaluate)
 
-        for seq in gen.next():
+        for seq in gen:
             accept = all([x(seq.seq) for x in tests])
             if accept:
                 yield seq
@@ -518,12 +521,7 @@ class Reverse(Subcommand):
 
     def generator(self, args, gen):
         self.force_color = args.force_color
-        return reverse(
-            gen,
-            complement=args.complement,
-            no_validate=args.no_validate,
-            preserve_color=args.preserve_color,
-        )
+        return reverse(gen, complement=args.complement, no_validate=args.no_validate)
 
 
 class Sniff(Subcommand):
@@ -644,7 +642,7 @@ class Sniff(Subcommand):
     def write(self, args, gen, out=sys.stdout):
         """
         This function basically just formats and prints the information in a
-        FileDescription object
+        FastaDescription object
         """
         seqsum = sniff(gen)
 
@@ -852,7 +850,7 @@ class Split(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        for s in gen.next():
+        for s in gen:
             yield s
 
     def write(self, args, gen, out=None):
@@ -863,7 +861,7 @@ class Split(Subcommand):
             fnum = i // N if args.seqs else i % N
             outfile = "%s%s.fasta" % (p, str(fnum))
             if not outfile in used and os.path.isfile(outfile):
-                err('Split refuses to overwrite "%s"' % outfile)
+                _err('Split refuses to overwrite "%s"' % outfile)
             used.add(outfile)
             with open(outfile, "a") as fo:
                 fo.write(seq.get_pretty_string() + "\n")
@@ -923,6 +921,13 @@ class Subseq(Subcommand):
             default=None,
         )
         parser.add_argument(
+            "-a",
+            "--annotate",
+            help="Append the subsequence interval to the defline",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
             "-Y",
             "--force-color",
             help="print in color even to non-tty (DANGEROUS)",
@@ -936,7 +941,13 @@ class Subseq(Subcommand):
         if args.gff:
             sgen = gff_subseq(gen, gff_file=args.gff, color=args.color)
         else:
-            sgen = subseq(gen, a=args.bounds[0], b=args.bounds[1], color=args.color)
+            sgen = subseq(
+                gen,
+                a=args.bounds[0],
+                b=args.bounds[1],
+                color=args.color,
+                annotate=args.annotate,
+            )
 
         return sgen
 
@@ -1033,7 +1044,7 @@ class Sample(Subcommand):
 
         if args.seed:
             random.seed(args.seed)
-        seqs = [s for s in gen.next()]
+        seqs = [s for s in gen]
         sample_indices = random.sample(range(len(seqs)), min(len(seqs), args.number))
         for i in sample_indices:
             yield seqs[i]
@@ -1101,10 +1112,10 @@ class Sort(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        seqs = [s for s in gen.next()]
+        seqs = [s for s in gen]
 
         if args.numeric_sort and not args.regex:
-            err("--numeric does nothing unless with --regex")
+            _err("--numeric does nothing unless with --regex")
 
         # Set type of order determining variable
         if args.numeric_sort:
@@ -1113,7 +1124,7 @@ class Sort(Subcommand):
                 try:
                     return float(x)
                 except ValueError:
-                    err("'{}' cannot be numerically sorted".format(x))
+                    _err("'{}' cannot be numerically sorted".format(x))
 
         else:
 
@@ -1129,9 +1140,9 @@ class Sort(Subcommand):
                     capture = re.search(r, x.header).groups()[0]
                     return typer(capture)
                 except AttributeError:
-                    err("No match for regex '{}'".format(args.regex))
+                    _err("No match for regex '{}'".format(args.regex))
                 except IndexError:
-                    err("Nothing was captured in regex '{}'".format(args.regex))
+                    _err("Nothing was captured in regex '{}'".format(args.regex))
 
         elif args.key:
             try:
@@ -1141,7 +1152,7 @@ class Sort(Subcommand):
                     try:
                         return typer(x.header.split(args.field_separator)[key])
                     except IndexError:
-                        err("Cannot sort by column '{}', two few columns".format(key))
+                        _err("Cannot sort by column '{}', two few columns".format(key))
 
             except:
                 key = args.key
@@ -1158,13 +1169,13 @@ class Sort(Subcommand):
                         try:
                             d = {k: v for k, v in xs}
                         except ValueError as e:
-                            err(str(e))
+                            _err(str(e))
                     try:
                         return typer(d[key])
                     except KeyError:
-                        err("Could not find key '{}'".format(key))
+                        _err("Could not find key '{}'".format(key))
                     except Exception as e:
-                        err(str(e))
+                        _err(str(e))
 
         elif args.random_sort:
             import random
@@ -1276,13 +1287,13 @@ class Cut(Subcommand):
                     try:
                         indices |= set(range(int(s) - 1, int(t)))
                     except TypeError:
-                        err(
+                        _err(
                             "'{}-{}' does not specify a valid range".format(
                                 str(s), str(t)
                             )
                         )
                 except ValueError:
-                    err("Cannot parse '{}'".format(args.fields))
+                    _err("Cannot parse '{}'".format(args.fields))
 
         cut(gen, indicies=indicies, complement=args.complement)
 
@@ -1332,14 +1343,27 @@ class Head(Subcommand):
         parser.set_defaults(func=self.func)
 
     def generator(self, args, gen):
-        return head(
-            gen,
-            entries=args.entries,
-            nseqs=args.nseqs,
-            fh=args.fh,
-            first=args.first,
-            last=args.last,
-        )
+        allbut = False
+        if args.entries:
+            if args.nseqs:
+                _err("Please don't use nseqs with --entries")
+            try:
+                if args.entries[0] == "-":
+                    allbut = True
+                    nseqs = int(args.entries[1:])
+                else:
+                    nseqs = int(args.entries)
+            except AttributeError:
+                _err("-n (--entries) must be a number")
+        elif args.nseqs:
+            try:
+                nseqs = int(re.match(r"-(\d+)", args.nseqs).group(1))
+            except AttributeError:
+                _err("N must be formatted as '-12'")
+        else:
+            nseqs = 1
+
+        return head(gen, nseqs=nseqs, first=args.first, last=args.last, allbut=allbut)
 
 
 class Grep(Subcommand):
@@ -1697,7 +1721,7 @@ class Wc(Subcommand):
 
     def generator(self, args, gen):
         nchars, nseqs = 0, 0
-        for seq in gen.next():
+        for seq in gen:
             nchars += len(seq.seq)
             nseqs += 1
         yield nseqs
@@ -1771,7 +1795,7 @@ class Tail(Subcommand):
             pass
 
         if args.nseqs and args.entries:
-            err("ERROR: do not use -n along with positional number argument")
+            _err("ERROR: do not use -n along with positional number argument")
 
         if not nstring:
             if args.entries:
@@ -1788,13 +1812,13 @@ class Tail(Subcommand):
             try:
                 nstring = int(nstring)
             except ValueError:
-                err("N must be formatted as '[+-]12'")
+                _err("N must be formatted as '[+-]12'")
 
         if fromtop:
             i = 1
-            for seq in gen.next():
+            for seq in gen:
                 if i >= nstring:
-                    yield headtailtrunk(seq, args.first, args.last)
+                    yield _headtailtrunk(seq, args.first, args.last)
                 i += 1
         else:
             from collections import deque
@@ -1802,12 +1826,12 @@ class Tail(Subcommand):
             try:
                 lastseqs = deque(maxlen=nstring)
             except ValueError:
-                err("--nseqs argument must be positive")
-            for seq in gen.next():
+                _err("--nseqs argument must be positive")
+            for seq in gen:
                 lastseqs.append(seq)
 
             for s in lastseqs:
-                yield headtailtrunk(s, args.first, args.last)
+                yield _headtailtrunk(s, args.first, args.last)
 
 
 # =======
@@ -1821,5 +1845,39 @@ def main():
     else:
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     args = parse()
-    gen = FSeqGenerator(args)
+
+    # This is only relevant to Head and Tail
+    if "nseqs" in args:
+        # This resolve cases where there is a positional filename and no
+        # nseqs given.
+        # If the first positional argument is a readable filename, treat
+        # it as input. Otherwise, try to interpret it as a number
+        if os.access(args.nseqs, os.R_OK):
+            args.fh = [args.nseqs] + args.fh
+            args.nseqs = None
+
+    if "pattern" in args:        
+        # If the pattern is readable, it is probably meant to be an input, not
+        # a pattern
+        if args.file or args.fastain:
+            args.fh = [args.pattern] + args.fh
+            args.pattern = None
+
+    # If no input is given,
+    # and if smof is not reading user input from stdin,
+    # assume piped input is from STDIN
+    try:
+        if not args.fh:
+            files = [sys.stdin]
+        else:
+            files = args.fh
+    # If args does not have a .fh argument, then try treating args itself
+    # as the input
+    except AttributeError:
+        files = [args]
+
+    handle_color = ("preserve_color" in args) and bool(args.preserve_color)
+
+    gen = _stream_entries(files, handle_color=handle_color)
+
     args.func(args, gen, out=sys.stdout)
