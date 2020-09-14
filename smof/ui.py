@@ -1856,6 +1856,13 @@ def main():
             args.fh = [args.nseqs] + args.fh
             args.nseqs = None
 
+    if "pattern" in args:        
+        # If the pattern is readable, it is probably meant to be an input, not
+        # a pattern
+        if args.file or args.fastain:
+            args.fh = [args.pattern] + args.fh
+            args.pattern = None
+
     # If no input is given,
     # and if smof is not reading user input from stdin,
     # assume piped input is from STDIN

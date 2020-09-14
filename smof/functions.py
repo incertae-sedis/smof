@@ -1654,17 +1654,11 @@ class GrepSearch:
 
     @staticmethod
     def _process_arguments(args):
-        # If the pattern is readable, it is probably meant to be an input, not
-        # a pattern
-        if args.pattern and os.access(args.pattern, os.R_OK):
-            args.fh = [args.pattern] + args.fh
-            args.pattern = None
-
         # Stop if there are any incompatible options
         if args.count_matches and args.invert_match:
             _err("--count-matches argument is incompatible with --invert-matches")
 
-        if args.line_regexp and (args.wrap):
+        if args.line_regexp and args.wrap:
             _err("--line_regexp is incompatible with --wrap")
 
         if args.gff and (args.exact or args.line_regexp):
@@ -2028,6 +2022,7 @@ class GrepSearch:
                                 yield match
 
         elif args.files_without_match or args.files_with_matches:
+            print("C")
 
             def sgen(gen, matcher):
                 seqmat = collections.OrderedDict()

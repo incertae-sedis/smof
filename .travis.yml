@@ -7,7 +7,7 @@ python:
  - "3.8"
  - "3.8-dev"
  - "nightly"
-script: ./runtest.py
+script: ./runtest.py && cd sample-data && ./test.sh
 
 # Adapted from the code written by Walter Purcaro and shared on at travis-ci#9929
 jobs:
@@ -32,4 +32,4 @@ jobs:
         - python3 -m pip install --upgrade virtualenv
         - virtualenv -p python3 --system-site-packages "$HOME/venv"
         - source "$HOME/venv/bin/activate"
-      script: ./runtest.py
+      script: ./runtest.py && cd sample-data && ./test.sh
