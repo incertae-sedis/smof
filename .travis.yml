@@ -7,6 +7,7 @@ python:
  - "3.8"
  - "3.8-dev"
  - "nightly"
+cache: pip
 script: ./runtest.py && pip install . && cd sample-data && ./test.sh
 
 # Adapted from the code written by Walter Purcaro and shared on at travis-ci#9929
