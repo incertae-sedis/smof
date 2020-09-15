@@ -33,4 +33,4 @@ jobs:
         - python3 -m pip install --upgrade virtualenv
         - virtualenv -p python3 --system-site-packages "$HOME/venv"
         - source "$HOME/venv/bin/activate"
-      script: ./runtest.py && python3 -m pip install . && cd sample-data && ./test.sh
+      script: ./runtest.py
