@@ -1,6 +1,6 @@
 language: python
 python:
- - "3.4"
+ # - "3.4" # I think this version *should* work, but Travis is bugging out
  - "3.5"
  - "3.6"
  - "3.7"
@@ -32,4 +32,4 @@ jobs:
         - python3 -m pip install --upgrade virtualenv
         - virtualenv -p python3 --system-site-packages "$HOME/venv"
         - source "$HOME/venv/bin/activate"
-      script: ./runtest.py && pip install . && cd sample-data && ./test.sh
+      script: ./runtest.py && python3 -m pip install . && cd sample-data && ./test.sh
