@@ -1438,6 +1438,7 @@ class TestTranslateDNA(unittest.TestCase):
         self.assertEqual(smof.translate_dna("ATG"), "M")
         self.assertEqual(smof.translate_dna("atG"), "M")
         self.assertEqual(smof.translate_dna("ATGT"), "M")
+        self.assertEqual(smof.translate_dna("A-TGT"), "M")
         self.assertEqual(smof.translate_dna("AT"), "")
         self.assertEqual(smof.translate_dna(""), "")
         self.assertEqual(smof.translate_dna("TAA"), "*")
@@ -1449,9 +1450,18 @@ class TestTranslateDNA(unittest.TestCase):
             ),
             "FSYCFSYCLS**LS*WLPHRLPHRLPQRLPQRITNSITNSITKRMTKRVADGVADGVAEGVAEG",
         )
+        self.assertEqual(
+            smof.translate_dna(
+                "TTTTCTTATTGTTTCTCCTACTGCTTATCATAATGATTGTCGTAGTGGCTTCCTCATCGTCTCCCCCACCGCCTACCACAACGACTGCCGCAGCGGATTACTAATAGTATCACCAACAGCATAACAAAAAGAATGACGAAGAGGGTTGCTGATGGTGTCGCCGACGGCGTAGCAGAAGGAGTGGCGGAGGGG"
+            ),
+            smof.translate_dna(
+                "TTTT-CTTATTGTTT-CTCC--TACTGCTTATCAT-AATGATTGTCGT--AGTGGCTTCCTCA-TCGTCTCCCCCACCGCCTACCACAACGACTGCCGCAGCGGATT--ACTAATAGTATCACCAA-CAGCATAACAAAAAGAATGACGAAGAGGGTT--GCTGATGGTGTCGCCGACGGCGTA-GCAGAAGGAGTGGCGGAGGGG"
+            ),
+        )
 
     def test_ambiguous_handling(self):
         self.assertEqual(smof.translate_dna("TTTATGYNNATG"), "FMXM")
+        self.assertEqual(smof.translate_dna("TTTA-TGYNNATG"), "FMXM")
         self.assertEqual(smof.translate_dna("YTT"), "X")
         self.assertEqual(smof.translate_dna("-AT---GT_..TT-"), "MF")
 
@@ -1466,11 +1476,21 @@ class TestTranslateDNA(unittest.TestCase):
         self.assertEqual(
             smof_base._get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True), "VINLCFF"
         )  # match in 3rd frame
+        self.assertEqual(
+            smof_base._get_orf("ATGTGATTAATTTATGTTTTTTTTT", all_frames=True),
+            smof_base._get_orf("A-TGTG--ATTA--ATTTAT-GTT--TTTTTTT", all_frames=True),
+        )  # match in 3rd frame
 
     def test_require_start_and_all_frames(self):
         self.assertEqual(
             smof_base._get_orf(
                 "ATGTGATTAATTTATGTTTTTTTTT", all_frames=True, from_start=True
+            ),
+            "MFFF",
+        )  # match in 3rd frame
+        self.assertEqual(
+            smof_base._get_orf(
+                "ATG---TG-ATTAA-TTTA-TG-TTT-TTTTTT", all_frames=True, from_start=True
             ),
             "MFFF",
         )  # match in 3rd frame
@@ -1493,6 +1513,16 @@ class TestTranslateDNA(unittest.TestCase):
             ),
             "ATGTTT",
         )
+
+        self.assertEqual(
+            smof_base._get_orf(
+                "TATGTTTTGA", all_frames=True, from_start=True, translate=False
+            ),
+            smof_base._get_orf(
+                "-TA-TGTTTT---GA-", all_frames=True, from_start=True, translate=False
+            ),
+        )
+
         self.assertEqual(
             smof_base._get_orf(
                 "TATGTTTTGA", all_frames=True, from_start=True, translate=False

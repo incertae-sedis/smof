@@ -12,7 +12,7 @@ from smof.version import __version__
 
 def to_pair(seq):
     """
-    Convert a FastaEntry object to a simple header/sequence pair 
+    Convert a FastaEntry object to a simple header/sequence pair
     """
     return (seq.header, seq.seq)
 
@@ -484,6 +484,7 @@ def find_max_orf(dna, from_start=False):
 
 
 def _get_orf(dna, all_frames=False, from_start=False, translate=True):
+    dna = dna.translate(FastaEntry.ungapper).upper()
     if all_frames:
         cds_start, cds_length = find_max_orf(dna, from_start=from_start)
         if cds_start is None:
