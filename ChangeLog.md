@@ -1,11 +1,15 @@
-2.21.0 [2021-02-15]
+2.21.1 [2021-02-15]
 
   * fix bug in translation of gapped DNA sequences
 
-2.20.0 [2020-09-12]
+2.21.0 [2020-09-14]
 
   * modularize functions for import into other Python packages
   * make the subseq annotation optional ("|subseq(i..j)")
+
+2.20.0 [2020-09-03]
+
+  * draft modularization
 
 2.19.0 [2020-07-29]
 
