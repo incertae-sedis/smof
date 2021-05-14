@@ -97,6 +97,7 @@ def clean(
     toseq=False,
     standardize=False,
     reduce_header=False,
+    delimiter="[ |]",
     mask_lowercase=False,
     mask_irregular=False,
 ):
@@ -136,7 +137,7 @@ def clean(
     for seq in gen:
 
         if reduce_header:
-            seq.header = _parse_header_firstword(seq.header, delimiter=" \t|")
+            seq.header = _parse_header_firstword(seq.header, delimiter=delimiter)
 
         if standardize:
             try:
@@ -736,8 +737,8 @@ def translate_dna(dna):
     return "".join(aa)
 
 
-def _parse_header_firstword(h, delimiter=" \t"):
-    return re.sub("^([^%s]+).*" % delimiter, "\\1", h)
+def _parse_header_firstword(h, delimiter="[ \t]"):
+    return re.sub("%s.*" % delimiter, "", h)
 
 
 def _parse_header_description(h):

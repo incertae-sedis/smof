@@ -195,9 +195,14 @@ class Clean(Subcommand):
         parser.add_argument(
             "-s",
             "--reduce-header",
-            help="Remove all text from header that follows the first word (delimited by [ |])",
+            help="Remove all text from header that follows the first word (delimited by the value of the --delimiter argument, '[ |]' by default)",
             action="store_true",
             default=False,
+        )
+        parser.add_argument(
+            "--delimiter",
+            help="The regex delimiter used by --reduce-header",
+            default="[ |]",
         )
         parser.add_argument(
             "-r",
@@ -252,6 +257,7 @@ class Clean(Subcommand):
             toseq=args.toseq,
             standardize=args.standardize,
             reduce_header=args.reduce_header,
+            delimiter=args.delimiter,
             mask_lowercase=args.mask_lowercase,
             mask_irregular=args.mask_irregular,
         )

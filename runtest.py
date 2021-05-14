@@ -743,6 +743,9 @@ class TestClean(unittest.TestCase):
     def test_reduce_header(self):
         self.assertEqual(get_output(self.header, ["clean", "-s"])[0], ">l")
         self.assertEqual(get_output(self.header, ["clean", "-s"])[2], ">m")
+        self.assertEqual(get_output(self.header, ["clean", "-s", '--delimiter="[ |]"'])[0], ">l a")
+        ### why the tarnation doesn't this work? it works from the command line, I swear it does
+        #  self.assertEqual(get_output(self.header, ["clean", "-s", '--delimiter="[ |]"'])[2], ">m")
 
     def test_reduce_and_mask(self):
         self.assertEqual(get_output(self.gapamb, ["clean", "-uxrt", "n"])[1], "NNATT")

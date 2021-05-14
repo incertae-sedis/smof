@@ -1,3 +1,7 @@
+2.22.0 [2021-05-14]
+
+  * add --delimiter argument to clean for removing descriptions 
+
 2.21.1 [2021-02-15]
 
   * fix bug in translation of gapped DNA sequences
