@@ -1331,6 +1331,37 @@ class TestSort(unittest.TestCase):
             self.regex_numeric,
         )
 
+class TestCut(unittest.TestCase):
+    def setUp(self):
+        self.seq = [
+            ">A",
+            "AAA",
+            ">B",
+            "AA",
+            ">C",
+            "AAAA",
+            ">D",
+            "A",
+        ]
+        self.xs = ['a','b','c','d','e']
+
+    def test_base(self):
+        self.assertEqual(list(smof_base.cut(self.xs, [0,1])), ['a', 'b'])
+        self.assertEqual(list(smof_base.cut(self.xs, [0,2,5])), ['a', 'c'])
+        self.assertEqual(list(smof_base.cut(self.xs, [0,2,5], complement=True)), ['b', 'd', 'e'])
+
+    def test_good(self):
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1"]), [">A", "AAA"])
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "4"]), [">D", "A"])
+
+    def test_several(self):
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "2-3"]), [">B", "AA", ">C", "AAAA"])
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1,3"]), [">A", "AAA", ">C", "AAAA"])
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1-2,4"]), [">A", "AAA", ">B", "AA", ">D", "A"])
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1-2,4", "-v"]), [">C", "AAAA"])
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1-4"]), self.seq)
+        self.assertEqual(get_output(self.seq, ["cut", "-f", "1-10"]), self.seq)
+
 
 class TestStatSeqFun(unittest.TestCase):
     def setUp(self):

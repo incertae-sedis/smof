@@ -165,7 +165,7 @@ def clean(
         yield seq
 
 
-def cut(gen, indicies, complement=False):
+def cut(gen, indices, complement=False):
     i = 0
     if complement:
         for seq in gen:

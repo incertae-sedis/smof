@@ -1301,7 +1301,7 @@ class Cut(Subcommand):
                 except ValueError:
                     _err("Cannot parse '{}'".format(args.fields))
 
-        cut(gen, indicies=indicies, complement=args.complement)
+        return cut(gen, indices=indices, complement=args.complement)
 
 
 class Head(Subcommand):
