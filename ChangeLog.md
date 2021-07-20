@@ -1,3 +1,8 @@
+2.22.1 [2021-07-19]
+
+  * fix instant death bug in `cut`
+  * add tests for `cut`
+
 2.22.0 [2021-05-14]
 
   * add --delimiter argument to clean for removing descriptions 
