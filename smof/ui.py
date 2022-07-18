@@ -1242,6 +1242,7 @@ class Consensus(Subcommand):
         if args.table:
             out.write("\t".join(result[0]))
             out.write("\n")
+            transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
             for row in transpose:
                 out.write("\t".join([str(x) for x in row]))
                 out.write("\n")
