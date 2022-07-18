@@ -408,7 +408,7 @@ def subseq(gen, a, b, color=None, annotate=False):
 
         if color:
             c = Colors.COLORS[color]
-            seq.colseq.colorpos(start - 1, end, c)
+            seq.color_seq(start - 1, end, c)
             outseq = seq
         else:
             outseq = seq.subseq(start - 1, end, annotate=annotate)
