@@ -1,3 +1,8 @@
+2.22.2 [2022-07-18]
+
+ * Fix bug in `consensus`
+ * Fix bug in `subseq --color`
+
 2.22.1 [2021-07-19]
 
   * fix instant death bug in `cut`
