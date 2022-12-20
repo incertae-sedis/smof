@@ -169,6 +169,7 @@ class Clean(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument("-t", "--type", metavar="n|p", help="sequence type")
         parser.add_argument(
@@ -286,6 +287,7 @@ class Filter(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-s",
@@ -368,6 +370,7 @@ class Md5sum(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-i",
@@ -436,6 +439,7 @@ class Permute(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-w",
@@ -494,6 +498,7 @@ class Reverse(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-c",
@@ -639,6 +644,7 @@ class Sniff(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.set_defaults(func=self.func)
 
@@ -675,6 +681,7 @@ class Stat(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument("-d", "--delimiter", help="output delimiter", default="\t")
         parser.add_argument(
@@ -839,6 +846,7 @@ class Split(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-q",
@@ -895,6 +903,7 @@ class Subseq(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-b",
@@ -978,6 +987,7 @@ class Translate(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-s",
@@ -1036,6 +1046,7 @@ class Sample(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "--seed",
@@ -1072,6 +1083,7 @@ class Sort(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-x", "--regex", metavar="REG", help="sort by single regex capture"
@@ -1230,6 +1242,7 @@ class Consensus(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.set_defaults(func=self.func)
 
@@ -1269,6 +1282,7 @@ class Cut(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-f", "--fields", help="Indices to print, comma delimited, with ranges"
@@ -1331,6 +1345,7 @@ class Head(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-f",
@@ -1409,6 +1424,7 @@ class Grep(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-q",
@@ -1625,6 +1641,7 @@ class Uniq(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         group = parser.add_mutually_exclusive_group()
         group.add_argument(
@@ -1709,6 +1726,7 @@ class Wc(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-m",
@@ -1770,6 +1788,7 @@ class Tail(Subcommand):
             help="input fasta sequence (default = stdin)",
             metavar="INPUT",
             nargs="*",
+            default=sys.stdin,
         )
         parser.add_argument(
             "-f",
@@ -1860,15 +1879,14 @@ def main():
         # If the first positional argument is a readable filename, treat
         # it as input. Otherwise, try to interpret it as a number
         if os.access(args.nseqs, os.R_OK):
-            args.fh = [args.nseqs] + args.fh
+            args.fh = [args.nseqs]
             args.nseqs = None
 
-    if "pattern" in args:        
+    if "pattern" in args and args.pattern:    
         # If the pattern is readable, it is probably meant to be an input, not
         # a pattern
-        if args.file or args.fastain:
-            args.fh = [args.pattern] + args.fh
-            args.pattern = None
+        args.fh = [args.pattern]
+        args.pattern = None
 
     # If no input is given,
     # and if smof is not reading user input from stdin,
