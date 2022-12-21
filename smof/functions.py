@@ -1514,8 +1514,7 @@ def _stream_entries(entries, *args, **kwargs):
                 yield seq
 
         else:
-            print("Can't handle this type:" + str(type(entry)), file=sys.stderr)
-            raise ShitInput
+            raise ValueError("Can't handle this type:" + str(type(entry)))
 
 
 class FastaEntryStat:
