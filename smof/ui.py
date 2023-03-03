@@ -954,7 +954,7 @@ class Subseq(Subcommand):
     def generator(self, args, gen):
         self.force_color = args.force_color
         if args.gff:
-            sgen = gff_subseq(gen, gff_file=args.gff, color=args.color)
+            return gff_subseq(gen, gff_file=args.gff, color=args.color)
         else:
             sgen = subseq(
                 gen,
@@ -963,8 +963,7 @@ class Subseq(Subcommand):
                 color=args.color,
                 annotate=args.annotate,
             )
-
-        return sgen
+            return sgen
 
 
 class Translate(Subcommand):

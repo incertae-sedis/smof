@@ -1,3 +1,7 @@
+2.22.3 [2023-03-03]
+
+ * Fix bug in `subseq`
+
 2.22.2 [2022-07-18]
 
  * Fix bug in `consensus`

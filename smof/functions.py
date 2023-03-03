@@ -418,7 +418,7 @@ def subseq(gen, a, b, color=None, annotate=False):
 
 
 def gff_subseq(gen, gff_file, keep=False, color=None):
-    subseqs = defaultdict(list)
+    subseqs = collections.defaultdict(list)
     for line in gff_file:
         row = line.split("\t")
         try:
@@ -444,11 +444,12 @@ def gff_subseq(gen, gff_file, keep=False, color=None):
 
         if color:
             for s in subseqs[seqid]:
-                seq = subseq(seq, s["start"], s["end"], color)
-            yield seq
+                for x in subseq([seq], s["start"], s["end"], color):
+                    yield x
         else:
             for s in subseqs[seqid]:
-                yield subseq(seq, s["start"], s["end"])
+                for x in subseq([seq], s["start"], s["end"]):
+                    yield x
 
 
 def find_max_orf(dna, from_start=False):
