@@ -1669,6 +1669,12 @@ class GrepSearch:
         if args.gff and (args.files_without_match or args.files_with_matches):
             _err("--gff is incompatible with -l and -L options")
 
+        # If the query string is coming from a file, then treat the 
+        # first positional argument as a search file
+        if args.pattern and (args.fastain or args.file):
+          args.fh = args.pattern + args.fh
+          args.pattern = None
+
         if args.fastain:
             args.match_sequence = True
 
@@ -1743,12 +1749,15 @@ class GrepSearch:
         if args.fastain:
             # read patterns from a fasta file
             pat.update((s.seq for s in read_fasta(args.fastain)))
-        if args.file:
+        elif args.file:
             # read patterns from a file (stripping whitespace from the end)
             pat.update([l.rstrip("\n\t\r ") for l in args.file])
-        if args.pattern:
+        elif args.pattern:
             # read pattern from command line
             pat.update([args.pattern])
+
+        if not pat:
+            _err("Please provide a pattern")
 
         if args.ambiguous_nucl:
             apat = set()
@@ -1756,9 +1765,6 @@ class GrepSearch:
                 perlpat = ambiguous2perl(p)
                 apat.update([perlpat])
             pat = apat
-
-        if not pat and not (args.fastain or args.file):
-            _err("Please provide a pattern")
 
         # TODO searching for perfect matches would be faster without using
         # regex (just <str>.find(pat))

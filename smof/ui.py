@@ -1881,9 +1881,8 @@ def main():
             args.fh = [args.nseqs]
             args.nseqs = None
 
-    if "pattern" in args and args.pattern:    
-        # If the pattern is readable, it is probably meant to be an input, not
-        # a pattern
+    # If the pattern is readable, it is probably meant to be an input, not a pattern
+    if "pattern" in args and os.path.exists(args.pattern):
         args.fh = [args.pattern]
         args.pattern = None
 
