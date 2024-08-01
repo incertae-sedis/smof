@@ -1,3 +1,14 @@
+2.22.4 [2024-07-31]
+
+Fix bugs in `grep`, `consensus`, `head`, and `tail`
+
+ * grep failed when no explicit pattern was given (only patterns from -f)
+ * consensus failed on `--table` option due to incomplete implementation
+ * head and tail both failed when reading STDIN when using default
+   ("-1") cutting pattern
+
+More residual bugs from the modularization effort of the early 20s.
+
 2.22.3 [2023-03-03]
 
  * Fix bug in `subseq`
