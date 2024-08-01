@@ -1249,16 +1249,16 @@ class Consensus(Subcommand):
         raise NotImplementedError
 
     def write(self, args, gen, out=sys.stdout):
-        result = consensus(gen, table=args.table)
-
         if args.table:
-            out.write("\t".join(result[0]))
+            (characters, transpose) = consensus_table(gen)
+            out.write("\t".join(characters))
             out.write("\n")
-            transpose = [[s.seq[i] for s in seqs] for i in range(0, imax)]
+
             for row in transpose:
                 out.write("\t".join([str(x) for x in row]))
                 out.write("\n")
         else:
+            result = consensus(gen)
             result.print()
 
 
@@ -1873,18 +1873,26 @@ def main():
 
     # This is only relevant to Head and Tail
     if "nseqs" in args:
-        # This resolve cases where there is a positional filename and no
+        # This resolves cases where there is a positional filename and no
         # nseqs given.
         # If the first positional argument is a readable filename, treat
         # it as input. Otherwise, try to interpret it as a number
-        if os.access(args.nseqs, os.R_OK):
-            args.fh = [args.nseqs]
-            args.nseqs = None
+        if args.nseqs is not None:
+            if os.access(args.nseqs, os.R_OK):
+                args.fh = [args.nseqs]
+                args.nseqs = None
+        else:
+            args.nseqs = "-1"
 
-    # If the pattern is readable, it is probably meant to be an input, not a pattern
-    if "pattern" in args and os.path.exists(args.pattern):
-        args.fh = [args.pattern]
-        args.pattern = None
+    # kludge so that Grep PATTERN metavar behaves as a file input when needed
+    if "pattern" in args and args.pattern and os.path.exists(args.pattern):
+        if not args.fh:
+            args.fh = [args.pattern]
+        else:
+            if isinstance(args.fh, list):
+                args.fh.append(args.pattern)
+            else:
+                args.fh = args.pattern
 
     # If no input is given,
     # and if smof is not reading user input from stdin,

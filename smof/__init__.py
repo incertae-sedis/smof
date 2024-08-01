@@ -16,6 +16,7 @@ from smof.functions import (
     to_pair,
     ambiguous2perl,
     clean,
+    consensus_table,
     consensus,
     cut,
     gff_subseq,

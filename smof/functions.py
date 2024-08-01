@@ -2,7 +2,6 @@ import math
 import re
 import sys
 import string
-import os
 import io
 import hashlib
 import collections
@@ -182,7 +181,7 @@ def cut(gen, indices, complement=False):
             i += 1
 
 
-def consensus(gen, table=False):
+def _consensus(gen):
     seqs = [s for s in gen]
     imax = max([len(s.seq) for s in seqs])
     try:
@@ -192,16 +191,21 @@ def consensus(gen, table=False):
 
     characters = list(set(("").join([s.seq for s in seqs])))
 
-    if table:
-        rows = []
-        for column in transpose:
-            c = collections.Counter(column)
-            rows.append([c[x] for x in characters])
-        return (characters, rows)
-    else:
-        consensus = [collections.Counter(c).most_common()[0][0] for c in transpose]
-        header = "Consensus"
-        return FastaEntry(header, "".join(consensus))
+    return (characters, transpose)
+
+def consensus(gen):
+    (_, transpose) = _consensus(gen)
+    consensus = [collections.Counter(c).most_common()[0][0] for c in transpose]
+    header = "Consensus"
+    return FastaEntry(header, "".join(consensus))
+
+def consensus_table(gen):
+    (characters, transpose) = _consensus(gen)
+    rows = []
+    for column in transpose:
+        c = collections.Counter(column)
+        rows.append([c[x] for x in characters])
+    return (characters, rows)
 
 
 class GrepOptions:
@@ -1755,6 +1759,13 @@ class GrepSearch:
         elif args.pattern:
             # read pattern from command line
             pat.update([args.pattern])
+        else:
+            # read pattern from first positional
+            if args.fh:
+                pat.update([args.fh[0]])
+                args.fh = args.fh[1:]
+            else:
+                _err("Please provide a pattern")
 
         if not pat:
             _err("Please provide a pattern")

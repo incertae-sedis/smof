@@ -1,0 +1,40 @@
+>Acaryochloris_marina_MBIC11017_Acar_mari_MBIC11017_tRNA-Pro-AGG-1-1 (chr.trna30-ProAGG) chr:1113531-1113635 (+) Pro (AGG) 105 bp Sc: 20.3
+-----------------------gggataagtggcgattcccgctttgaggattagaaaa
+gctaagc---ctgtgaatgaatggggagctaatag---ctag----------ggcggaca
+cgggttcgactcccgtcagctcca---
+>Acidovorax_sp_JS42_Acid_JS42_tRNA-Ser-CGA-3-1 (chr.trna11-SerCGA) chr:1517044-1517110 (+) Ser (CGA) 67 bp Sc: 21.2
+-----------------------------------------------------------a
+gtcgaag----------tggtaagaaaatccctcgacctca-----------cggtcatg
+ccggttcgattccggccccgggcacca
+>Aggregatibacter_actinomycetemcomitans_D11S-1_Aggr_acti_D11S_1_tRNA-Leu-AAG-1-1 (phage_S1249.trna1-LeuAAG) phage_S1249:35391-35481 (+) Leu (AAG) 91 bp Sc: 43.6
+------ggccatgtagctttaaggaaagtagccccagct------------------taa
+gataaaggctctttatctggggtagatgtt------------------------------
+--ggttcgaatccagccatggccgcca
+>Agrobacterium_sp_H13-3_Agro_H13_3_tRNA-Leu-AAG-1-1 (chrlinear.trna2-LeuAAG) chrlinear:1168216-1168311 (+) Leu (AAG) 96 bp Sc: 22.1
+gaccacgaacgtcctatccaatggagatgggcggcggct------------------aaa
+gccgaag----------tggtatgaatcctg-----------------------gggtcg
+gaggttcgaatcctctcgtggacacca
+>Agrobacterium_tumefaciens_Ach5_Agro_tume_Ach5_tRNA-Leu-AAG-1-1 (chrlinear.trna2-LeuAAG) chrlinear:851951-852046 (+) Leu (AAG) 96 bp Sc: 22.1
+gaccacgaacgtcctatccaatggagatgggcggcggct------------------aaa
+gccgaag----------tggtatgaatcctg-----------------------gggtcg
+gaggttcgaatcctctcgtggacacca
+>Agrobacterium_tumefaciens_LBA4213_Ach5_Agro_tume_LBA4213_Ach5_tRNA-Leu-AAG-1-1 (chrlinear.trna2-LeuAAG) chrlinear:851732-851827 (+) Leu (AAG) 96 bp Sc: 22.1
+gaccacgaacgtcctatccaatggagatgggcggcggct------------------aaa
+gccgaag----------tggtatgaatcctg-----------------------gggtcg
+gaggttcgaatcctctcgtggacacca
+>Alistipes_finegoldii_DSM_17242_Alis_fine_DSM_17242_tRNA-Trp-CCA-2-2 (chr.trna4-TrpCCA) chr:740648-740722 (+) Trp (CCA) 75 bp Sc: 38.3
+---------------------------------gccacc------------------gta
+gctcaat----------tga-aagagcacacctc----cca---tcgggagctgaggttg
+tgggtttgagtcccaccggcggca---
+>Alistipes_finegoldii_DSM_17242_Alis_fine_DSM_17242_tRNA-Trp-CCA-2-1 (chr.trna52-TrpCCA) chr:242387-242461 (-) Trp (CCA) 75 bp Sc: 38.3
+---------------------------------gccacc------------------gta
+gctcaat----------tga-aagagcacacctc----cca---tcgggagctgaggttg
+tgggtttgagtcccaccggcggca---
+>Alteromonas_australica_DE170_Alte_aust_DE170_tRNA-Pro-CGG-1-1 (chr.trna2-ProCGG) chr:34304-34385 (+) Pro (CGG) 82 bp Sc: 64.8
+---------------------------------aggctt------------------gta
+gctcagc----------tggttagagcgcacccc----tcggataagagcggtgaggtcg
+gcagttcaagtctgcccaagcctacca
+>Alteromonas_australica_DE170_Alte_aust_DE170_tRNA-Pro-CGG-1-3 (chr.trna46-ProCGG) chr:2841030-2841111 (-) Pro (CGG) 82 bp Sc: 64.8
+---------------------------------aggctt------------------gta
+gctcagc----------tggttagagcgcacccc----tcggataagagcggtgaggtcg
+gcagttcaagtctgcccaagcctacca
