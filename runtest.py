@@ -502,15 +502,15 @@ class TestAmbiguous2Perl(unittest.TestCase):
         self.assertEqual(smof.ambiguous2perl("Y"), "[CT]")
 
     def test_escaped(self):
-        self.assertEqual(smof.ambiguous2perl("\Y"), "Y")
-        self.assertEqual(smof.ambiguous2perl("\YY"), "Y[CT]")
-        self.assertEqual(smof.ambiguous2perl("Y\Y+Y\\{2"), "[CT]Y+[CT]\\{2")
+        self.assertEqual(smof.ambiguous2perl(r"\Y"), "Y")
+        self.assertEqual(smof.ambiguous2perl(r"\YY"), r"Y[CT]")
+        self.assertEqual(smof.ambiguous2perl(r"Y\Y+Y\{2"), r"[CT]Y+[CT]\{2")
 
     def test_bracketed(self):
         self.assertEqual(smof.ambiguous2perl("[Y]"), "[CT]")
-        self.assertEqual(smof.ambiguous2perl("[Y\]]"), "[CT\]]")
         # Of course, '[' and ']' should NEVER be in a DNA sequence, but ...
-        self.assertEqual(smof.ambiguous2perl("[\[Y\]]"), "[\[CT\]]")
+        self.assertEqual(smof.ambiguous2perl(r"[Y\]]"), r"[CT\]]")
+        self.assertEqual(smof.ambiguous2perl(r"[\[Y\]]"), r"[\[CT\]]")
 
 
 class TestFasta(unittest.TestCase):
@@ -826,7 +826,7 @@ class TestHeaderGrep(unittest.TestCase):
             [">gg sco 12", "A", ">gg bob 48a", "A"],
         )
         self.assertEqual(
-            get_output(self.headers, ["grep", "-yP", "\d+[a-z]"]), [">gg bob 48a", "A"]
+            get_output(self.headers, ["grep", "-yP", r"\d+[a-z]"]), [">gg bob 48a", "A"]
         )
 
     def test_invert(self):
@@ -851,7 +851,7 @@ class TestHeaderGrep(unittest.TestCase):
 
     def test_only_matching(self):
         self.assertEqual(
-            get_output([">a;glob.", "GACFADE"], ["grep", "-oP", "g..b\."]), ["glob."]
+            get_output([">a;glob.", "GACFADE"], ["grep", "-oP", r"g..b\."]), ["glob."]
         )
 
     def test_only_matching_wrap(self):
@@ -1311,8 +1311,6 @@ class TestSort(unittest.TestCase):
 
     def test_default(self):
         self.assertEqual(get_output(self.unsorted, ["sort"]), self.default)
-
-    def test_default(self):
         self.assertEqual(
             get_output(self.unsorted, ["sort", "-r"]), self.default_reverse
         )
@@ -1322,12 +1320,12 @@ class TestSort(unittest.TestCase):
 
     def test_regex_sort(self):
         self.assertEqual(
-            get_output(self.unsorted, ["sort", "-x", "d=(\d+)"]), self.regex
+            get_output(self.unsorted, ["sort", "-x", r"d=(\d+)"]), self.regex
         )
 
     def test_numeric_sort(self):
         self.assertEqual(
-            get_output(self.unsorted, ["sort", "-x", "d=(\d+)", "-n"]),
+            get_output(self.unsorted, ["sort", "-x", r"d=(\d+)", "-n"]),
             self.regex_numeric,
         )
 
